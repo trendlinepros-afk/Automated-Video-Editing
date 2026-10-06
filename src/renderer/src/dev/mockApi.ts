@@ -591,6 +591,7 @@ export function installMockApi(): void {
         pikzels = pikzels.map((p) => (p.id === id ? { ...p, name } : p))
         return pikzels.find((p) => p.id === id)!
       },
+      thumbnailsFromLink: async () => ({ source: 'Mock channel', items: [] }),
       pricing: async () => mockPricing(),
       setPrices: async (o) => {
         priceOverrides = o ?? {}

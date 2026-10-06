@@ -24,7 +24,7 @@ export const API_METHODS = [
   'claude.state', 'claude.stop', 'claude.resume',
   'library.list', 'library.update', 'library.duplicate', 'library.remove', 'library.placeInProject',
   'pikzels.list', 'pikzels.create', 'pikzels.refresh', 'pikzels.updateInstructions', 'pikzels.remove',
-  'pikzels.rename', 'pikzels.pricing', 'pikzels.setPrices'
+  'pikzels.rename', 'pikzels.pricing', 'pikzels.setPrices', 'pikzels.thumbnailsFromLink'
 ] as const
 
 export type ApiMethod = (typeof API_METHODS)[number]

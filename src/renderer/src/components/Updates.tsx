@@ -2,6 +2,7 @@
  * "Check for updates" sits in the top bar on every screen, next to the version number.
  * Its label follows the updater: Checking / Up to date / NN% / Restart to update / error with Retry.
  */
+import { useState } from 'react'
 import { app, call } from '../state/app'
 import { useStore } from '../state/store'
 import { Modal } from './Modal'
@@ -10,7 +11,11 @@ export function UpdateButton() {
   const u = useStore(app, (s) => s.update)
   const info = useStore(app, (s) => s.info)
   const version = u?.currentVersion ?? info?.version ?? ''
-  const check = () => void call(() => window.api.updates.check(), 'Could not check for updates')
+  const [showError, setShowError] = useState(false)
+  const check = () => {
+    setShowError(false)
+    void call(() => window.api.updates.check(), 'Could not check for updates')
+  }
   let label = 'Check for updates'
   let title = 'Look for a new version of the app'
   let onClick: () => void = check
@@ -45,8 +50,16 @@ export function UpdateButton() {
     <div className="row" style={{ gap: 6 }}>
       {u?.status === 'error' ? (
         <>
-          <span className="small bad ellipsis" style={{ maxWidth: 260 }} title={u.error}>
-            {u.error || 'Could not check for updates'}
+          {/* A short label in the bar; the full message opens below it, never cut off. */}
+          <span style={{ position: 'relative' }}>
+            <button className="btn small ghost bad" onClick={() => setShowError((v) => !v)} title="Show what went wrong">
+              Update check failed ⓘ
+            </button>
+            {showError && (
+              <div className="popover small" style={{ right: 0, top: 'calc(100% + 6px)', width: 320, whiteSpace: 'normal', lineHeight: 1.45 }}>
+                {u.error || 'Could not check for updates.'}
+              </div>
+            )}
           </span>
           <button className="btn small" onClick={check}>
             Retry

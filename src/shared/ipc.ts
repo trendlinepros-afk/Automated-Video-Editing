@@ -230,6 +230,12 @@ export interface ThumbnailScore {
 }
 
 /** Prices per action (USD), the published defaults, the owner's overrides and the all-time spend. */
+/** Thumbnails listed from a YouTube channel, video or playlist link, saved locally for training. */
+export interface YouTubeThumbnailList {
+  source: string
+  items: { videoId: string; title: string; file: string }[]
+}
+
 export interface PikzelsPricing {
   prices: Record<string, number>
   defaults: Record<string, number>
@@ -369,6 +375,8 @@ export interface Api {
     refresh(): Promise<Pikzonality[]>
     updateInstructions(id: string, text: string): Promise<Pikzonality>
     rename(id: string, name: string): Promise<Pikzonality>
+    /** List thumbnails from YouTube links (channel, video or playlist) to train a persona or style from. */
+    thumbnailsFromLink(links: string): Promise<YouTubeThumbnailList>
     remove(id: string): Promise<void>
     pricing(): Promise<PikzelsPricing>
     /** Save price overrides (null = reset to the published prices). */

@@ -18,6 +18,7 @@ import { snapshotOf } from './project/manager'
 import { newId, type ProjectStore } from './project/store'
 import { applyUserOp, probeSource } from './project/userOps'
 import { exportLog, exportPack } from './services/publish'
+import { fetchYouTubeThumbnails } from './services/youtube'
 
 type Handler = (...args: any[]) => unknown
 
@@ -393,6 +394,11 @@ export function registerIpc(ctx: AppContext, getWindow: () => BrowserWindow | nu
 
     // ---------------------------------------------------------------- pikzels
     'pikzels.list': () => ctx.pikzels.list(),
+    'pikzels.thumbnailsFromLink': async (links: string) => {
+      const list = await fetchYouTubeThumbnails(links, { cacheDir: join(paths.data, 'cache', 'youtube') })
+      ctx.appLog.write('thumbnail', `Listed ${list.items.length} YouTube thumbnails for training`, { source: list.source })
+      return list
+    },
     'pikzels.create': (kind: 'persona' | 'style', name: string, imagePaths: string[]) => ctx.pikzels.create(kind, name, imagePaths),
     'pikzels.refresh': () => ctx.pikzels.refresh(),
     'pikzels.updateInstructions': (id: string, text: string) => ctx.pikzels.updateInstructions(id, text),

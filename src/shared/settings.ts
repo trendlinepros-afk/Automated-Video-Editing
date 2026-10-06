@@ -1,6 +1,6 @@
 import { z } from 'zod'
 import { DEFAULT_MCP_PORT, SETTINGS_FORMAT_VERSION } from './appInfo'
-import { BrandKitSchema, ExportPresetSchema, MixSettingsSchema } from './project'
+import { BrandKitSchema, ExportPresetSchema, MixSettingsSchema, PikzelsSpendSchema } from './project'
 
 export const MusicFolderSchema = z.looseObject({ id: z.string(), path: z.string(), name: z.string() })
 export type MusicFolder = z.infer<typeof MusicFolderSchema>
@@ -57,8 +57,12 @@ export const SettingsSchema = z.looseObject({
   mcpPort: z.number().int().default(DEFAULT_MCP_PORT),
   pikzels: z.looseObject({
     model: z.string().default('pkz_4_5'),
-    pikzonalities: z.array(PikzonalitySchema).default([])
-  }).default({ model: 'pkz_4_5', pikzonalities: [] }),
+    pikzonalities: z.array(PikzonalitySchema).default([]),
+    /** The owner's price overrides (USD per call), keyed as in shared/pikzelsPricing.ts. */
+    prices: z.record(z.string(), z.number()).default({}),
+    /** All-time Pikzels spend on this PC (successful calls only). */
+    spend: PikzelsSpendSchema.default({ total: 0, byAction: {} })
+  }).default({ model: 'pkz_4_5', pikzonalities: [], prices: {}, spend: { total: 0, byAction: {} } }),
   setupDone: z.boolean().default(false),
   previewHeight: z.number().int().default(540),
   previewFps: z.number().default(30)

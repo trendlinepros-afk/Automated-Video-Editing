@@ -7,7 +7,7 @@ import { copyFileSync, existsSync, mkdirSync } from 'node:fs'
 import { basename, extname, isAbsolute, join } from 'node:path'
 import { APP_NAME, MCP_SERVER_NAME } from '@shared/appInfo'
 import { API_METHODS, type ApiMethod } from '@shared/ipcChannels'
-import type { LibraryAsset, ProjectSnapshot, ThumbnailRequest, UserOp } from '@shared/ipc'
+import type { EditThumbnailRequest, FaceSwapRequest, LibraryAsset, ProjectSnapshot, RecreateRequest, ThumbnailRequest, TitlesRequest, UserOp } from '@shared/ipc'
 import type { ExportPreset, Item, Range, TrackKind } from '@shared/project'
 import type { Profile, Settings } from '@shared/settings'
 import { TimelineResolver, findTimeRange, formatTime, placeSegments } from '@shared/timeline'
@@ -343,9 +343,14 @@ export function registerIpc(ctx: AppContext, getWindow: () => BrowserWindow | nu
         }, BOOKKEEPING)
       }
       const count = Math.min(3, Math.max(1, Math.round(req.count || 1)))
-      await ctx.pikzels.generate({ prompts: Array.from({ length: count }, () => prompt), source: 'user', referenceTime: req.referenceTime })
+      await ctx.pikzels.generate({ prompts: Array.from({ length: count }, () => prompt), source: 'user', referenceTime: req.referenceTime, model: req.model })
     },
     'thumbnails.regenerate': (id: string) => ctx.pikzels.regenerate(id),
+    'thumbnails.recreate': async (req: RecreateRequest) => void (await ctx.pikzels.recreate({ ...req, source: 'user' })),
+    'thumbnails.edit': async (req: EditThumbnailRequest) => void (await ctx.pikzels.edit({ ...req, source: 'user' })),
+    'thumbnails.faceSwap': async (req: FaceSwapRequest) => void (await ctx.pikzels.faceSwap(req)),
+    'thumbnails.score': (id: string, title?: string) => ctx.pikzels.score(id, title),
+    'thumbnails.titles': (req: TitlesRequest) => ctx.pikzels.titles({ ...req, source: 'user' }),
     'thumbnails.choose': (id: string) => {
       store().mutate('Choose thumbnail', 'user', (d) => {
         if (!d.project.thumbnails.items.some((t) => t.id === id)) throw new Error('That thumbnail no longer exists.')
@@ -391,7 +396,10 @@ export function registerIpc(ctx: AppContext, getWindow: () => BrowserWindow | nu
     'pikzels.create': (kind: 'persona' | 'style', name: string, imagePaths: string[]) => ctx.pikzels.create(kind, name, imagePaths),
     'pikzels.refresh': () => ctx.pikzels.refresh(),
     'pikzels.updateInstructions': (id: string, text: string) => ctx.pikzels.updateInstructions(id, text),
-    'pikzels.remove': (id: string) => ctx.pikzels.remove(id)
+    'pikzels.remove': (id: string) => ctx.pikzels.remove(id),
+    'pikzels.rename': (id: string, name: string) => ctx.pikzels.rename(id, name),
+    'pikzels.pricing': () => ctx.pikzels.pricing(),
+    'pikzels.setPrices': (overrides: Record<string, number> | null) => ctx.pikzels.setPrices(overrides)
   }
 
   for (const name of API_METHODS) {

@@ -20,6 +20,7 @@ import numpy as np
 from PIL import Image, ImageOps
 
 from . import media
+from .backend import cv2 as backend_cv2
 from .backend import get_backend
 from .captions import CaptionDrawer
 from .decode import ReaderPool, load_image
@@ -162,6 +163,8 @@ class Renderer:
                             and (e.get('params') or {}).get('scope') == 'all']
         self.graphics = [l for l in layers if l.get('kind') == 'graphic']
         self.pool = ReaderPool()
+        # Enlarge footage on the graphics card (or with OpenCV); plain numpy leaves it to ffmpeg.
+        self.backend_upscale = self.B.name == 'torch' or backend_cv2 is not None
         # Graphics and captions are drawn at no less than GFX_MIN_HEIGHT lines and box-reduced, so text
         # in a low-resolution preview matches the export instead of being rasterized at a tiny size.
         self.gfx_k = max(1, math.ceil(GFX_MIN_HEIGHT / self.height))
@@ -245,9 +248,20 @@ class Renderer:
         """RGB (or premultiplied RGBA for images) of the layer's source at source time s, sized w x h."""
         if layer.get('isImage') or info.kind == 'image':
             return self._image(layer['path'], mode, w, h)
+        # ffmpeg only ever shrinks; enlarging (1080p footage in a 4K export) happens in the backend, on
+        # the graphics card when there is one, so a quarter of the pixels travel down the pipe.
+        sw, sh = info.width or w, info.height or h
         if mode == 'cover':
+            f = max(w / sw, h / sh)
+            if f > 1.0001 and self.backend_upscale:
+                cw, ch = min(sw, max(2, int(round(w / f)))), min(sh, max(2, int(round(h / f))))
+                raw = self.pool.frame(layer['path'], info, f'crop={cw}:{ch}', cw, ch, s)
+                return self.B.upscale(self.B.from_uint8(raw), w, h)
             vf = f'scale={w}:{h}:force_original_aspect_ratio=increase:flags=bicubic,crop={w}:{h}'
         else:
+            if (w > sw * 1.0001 or h > sh * 1.0001) and self.backend_upscale:
+                raw = self.pool.frame(layer['path'], info, f'scale={sw}:{sh}', sw, sh, s)
+                return self.B.upscale(self.B.from_uint8(raw), w, h)
             vf = f'scale={w}:{h}:flags=bicubic'
         raw = self.pool.frame(layer['path'], info, vf, w, h, s)
         return self.B.from_uint8(raw)

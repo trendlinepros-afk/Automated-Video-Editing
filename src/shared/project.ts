@@ -334,9 +334,30 @@ export const ThumbnailSchema = z.looseObject({
   source: z.enum(['claude', 'user']).default('claude'),
   status: z.enum(['pending', 'done', 'failed']).default('pending'),
   error: z.string().optional(),
-  batchId: z.string().optional()
+  batchId: z.string().optional(),
+  /** How it was made: from text, recreated from an image, edited, or face-swapped. */
+  kind: z.enum(['text', 'recreate', 'edit', 'faceswap']).optional(),
+  /** The thumbnail it was made from (edit, face swap, recreate from a thumbnail). */
+  parentId: z.string().optional(),
+  warning: z.string().optional(),
+  /** USD charged by Pikzels for making it (successful calls only). */
+  cost: z.number().optional(),
+  score: z.looseObject({
+    main: z.number(),
+    subscores: z.record(z.string(), z.unknown()).default({}),
+    suggestion: z.string().optional(),
+    title: z.string().optional(),
+    requestId: z.string().optional(),
+    at: z.string()
+  }).optional()
 })
 export type Thumbnail = z.infer<typeof ThumbnailSchema>
+
+/** Pikzels spend: total USD and per price key (see shared/pikzelsPricing.ts). */
+export const PikzelsSpendSchema = z.looseObject({
+  total: z.number().default(0),
+  byAction: z.record(z.string(), z.number()).default({})
+})
 
 export const ChapterSchema = z.looseObject({ id: z.string(), title: z.string(), anchor: AnchorSchema })
 export type Chapter = z.infer<typeof ChapterSchema>
@@ -392,7 +413,9 @@ export const ProjectSchema = z.looseObject({
     useMyDirection: z.boolean().default(false),
     format: z.enum(['16:9', '9:16', '1:1']).default('16:9'),
     items: z.array(ThumbnailSchema).default([]),
-    chosenId: z.string().optional()
+    chosenId: z.string().optional(),
+    /** Pikzels spend on this project (successful calls only). */
+    spend: PikzelsSpendSchema.default({ total: 0, byAction: {} })
   }),
   publish: z.looseObject({
     titles: z.array(z.string()).default([]),

@@ -30,6 +30,7 @@ import {
   type Transcript,
   type Word
 } from '@shared/project'
+import { PIKZELS_PRICES_UPDATED, defaultPrices, effectivePrices } from '@shared/pikzelsPricing'
 import { ProfileSchema, SettingsSchema, type Pikzonality, type Profile, type Settings } from '@shared/settings'
 import { TimelineResolver } from '@shared/timeline'
 
@@ -186,6 +187,14 @@ export function installMockApi(): void {
     setupDone: !hash.includes('setup'),
     libraryFolder: 'D:\\Library',
     musicFolders: [{ id: 'mf1', path: 'D:\\Music', name: 'Music' }]
+  })
+  let priceOverrides: Record<string, number> = {}
+  const mockPricing = () => ({
+    prices: effectivePrices(priceOverrides),
+    defaults: defaultPrices(),
+    overrides: priceOverrides,
+    updated: PIKZELS_PRICES_UPDATED,
+    spend: { total: 4.21, byAction: { 'thumbnail:pkz_4_5': 3.38, score: 0.45, persona_training: 0.38 } }
   })
   let pikzels: Pikzonality[] = [
     { id: 'pz1', kind: 'persona', name: 'Adam', status: 'completed', progress: 100, specialInstructions: '', createdAt: now(), sampleImage: placeholder('Adam', 30) },
@@ -514,7 +523,23 @@ export function installMockApi(): void {
       generate: async () => undefined,
       regenerate: async () => undefined,
       choose: async (id) => void commit((d) => void (d.project.thumbnails.chosenId = id), 'user', 'Choose thumbnail'),
-      exportImage: async () => 'C:\\Users\\Adam\\thumb.png'
+      exportImage: async () => 'C:\\Users\\Adam\\thumb.png',
+      recreate: async () => undefined,
+      edit: async () => undefined,
+      faceSwap: async () => undefined,
+      score: async (id, title) => {
+        const score = { main: 7.4, subscores: { clarity: 8, emotion: 7, text: 6 }, suggestion: 'Make the text bigger.', title, at: now() }
+        commit((d) => {
+          const t = d.project.thumbnails.items.find((x) => x.id === id)
+          if (t) t.score = score
+        }, 'app', 'Score')
+        return score
+      },
+      titles: async () => {
+        const out = ['My LiPo Almost Caught Fire', 'Do Not Charge Your LiPo Like This']
+        commit((d) => void (d.project.publish.titles = [...out, ...d.project.publish.titles]), 'user', 'Titles')
+        return out
+      }
     },
     preview: {
       state: async () => preview,
@@ -561,7 +586,16 @@ export function installMockApi(): void {
         pikzels = pikzels.map((p) => (p.id === id ? { ...p, specialInstructions: text } : p))
         return pikzels.find((p) => p.id === id)!
       },
-      remove: async (id) => void (pikzels = pikzels.filter((p) => p.id !== id))
+      remove: async (id) => void (pikzels = pikzels.filter((p) => p.id !== id)),
+      rename: async (id, name) => {
+        pikzels = pikzels.map((p) => (p.id === id ? { ...p, name } : p))
+        return pikzels.find((p) => p.id === id)!
+      },
+      pricing: async () => mockPricing(),
+      setPrices: async (o) => {
+        priceOverrides = o ?? {}
+        return mockPricing()
+      }
     }
   }
 

@@ -3,6 +3,8 @@ import { mkdirSync } from 'node:fs'
 import { join } from 'node:path'
 import { z } from 'zod'
 import type { RenderJobState } from '@shared/ipc'
+import { PIKZELS_MODELS } from '@shared/pikzelsPricing'
+import type { Thumbnail } from '@shared/project'
 import { round3 } from '@shared/timeline'
 import type { AppContext } from '../../context'
 import { newId } from '../../project/store'
@@ -13,6 +15,8 @@ export const PROMPT_WARN_CHARS = 750
 const THUMBNAIL_WAIT_MS = 240_000
 
 /** Last known state of each export job, per app. */
+const thumbView = (t: Thumbnail) => ({ id: t.id, kind: t.kind, status: t.status, file: t.file, error: t.error, warning: t.warning, cost: t.cost, requestId: t.requestId })
+
 const jobStates = new WeakMap<AppContext, Map<string, RenderJobState>>()
 
 function trackJobs(ctx: AppContext): Map<string, RenderJobState> {
@@ -36,7 +40,8 @@ export const outputTools = [
       `under ${PROMPT_WARN_CHARS} characters; links are removed. Images are downloaded into thumbnails/ and shown in the Thumbnails tab.`,
     input: {
       prompts: z.array(z.string().min(1)).min(1).max(3),
-      reference_time: z.number().min(0).optional()
+      reference_time: z.number().min(0).optional(),
+      model: z.enum(PIKZELS_MODELS).optional().describe('Default: the model in Settings (pkz_4_5). Persona and style only work on pkz_4 and pkz_4_5.')
     },
     run: async (args, env) => {
       if (!env.ctx.pikzels.hasKey()) throw new ToolError('Pikzels API key is missing or wrong. The owner adds it in Settings.')
@@ -46,7 +51,7 @@ export const outputTools = [
         if (/https?:\/\/|www\./i.test(p)) warnings.push(`Prompt ${i + 1} contained a link; links are removed.`)
       })
       const since = new Date().toISOString()
-      const job = env.ctx.pikzels.generate({ prompts: args.prompts, source: 'claude', referenceTime: args.reference_time })
+      const job = env.ctx.pikzels.generate({ prompts: args.prompts, source: 'claude', referenceTime: args.reference_time, model: args.model })
       let timedOut = false
       await Promise.race([job, new Promise<void>((res) => setTimeout(() => { timedOut = true; res() }, THUMBNAIL_WAIT_MS).unref?.())])
       const made = env.store.project.thumbnails.items
@@ -57,6 +62,77 @@ export const outputTools = [
         ...(timedOut ? { note: 'Still generating; the images will appear in the Thumbnails tab.' } : {}),
         ...(warnings.length ? { warnings } : {})
       })
+    }
+  }),
+
+  defineTool({
+    name: 'recreate_thumbnail',
+    description:
+      'Make a new thumbnail from an image through Pikzels ("Recreate"): a thumbnail of this project (thumbnail_id), a frame of the video ' +
+      '(time, timeline seconds), or a YouTube video link (youtube_url) whose thumbnail to take after. prompt says what to change or keep. ' +
+      "The project's persona and style are added on PKZ-4 and PKZ-4.5. Costs Pikzels credits; the result goes into the Thumbnails tab history.",
+    input: {
+      thumbnail_id: z.string().optional(),
+      time: z.number().min(0).optional(),
+      youtube_url: z.string().url().optional(),
+      prompt: z.string().optional(),
+      model: z.enum(PIKZELS_MODELS).optional()
+    },
+    run: async (args, env) => {
+      const from = { thumbnailId: args.thumbnail_id, time: args.time, url: args.youtube_url }
+      if (Object.values(from).filter((v) => v !== undefined).length !== 1) throw new ToolError('Give exactly one of thumbnail_id, time or youtube_url.')
+      try {
+        const t = await env.ctx.pikzels.recreate({ from, prompt: args.prompt, model: args.model, source: 'claude' })
+        return json({ thumbnail: thumbView(t) })
+      } catch (err) {
+        throw new ToolError(errMessage(err))
+      }
+    }
+  }),
+
+  defineTool({
+    name: 'edit_thumbnail',
+    description:
+      'Change part of an existing thumbnail of this project through Pikzels with a prompt (e.g. "make the text say IT EXPLODED, keep the rest"). ' +
+      'The edited image is a new thumbnail in the history; the original stays. Costs Pikzels credits.',
+    input: { thumbnail_id: z.string(), prompt: z.string().min(1) },
+    run: async (args, env) => {
+      try {
+        const t = await env.ctx.pikzels.edit({ thumbnailId: args.thumbnail_id, prompt: args.prompt, source: 'claude' })
+        return json({ thumbnail: thumbView(t) })
+      } catch (err) {
+        throw new ToolError(errMessage(err))
+      }
+    }
+  }),
+
+  defineTool({
+    name: 'score_thumbnail',
+    description:
+      'Score a thumbnail of this project with Pikzels (overall score, subscores and a suggestion), optionally against a video title ' +
+      '(default: the first title option). The score is stored on the thumbnail and shown to the owner. Costs a few Pikzels credits.',
+    input: { thumbnail_id: z.string(), title: z.string().optional() },
+    run: async (args, env) => {
+      try {
+        return json({ thumbnailId: args.thumbnail_id, score: await env.ctx.pikzels.score(args.thumbnail_id, args.title) })
+      } catch (err) {
+        throw new ToolError(errMessage(err))
+      }
+    }
+  }),
+
+  defineTool({
+    name: 'generate_titles',
+    description:
+      'Ask Pikzels for title options from a prompt (what the video is about; default: the start of the transcript), optionally showing it a ' +
+      'thumbnail of this project. The titles are added to the Publish tab title options. Costs Pikzels credits.',
+    input: { prompt: z.string().optional(), thumbnail_id: z.string().optional() },
+    run: async (args, env) => {
+      try {
+        return json({ titles: await env.ctx.pikzels.titles({ prompt: args.prompt, thumbnailId: args.thumbnail_id, source: 'claude' }) })
+      } catch (err) {
+        throw new ToolError(errMessage(err))
+      }
     }
   }),
 

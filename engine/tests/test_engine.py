@@ -241,13 +241,14 @@ def test_time_effects_pick_the_right_moment(media, tmp_path):
 
 
 def test_layout_is_resolution_independent(media, tmp_path):
-    """A transformed B-roll and graphic land in the same place at any output size."""
+    """A transformed B-roll and graphic land in the same place at any output size, including sizes
+    larger than the footage (1080p footage in a 1440p render is enlarged)."""
     from ave_engine.compositor import Renderer
 
     plan = make_plan(media, str(tmp_path / 'proj'), 640, 360, effects=False, captions=False)
     t = 0.65 * 12.0  # picture-in-picture B-roll with keyframes + transformed price badge
     small = Renderer(plan).frame_uint8(t)
-    big = Renderer(plan, 1920, 1080).frame_uint8(t)
+    big = Renderer(plan, 2560, 1440).frame_uint8(t)
     down = np.asarray(Image.fromarray(big).resize((640, 360), Image.BOX))
     assert psnr(small, down) > 30
 

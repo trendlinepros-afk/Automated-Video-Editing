@@ -25,9 +25,16 @@ import type {
   ProjectDoc,
   Range,
   RequestKind,
-  EditRequest
+  EditRequest,
+  Thumbnail
 } from '@shared/project'
 import type {
+  EditThumbnailRequest,
+  FaceSwapRequest,
+  PikzelsPricing,
+  RecreateRequest,
+  ThumbnailScore,
+  TitlesRequest,
   LibraryAsset,
   MusicTrack,
   PreviewState,
@@ -232,13 +239,26 @@ export interface LibraryService {
 
 export interface PikzelsService {
   hasKey(): boolean
-  generate(opts: { prompts: string[]; source: 'claude' | 'user'; referenceTime?: number }): Promise<void>
+  generate(opts: { prompts: string[]; source: 'claude' | 'user'; referenceTime?: number; model?: string }): Promise<void>
   regenerate(thumbnailId: string): Promise<void>
+  /** Each image action adds a thumbnail record (kept in history, failed or not) and returns it. */
+  recreate(opts: RecreateRequest & { source: 'claude' | 'user' }): Promise<Thumbnail>
+  edit(opts: EditThumbnailRequest & { source: 'claude' | 'user' }): Promise<Thumbnail>
+  /** User only: Claude never swaps faces. */
+  faceSwap(opts: FaceSwapRequest): Promise<Thumbnail>
+  /** Scores a thumbnail of the project and stores the result on its record. */
+  score(thumbnailId: string, title?: string): Promise<ThumbnailScore>
+  /** Title options; they are added to the Publish tab. */
+  titles(opts: TitlesRequest & { source: 'claude' | 'user' }): Promise<string[]>
   list(): Pikzonality[]
+  /** User only (training costs credits): Claude never creates personas or styles. */
   create(kind: 'persona' | 'style', name: string, imagePaths: string[]): Promise<Pikzonality>
   refresh(): Promise<Pikzonality[]>
   updateInstructions(id: string, text: string): Promise<Pikzonality>
+  rename(id: string, name: string): Promise<Pikzonality>
   remove(id: string): Promise<void>
+  pricing(): PikzelsPricing
+  setPrices(overrides: Record<string, number> | null): PikzelsPricing
 }
 
 export interface UpdaterService {

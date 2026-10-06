@@ -182,6 +182,60 @@ export interface ThumbnailRequest {
   prompt: string
   count: number
   referenceTime?: number
+  /** Pikzels model; default the one in Settings (pkz_4_5). Persona and style only work on pkz_4 and pkz_4_5. */
+  model?: string
+}
+
+/** Recreate a thumbnail from an image: a file, a frame of the video, a thumbnail in the project, or a YouTube link. */
+export interface RecreateRequest {
+  from: { path?: string; time?: number; thumbnailId?: string; url?: string }
+  prompt?: string
+  model?: string
+  /** How closely to follow the image (pkz_2 only). */
+  imageWeight?: 'low' | 'medium' | 'high'
+}
+
+export interface EditThumbnailRequest {
+  /** The image to edit: a thumbnail in the project or an image file. */
+  thumbnailId?: string
+  imagePath?: string
+  prompt: string
+  /** Painted mask (PNG, base64 without the data: prefix): white where the image may change. */
+  maskBase64?: string
+  supportImagePath?: string
+}
+
+export interface FaceSwapRequest {
+  thumbnailId?: string
+  imagePath?: string
+  /** A photo of the face to put on the thumbnail. */
+  facePath: string
+}
+
+export interface TitlesRequest {
+  /** Your own prompt; when empty the start of the transcript is used. */
+  prompt?: string
+  /** A thumbnail to show Pikzels with the prompt. */
+  thumbnailId?: string
+}
+
+export interface ThumbnailScore {
+  main: number
+  subscores: Record<string, unknown>
+  suggestion?: string
+  title?: string
+  requestId?: string
+  at: string
+  [k: string]: unknown
+}
+
+/** Prices per action (USD), the published defaults, the owner's overrides and the all-time spend. */
+export interface PikzelsPricing {
+  prices: Record<string, number>
+  defaults: Record<string, number>
+  overrides: Record<string, number>
+  updated: string
+  spend: { total: number; byAction: Record<string, number> }
 }
 
 export interface Suggestion {
@@ -284,6 +338,11 @@ export interface Api {
     regenerate(thumbnailId: string): Promise<void>
     choose(thumbnailId: string): Promise<void>
     exportImage(thumbnailId: string): Promise<string | null>
+    recreate(req: RecreateRequest): Promise<void>
+    edit(req: EditThumbnailRequest): Promise<void>
+    faceSwap(req: FaceSwapRequest): Promise<void>
+    score(thumbnailId: string, title?: string): Promise<ThumbnailScore>
+    titles(req: TitlesRequest): Promise<string[]>
   }
   preview: {
     state(): Promise<PreviewState>
@@ -309,7 +368,11 @@ export interface Api {
     create(kind: 'persona' | 'style', name: string, imagePaths: string[]): Promise<Pikzonality>
     refresh(): Promise<Pikzonality[]>
     updateInstructions(id: string, text: string): Promise<Pikzonality>
+    rename(id: string, name: string): Promise<Pikzonality>
     remove(id: string): Promise<void>
+    pricing(): Promise<PikzelsPricing>
+    /** Save price overrides (null = reset to the published prices). */
+    setPrices(overrides: Record<string, number> | null): Promise<PikzelsPricing>
   }
 }
 

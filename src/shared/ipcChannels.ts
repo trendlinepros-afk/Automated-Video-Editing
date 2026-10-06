@@ -19,10 +19,12 @@ export const API_METHODS = [
   'project.versions.compareFrames',
   'project.exportVideo', 'project.cancelExport', 'project.exportLog', 'project.exportPack', 'project.saveToLibrary',
   'thumbnails.generate', 'thumbnails.regenerate', 'thumbnails.choose', 'thumbnails.exportImage',
+  'thumbnails.recreate', 'thumbnails.edit', 'thumbnails.faceSwap', 'thumbnails.score', 'thumbnails.titles',
   'preview.state', 'preview.showBefore',
   'claude.state', 'claude.stop', 'claude.resume',
   'library.list', 'library.update', 'library.duplicate', 'library.remove', 'library.placeInProject',
-  'pikzels.list', 'pikzels.create', 'pikzels.refresh', 'pikzels.updateInstructions', 'pikzels.remove'
+  'pikzels.list', 'pikzels.create', 'pikzels.refresh', 'pikzels.updateInstructions', 'pikzels.remove',
+  'pikzels.rename', 'pikzels.pricing', 'pikzels.setPrices'
 ] as const
 
 export type ApiMethod = (typeof API_METHODS)[number]

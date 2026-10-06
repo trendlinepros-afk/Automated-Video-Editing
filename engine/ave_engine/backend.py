@@ -108,6 +108,20 @@ class NumpyBackend:
                  for c in range(x.shape[2])]
         return np.stack(chans, axis=-1).astype(np.float32)
 
+    def upscale(self, x, w: int, h: int):
+        """Bicubic enlargement (footage smaller than the output, e.g. 1080p in a 4K export)."""
+        x = np.asarray(x, dtype=np.float32)
+        if x.shape[1] == w and x.shape[0] == h:
+            return x
+        if cv2 is not None:
+            out = cv2.resize(x, (w, h), interpolation=cv2.INTER_CUBIC)
+        else:
+            from PIL import Image
+
+            out = np.stack([np.asarray(Image.fromarray(np.ascontiguousarray(x[..., c]), mode='F').resize((w, h), Image.BICUBIC))
+                            for c in range(x.shape[2])], axis=-1)
+        return np.clip(out.reshape(h, w, -1), 0.0, 1.0).astype(np.float32, copy=False)
+
     def blur(self, x, sigma: float):
         if sigma <= 0.05:
             return x
@@ -241,6 +255,12 @@ class TorchBackend:
         shrink = w < x.shape[1] or h < x.shape[0]
         y = self.F.interpolate(self._nchw(x), size=(h, w), mode='bilinear', align_corners=False, antialias=shrink)
         return self._hwc(y)
+
+    def upscale(self, x, w, h):
+        if x.shape[1] == w and x.shape[0] == h:
+            return x
+        y = self.F.interpolate(self._nchw(x), size=(h, w), mode='bicubic', align_corners=False)
+        return self._hwc(y).clamp_(0, 1)
 
     def blur(self, x, sigma):
         if sigma <= 0.05:

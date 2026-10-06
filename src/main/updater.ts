@@ -54,7 +54,10 @@ export const MESSAGES = {
 
 async function loadElectronUpdater(): Promise<UpdaterLike> {
   const mod = await import('electron-updater')
-  return mod.autoUpdater as unknown as UpdaterLike
+  // electron-updater is CommonJS: under ESM interop its exports may sit on `default`.
+  const updater = mod.autoUpdater ?? (mod as unknown as { default?: typeof mod }).default?.autoUpdater
+  if (!updater) throw new Error('electron-updater did not load')
+  return updater as unknown as UpdaterLike
 }
 
 /** Release notes may be HTML text (GitHub) or a list of notes per version. The dialog shows plain text. */

@@ -217,16 +217,19 @@ export function createProjectManager(ctx: AppContext, opts: { documentsDir?: str
       })
 
       const files = listMediaFiles(footageFolder)
-      const sources: Source[] = []
-      for (const file of files) {
-        const src = await probeSource(ctx, file, 'footage')
-        if ((src as { probeError?: string }).probeError) {
-          store.log.write('error', `Could not read ${file}; it is listed with what its name tells`, {
-            error: (src as { probeError?: string }).probeError
-          })
+      // A few probes at a time; the list keeps the folder's name order.
+      const sources: Source[] = new Array(files.length)
+      let next = 0
+      const worker = async () => {
+        while (next < files.length) {
+          const i = next++
+          const src = await probeSource(ctx, files[i], 'footage')
+          const problem = (src as { probeError?: string }).probeError
+          if (problem) store.log.write('error', `Could not read ${files[i]}; it is listed with what its name tells`, { error: problem })
+          sources[i] = src
         }
-        sources.push(src)
       }
+      await Promise.all(Array.from({ length: Math.min(4, files.length) }, worker))
       if (sources.length) {
         store.mutate(`Add ${sources.length} footage files`, 'app', (d) => {
           d.project.sources.push(...sources)

@@ -3,7 +3,8 @@
  * Intro ready: Continue with the rest, Redo the intro with new direction, or Stop there.
  */
 import { useState } from 'react'
-import { call, toast } from '../state/app'
+import { toast } from '../state/app'
+import { errorMessage } from '../util'
 import { applyOp, editor } from '../state/editor'
 import { useStore } from '../state/store'
 
@@ -27,8 +28,8 @@ export function StartPanel({ onStarted }: { onStarted: () => void }) {
       await window.api.project.startEdit({ inspiration, scope, introMaxSeconds })
       onStarted()
       toast(scope === 'intro' ? 'Claude is starting on the intro. It reads the whole video first.' : 'Claude is starting the edit. Watch it land on the timeline.')
-    } catch {
-      await call(() => window.api.project.startEdit({ inspiration, scope, introMaxSeconds }), 'Could not start the edit')
+    } catch (e) {
+      toast(`Could not start the edit: ${errorMessage(e)}`, { kind: 'error' })
     }
     setBusy(false)
   }
@@ -100,7 +101,7 @@ export function IntroPanel() {
     try {
       await window.api.project.introDecision(decision, decision === 'redo' ? direction : undefined)
     } catch (e) {
-      await call(() => Promise.reject(e), 'Could not send that')
+      toast(`Could not send that: ${errorMessage(e)}`, { kind: 'error' })
       return
     }
     setMode('hidden')

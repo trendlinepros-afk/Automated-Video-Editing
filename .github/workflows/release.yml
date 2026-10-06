@@ -1,0 +1,196 @@
+# Releasing is one step: push a tag such as v1.0.1 (matching package.json's version).
+#   gate        -> typecheck, unit tests (every sample project upgrades), engine tests (preview/export match)
+#   update-e2e  -> the previous build installs, finds this build on a local feed, updates itself over it,
+#                  and keeps the settings in %APPDATA%
+#   publish     -> builds the installer and publishes it with latest.yml to GitHub Releases
+# The repository is public, so installed apps read releases without a token.
+name: Release
+
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: read
+
+jobs:
+  gate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: pip
+      - name: Tag matches package.json and CHANGELOG.md
+        run: |
+          TAG_VERSION="${GITHUB_REF_NAME#v}"
+          PKG_VERSION="$(node -p "require('./package.json').version")"
+          if [ "$TAG_VERSION" != "$PKG_VERSION" ]; then
+            echo "::error::Tag $GITHUB_REF_NAME does not match package.json version $PKG_VERSION"
+            exit 1
+          fi
+          REQUIRE_CHANGELOG=1 node .github/scripts/release-notes.mjs "$TAG_VERSION" "$RUNNER_TEMP/notes.md"
+      - name: Install ffmpeg
+        run: sudo apt-get update && sudo apt-get install -y ffmpeg
+      - name: Install Node packages
+        run: npm ci
+      - name: Install engine test packages
+        run: bash .github/scripts/install-engine-test-deps.sh
+      - name: Typecheck
+        run: npm run typecheck
+      - name: Unit tests (sample project upgrades, section lock, log redaction, updater)
+        run: npx vitest run
+      - name: Engine tests (preview and export match)
+        env:
+          AVE_ALLOW_CPU: '1'
+        run: python -m pytest engine/tests -q
+
+  # "The updater installs the new build over the previous one."
+  # Build A is this code labelled 0.0.1; build B is this release. Both read updates from a local
+  # generic feed instead of GitHub. Installed A runs `--update-self-test`, which checks the feed,
+  # downloads B (sha512 verified by electron-updater), and runs B's installer silently.
+  update-e2e:
+    needs: gate
+    runs-on: windows-latest
+    timeout-minutes: 60
+    env:
+      FEED_URL: http://127.0.0.1:8765/
+    defaults:
+      run:
+        shell: pwsh
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install Node packages
+        run: npm ci
+      - name: Local feed config
+        run: |
+          @"
+          extends: ./electron-builder.yml
+          publish:
+            - provider: generic
+              url: $env:FEED_URL
+          "@ | Set-Content -Encoding utf8 electron-builder.e2e.yml
+          $version = "${{ github.ref_name }}".TrimStart('v')
+          "B_VERSION=$version" | Out-File -Append -Encoding utf8 $env:GITHUB_ENV
+          node .github/scripts/release-notes.mjs $version release-notes.md
+      - name: Build A (0.0.1)
+        run: |
+          $PSNativeCommandUseErrorActionPreference = $true
+          npm version 0.0.1 --no-git-tag-version --allow-same-version
+          npm run build
+          npx electron-builder --win --publish never --config electron-builder.e2e.yml '-c.directories.output=dist-a'
+      - name: Build B (this release)
+        run: |
+          $PSNativeCommandUseErrorActionPreference = $true
+          npm version $env:B_VERSION --no-git-tag-version --allow-same-version
+          npm run build
+          npx electron-builder --win --publish never --config electron-builder.e2e.yml '-c.directories.output=dist-b' '-c.releaseInfo.releaseNotesFile=release-notes.md'
+          Get-Content dist-b\latest.yml
+      - name: Install A silently (per-user, no admin)
+        run: |
+          $setup = Get-ChildItem dist-a -Filter 'AI-Video-Editor-Setup-*.exe' | Select-Object -First 1
+          Start-Process -FilePath $setup.FullName -ArgumentList '/S' -Wait
+          $exe = Get-ChildItem "$env:LOCALAPPDATA\Programs" -Recurse -Filter 'AI Video Editor.exe' -ErrorAction SilentlyContinue | Select-Object -First 1
+          if (-not $exe) { throw 'A did not install under %LOCALAPPDATA%\Programs' }
+          $v = (Get-Item $exe.FullName).VersionInfo.ProductVersion
+          Write-Host "Installed A at $($exe.FullName), version $v"
+          if ($v -notin @('0.0.1', '0.0.1.0')) { throw "Expected A to be 0.0.1, got $v" }
+          "APP_EXE=$($exe.FullName)" | Out-File -Append -Encoding utf8 $env:GITHUB_ENV
+      - name: Write settings before the update
+        run: |
+          $data = Join-Path $env:APPDATA 'AI Video Editor'
+          New-Item -ItemType Directory -Force -Path $data | Out-Null
+          $marker = @{ written = (Get-Date).ToString('o'); note = 'must survive the update' } | ConvertTo-Json
+          Set-Content -Encoding utf8 -Path (Join-Path $data 'e2e-marker.json') -Value $marker
+          (Get-FileHash (Join-Path $data 'e2e-marker.json')).Hash | Out-File -Encoding ascii "$env:RUNNER_TEMP\marker.sha"
+      - name: Serve B on the local feed
+        run: |
+          New-Item -ItemType Directory -Force -Path feed | Out-Null
+          Copy-Item dist-b\latest.yml, dist-b\*.exe, dist-b\*.blockmap feed\
+          # A's blockmap lets electron-updater try a differential download first.
+          Copy-Item dist-a\*.blockmap feed\
+          Start-Process -FilePath python -ArgumentList '-m','http.server','8765','--bind','127.0.0.1','--directory','feed' -WindowStyle Hidden
+          for ($i = 0; $i -lt 30; $i++) {
+            try { Invoke-WebRequest "$($env:FEED_URL)latest.yml" -UseBasicParsing | Out-Null; break } catch { Start-Sleep 1 }
+          }
+          (Invoke-WebRequest "$($env:FEED_URL)latest.yml" -UseBasicParsing).Content
+      - name: Run A with --update-self-test
+        env:
+          AVE_UPDATE_FEED_URL: ${{ env.FEED_URL }}
+          AVE_UPDATE_TEST_RESULT: ${{ runner.temp }}\update-result.json
+          AVE_ALLOW_CPU: '1'
+        run: |
+          $p = Start-Process -FilePath $env:APP_EXE -ArgumentList '--update-self-test' -PassThru
+          if (-not $p.WaitForExit(300000)) { $p.Kill(); throw 'The self-test did not finish in 5 minutes' }
+          Write-Host "Self-test exited with code $($p.ExitCode)"
+          Get-Content $env:AVE_UPDATE_TEST_RESULT
+          $r = Get-Content $env:AVE_UPDATE_TEST_RESULT | ConvertFrom-Json
+          if ($r.stages -notcontains 'downloaded') { throw "The update was not downloaded: $($r.error)" }
+          if ($r.newVersion -ne $env:B_VERSION) { throw "Self-test found $($r.newVersion), expected $env:B_VERSION" }
+      - name: Wait for the installer and check the installed version
+        run: |
+          $deadline = (Get-Date).AddMinutes(5)
+          do {
+            Start-Sleep 5
+            $v = $null
+            if (Test-Path $env:APP_EXE) { $v = (Get-Item $env:APP_EXE).VersionInfo.ProductVersion }
+            $installer = Get-Process | Where-Object { $_.Path -and $_.Path -like "*ai-video-editor-updater*" }
+            Write-Host "Installed version: $v; installer running: $([bool]$installer)"
+            $ok = $v -in @($env:B_VERSION, "$($env:B_VERSION).0")
+          } while ((-not $ok -or $installer) -and (Get-Date) -lt $deadline)
+          if (-not $ok) { throw "Installed version is $v, expected $env:B_VERSION" }
+          Write-Host "Updated to $v"
+
+      - name: Settings survived the update
+        run: |
+          $file = Join-Path $env:APPDATA 'AI Video Editor\e2e-marker.json'
+          if (-not (Test-Path $file)) { throw 'The settings folder was touched by the update' }
+          $before = (Get-Content "$env:RUNNER_TEMP\marker.sha").Trim()
+          if ((Get-FileHash $file).Hash -ne $before) { throw 'A settings file changed during the update' }
+          Write-Host 'Settings are unchanged.'
+      - name: App log
+        if: always()
+        run: |
+          $log = Join-Path $env:APPDATA 'AI Video Editor\logs\app.log'
+          if (Test-Path $log) { Get-Content $log -Tail 200 }
+
+  publish:
+    needs: [gate, update-e2e]
+    runs-on: windows-latest
+    timeout-minutes: 40
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - name: Fetch the tag annotation
+        shell: bash
+        run: git fetch --force origin "refs/tags/${{ github.ref_name }}:refs/tags/${{ github.ref_name }}"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: Install Node packages
+        run: npm ci
+      - name: Release notes
+        shell: bash
+        run: node .github/scripts/release-notes.mjs "${GITHUB_REF_NAME#v}" release-notes.md
+      - name: Build
+        run: npm run build
+      - name: Publish to GitHub Releases
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        shell: bash
+        run: npx electron-builder --win --publish always -c.releaseInfo.releaseNotesFile=release-notes.md

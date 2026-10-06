@@ -1,0 +1,63 @@
+# Packaging and publishing. appId and productName must match src/shared/appInfo.ts
+# (tests/updater.test.ts checks this). The installer is per-user: no admin prompt, and it only
+# replaces program files. Settings, profiles and projects live in %APPDATA% and project folders.
+appId: com.aivideoeditor.app
+productName: AI Video Editor
+copyright: Copyright © 2026 Adam
+
+directories:
+  output: dist
+  buildResources: build
+
+files:
+  - out/**
+  - package.json
+
+asar: true
+
+# The Python render engine ships next to the app (resources/engine) and is copied into
+# %LOCALAPPDATA%\AI Video Editor\engines\<version> on first use, so old projects keep their engine.
+extraResources:
+  - from: engine
+    to: engine
+    filter:
+      - "**/*"
+      - "!tests/**"
+      - "!**/__pycache__/**"
+      - "!**/*.pyc"
+      - "!**/.pytest_cache/**"
+  - from: resources
+    to: resources
+    filter:
+      - "**/*"
+
+win:
+  target:
+    - target: nsis
+      arch:
+        - x64
+  icon: build/icon.ico
+  # Unsigned builds (Windows shows a SmartScreen warning on first install). With no publisher name
+  # in app-update.yml, electron-updater relies on the sha512 check alone.
+  verifyUpdateCodeSignature: false
+
+nsis:
+  oneClick: true
+  perMachine: false
+  allowElevation: false
+  # Installs to %LOCALAPPDATA%\Programs\AI Video Editor
+  artifactName: AI-Video-Editor-Setup-${version}.${ext}
+  shortcutName: AI Video Editor
+  uninstallDisplayName: AI Video Editor
+  createDesktopShortcut: true
+  createStartMenuShortcut: true
+  runAfterFinish: true
+  # Never delete settings, profiles or the Python environment on uninstall or update.
+  deleteAppDataOnUninstall: false
+  differentialPackage: true
+
+publish:
+  provider: github
+  owner: trendlinepros-afk
+  repo: Automated-Video-Editing
+  releaseType: release

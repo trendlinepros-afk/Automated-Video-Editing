@@ -1,0 +1,65 @@
+# Every push and pull request: typecheck, unit tests (project upgrades, section lock, log redaction,
+# updater), engine tests (preview/export match), and a Windows installer build as a smoke test.
+name: CI
+
+on:
+  push:
+    branches: ['**']
+    tags-ignore: ['v*'] # tags run release.yml
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: pip
+      - name: Install ffmpeg
+        run: sudo apt-get update && sudo apt-get install -y ffmpeg
+      - name: Install Node packages
+        run: npm ci
+      - name: Install engine test packages
+        run: bash .github/scripts/install-engine-test-deps.sh
+      - name: Typecheck
+        run: npm run typecheck
+      - name: Unit tests
+        run: npx vitest run
+      - name: Engine tests
+        env:
+          AVE_ALLOW_CPU: '1'
+        run: python -m pytest engine/tests -q
+
+  build-windows:
+    runs-on: windows-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: Install Node packages
+        run: npm ci
+      - name: Build
+        run: npm run build
+      - name: Package installer (not published)
+        run: npx electron-builder --win --publish never
+      - uses: actions/upload-artifact@v4
+        with:
+          name: installer-${{ github.sha }}
+          path: |
+            dist/*.exe
+            dist/latest.yml
+          retention-days: 7

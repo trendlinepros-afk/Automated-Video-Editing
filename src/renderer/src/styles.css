@@ -279,13 +279,13 @@ h4 { font-size: 12px; color: var(--text-2); text-transform: uppercase; letter-sp
 .tl-toolbar { flex: none; display: flex; align-items: center; gap: 8px; padding: 4px 10px; border-bottom: 1px solid var(--line); height: 36px; }
 .tl-scroll { flex: 1; min-height: 0; overflow: auto; position: relative; }
 .tl-content { position: relative; min-height: 100%; }
-.tl-ruler { position: sticky; top: 0; z-index: 4; height: 28px; display: flex; background: var(--bg-1); border-bottom: 1px solid var(--line); }
-.tl-corner { position: sticky; left: 0; z-index: 5; flex: none; background: var(--bg-1); border-right: 1px solid var(--line); display: flex; align-items: center; padding: 0 8px; font-family: var(--mono); font-size: 11px; color: var(--text-2); }
+.tl-ruler { position: sticky; top: 0; z-index: 7; height: 28px; display: flex; background: var(--bg-1); border-bottom: 1px solid var(--line); }
+.tl-corner { position: sticky; left: 0; z-index: 8; flex: none; background: var(--bg-1); border-right: 1px solid var(--line); display: flex; align-items: center; padding: 0 8px; font-family: var(--mono); font-size: 11px; color: var(--text-2); }
 .tl-ruler-body { position: relative; flex: 1; cursor: text; }
 .tl-tick { position: absolute; top: 0; bottom: 0; border-left: 1px solid var(--line-2); padding-left: 3px; font-size: 10px; color: var(--text-3); font-family: var(--mono); pointer-events: none; }
 .tl-tick.minor { top: 20px; }
 .tl-lane { display: flex; border-bottom: 1px solid var(--line); }
-.tl-head { position: sticky; left: 0; z-index: 3; flex: none; background: var(--bg-1); border-right: 1px solid var(--line); display: flex; align-items: center; gap: 4px; padding: 0 6px 0 8px; }
+.tl-head { position: sticky; left: 0; z-index: 5; flex: none; background: var(--bg-1); border-right: 1px solid var(--line); display: flex; align-items: center; gap: 4px; padding: 0 6px 0 8px; }
 .tl-head .name { flex: 1; min-width: 0; font-size: 12px; display: flex; align-items: center; gap: 6px; }
 .tl-head .swatch { width: 4px; height: 18px; border-radius: 2px; flex: none; }
 .tl-head .ms { width: 20px; height: 20px; border: 1px solid var(--line-2); border-radius: 3px; background: var(--bg-2); color: var(--text-3); font-size: 10px; font-weight: 700; cursor: pointer; padding: 0; }
@@ -311,7 +311,7 @@ h4 { font-size: 12px; color: var(--text-2); text-transform: uppercase; letter-sp
 .tl-item canvas { position: absolute; top: 14px; bottom: 0; height: calc(100% - 14px); pointer-events: none; opacity: 0.85; }
 .tl-item.caption { cursor: pointer; background: color-mix(in srgb, var(--track-captions) 20%, var(--bg-2)); }
 .tl-item.caption .lbl { top: 50%; transform: translateY(-50%); }
-.tl-seam { position: absolute; top: 0; bottom: 0; width: 12px; margin-left: -6px; z-index: 4; cursor: ew-resize; display: flex; }
+.tl-seam { position: absolute; top: 0; bottom: 0; width: 12px; margin-left: -6px; z-index: 3; cursor: ew-resize; display: flex; }
 .tl-seam > div { flex: 1; }
 .tl-seam::after { content: ''; position: absolute; left: 5px; top: 0; bottom: 0; width: 2px; background: rgba(255, 255, 255, 0.55); pointer-events: none; }
 .tl-seam:hover::after { background: #fff; }
@@ -322,8 +322,9 @@ h4 { font-size: 12px; color: var(--text-2); text-transform: uppercase; letter-sp
 .tl-range { background: rgba(79, 140, 255, 0.13); border-left: 1px solid var(--accent); border-right: 1px solid var(--accent); z-index: 1; }
 .tl-chatrange { background: rgba(255, 212, 0, 0.1); border-left: 1px dashed #ffd400; border-right: 1px dashed #ffd400; z-index: 1; }
 .tl-lock { background: repeating-linear-gradient(135deg, rgba(232, 163, 61, 0.14) 0 8px, transparent 8px 16px); border-left: 1px solid var(--warn); border-right: 1px solid var(--warn); z-index: 1; }
-.tl-playhead { width: 1px; background: #fff; z-index: 6; }
-.tl-playhead::before { content: ''; position: absolute; top: 0; left: -5px; border: 5px solid transparent; border-top: 7px solid #fff; }
+.tl-playhead { width: 1px; background: #fff; z-index: 4; }
+.tl-ruler-head { position: absolute; top: 0; bottom: 0; width: 1px; background: #fff; pointer-events: none; z-index: 2; }
+.tl-ruler-head::before { content: ''; position: absolute; top: 0; left: -5px; border: 5px solid transparent; border-top: 7px solid #fff; }
 .tl-ruler-range { position: absolute; top: 0; bottom: 0; background: rgba(79, 140, 255, 0.35); pointer-events: none; }
 .tl-req { position: absolute; bottom: 1px; height: 6px; border-radius: 3px; pointer-events: auto; cursor: default; }
 .tl-req.queued { background: var(--text-3); }

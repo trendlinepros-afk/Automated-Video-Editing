@@ -27,24 +27,11 @@ export async function renderDialogue(env: ToolEnv, out: string, range?: Range): 
   const doc = env.store.snapshotDoc()
   const p = doc.project
   const plan = buildPlan(doc, { projectDir: env.dir, width: p.output.width, height: p.output.height, fps: p.output.fps, burnCaptions: false })
-  plan.layers = []
-  plan.captions = { ...plan.captions, burn: false, lines: [] }
-  plan.audio.clips = plan.audio.clips.filter((c) => c.role === 'voice')
-  if (range) {
-    const start = range.start
-    const end = Math.min(range.end, plan.duration)
-    if (end <= start) throw new ToolError('That range is outside the edited timeline.')
-    plan.audio.clips = plan.audio.clips
-      .filter((c) => c.end > start && c.start < end)
-      .map((c) => {
-        const cutHead = Math.max(0, start - c.start)
-        const clipEnd = Math.min(c.end, end)
-        return { ...c, start: Math.max(0, c.start - start), end: clipEnd - start, sourceIn: c.sourceIn + cutHead * (c.speed || 1), fadeIn: cutHead > 0 ? 0 : c.fadeIn, fadeOut: clipEnd < c.end ? 0 : c.fadeOut }
-      })
-    plan.duration = end - start
-  }
-  const planFile = env.ctx.engine.writePlan(plan, cacheDir(env, 'plans'), `${stampName('dialogue')}.json`)
-  await env.ctx.engine.run(p.engineVersion, ['mix', '--plan', planFile, '--out', out, '--dialogue-only'])
+  if (range && Math.min(range.end, plan.duration) <= range.start) throw new ToolError('That range is outside the edited timeline.')
+  const planFile = env.ctx.engine.writePlan(plan, cacheDir(env, 'plans'), 'dialogue.json')
+  const args = ['mix', '--plan', planFile, '--out', out, '--dialogue-only', '--fade', '0']
+  if (range) args.push('--start', String(range.start), '--end', String(Math.min(range.end, plan.duration)))
+  await env.ctx.engine.run(p.engineVersion, args)
   return out
 }
 

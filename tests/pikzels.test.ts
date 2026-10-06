@@ -219,6 +219,50 @@ describe('Pikzels', () => {
     expect(list[0]).toMatchObject({ id: 'pz_1', status: 'completed', progress: 100 })
   })
 
+  it('sends YouTube picks as links, falls back to image data while Pikzels rejects the request, and says why', async () => {
+    const imgs = ['aaaaaaaaaaa__maxresdefault', 'bbbbbbbbbbb__sddefault', 'ccccccccccc__hqdefault'].map((n) => {
+      const p = join(dir, `${n}.jpg`)
+      writeFileSync(p, n)
+      return p
+    })
+    const bodies: any[] = []
+    const reject = { status: 400, json: { error: { code: 'invalid_request', message: 'The request is invalid.' }, request_id: 'req_bad' } }
+    const accept = { status: 200, json: { id: 'pz_9' } }
+    // Pikzels rejects links and raw data, and accepts data with its type.
+    const { fn } = fakeFetch({
+      routes: {
+        '/v2/pikzonality/persona': (body) => {
+          bodies.push(body)
+          return body.image_base64s?.[0]?.startsWith('data:image/jpeg;base64,') ? accept : reject
+        }
+      }
+    })
+    const ctx = makeCtx()
+    const p = await createPikzelsService(ctx, { fetch: fn, sleep: async () => {} }).create('persona', 'Adam', imgs)
+    expect(p.id).toBe('pz_9')
+    expect(bodies.map((b) => Object.keys(b).sort().join(','))).toEqual(['image_urls,name', 'image_base64s,name', 'image_base64s,name'])
+    expect(bodies[0].image_urls).toEqual([
+      'https://i.ytimg.com/vi/aaaaaaaaaaa/maxresdefault.jpg',
+      'https://i.ytimg.com/vi/bbbbbbbbbbb/sddefault.jpg',
+      'https://i.ytimg.com/vi/ccccccccccc/hqdefault.jpg'
+    ])
+    expect(bodies[1].image_base64s[0]).toBe(Buffer.from('aaaaaaaaaaa__maxresdefault').toString('base64'))
+    // Pikzels' own answer is in the log for each rejected form.
+    const log = readFileSync(join(dir, 'app.log'), 'utf8')
+    expect(log).toContain('sent as image links')
+    expect(log).toContain('invalid_request')
+
+    // When every form is rejected, the message says what Pikzels said; a wrong key is not retried in other forms.
+    const all = fakeFetch({ routes: { '/v2/pikzonality/persona': () => reject } })
+    await expect(createPikzelsService(makeCtx(), { fetch: all.fn, sleep: async () => {} }).create('persona', 'Adam', imgs)).rejects.toThrow(
+      'Pikzels rejected the request: The request is invalid (invalid_request).'
+    )
+    let n = 0
+    const denied = fakeFetch({ routes: { '/v2/pikzonality/persona': () => (n++, { status: 401, json: { error: { code: 'unauthorized', message: 'Bad key' } } }) } })
+    await expect(createPikzelsService(makeCtx(), { fetch: denied.fn, sleep: async () => {} }).create('persona', 'Adam', imgs)).rejects.toThrow(/key is missing or wrong/)
+    expect(n).toBe(1)
+  })
+
   it('recreates from an image file, a video frame and a YouTube link', async () => {
     const { fn, calls } = fakeFetch()
     const svc = createPikzelsService(makeCtx(), { fetch: fn, sleep: async () => {} })

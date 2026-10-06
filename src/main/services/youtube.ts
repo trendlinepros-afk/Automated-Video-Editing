@@ -216,8 +216,11 @@ export async function fetchYouTubeThumbnails(input: string, opts: FetchThumbnail
 
 /** Downloads the largest thumbnail YouTube has for a video. maxresdefault is missing on some videos. */
 async function saveThumbnail(doFetch: FetchLike, v: { videoId: string; title: string }, dir: string): Promise<YouTubeThumbnail | null> {
-  const file = join(dir, `${v.videoId}.jpg`)
-  if (existsSync(file) && statSync(file).size > 2000) return { ...v, file }
+  // Saved as <videoId>__<size>.jpg so the public link can be rebuilt (Pikzels can take links).
+  for (const size of ['maxresdefault', 'sddefault', 'hqdefault']) {
+    const file = join(dir, `${v.videoId}__${size}.jpg`)
+    if (existsSync(file) && statSync(file).size > 2000) return { ...v, file }
+  }
   for (const size of ['maxresdefault', 'sddefault', 'hqdefault']) {
     try {
       const res = await doFetch(`https://i.ytimg.com/vi/${v.videoId}/${size}.jpg`)
@@ -225,6 +228,7 @@ async function saveThumbnail(doFetch: FetchLike, v: { videoId: string; title: st
       const buf = Buffer.from(await res.arrayBuffer())
       // YouTube serves a tiny grey placeholder for sizes that do not exist.
       if (buf.length < 2000) continue
+      const file = join(dir, `${v.videoId}__${size}.jpg`)
       writeFileSync(file, buf)
       return { ...v, file }
     } catch {

@@ -3,6 +3,11 @@
 Each release's section becomes its GitHub release text and the notes shown in the app's update dialog.
 A release is blocked until the section for its version has notes.
 
+## 1.0.2
+
+- **Creating a persona or style no longer fails with "The request is invalid".** Thumbnails picked from YouTube are sent to Pikzels as links, and image files as image data; if Pikzels rejects one form, the next is tried. A rejected request costs nothing.
+- When Pikzels rejects a request, the message now says what Pikzels said, and the app log keeps Pikzels' full answer so any remaining problem can be pinned down.
+
 ## 1.0.1
 
 - **Personas and styles from YouTube.** Paste a channel, video or playlist link (or several) in Personas & Styles, click Show thumbnails, and pick the three to train from. No more downloading and uploading thumbnails by hand. Works for both personas and styles.

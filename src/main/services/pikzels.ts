@@ -12,7 +12,7 @@
  * The API key lives in the secrets store and never reaches a project file or a log.
  */
 import { copyFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
-import { extname, isAbsolute, join } from 'node:path'
+import { basename, extname, isAbsolute, join } from 'node:path'
 import type { EditThumbnailRequest, FaceSwapRequest, PikzelsPricing, RecreateRequest, ThumbnailScore, TitlesRequest } from '@shared/ipc'
 import {
   PIKZELS_PRICES_UPDATED,
@@ -63,6 +63,7 @@ export const PIKZELS_API = {
     title: 'title',
     name: 'name',
     images: 'image_base64s',
+    imageUrls: 'image_urls',
     specialInstructions: 'special_instructions'
   },
   response: {
@@ -98,7 +99,9 @@ export class PikzelsError extends Error {
     message: string,
     readonly status: number,
     readonly code?: string,
-    readonly requestId?: string
+    readonly requestId?: string,
+    /** Pikzels' own error body (trimmed), kept for the log so a rejected request can be diagnosed. */
+    readonly details?: unknown
   ) {
     super(message)
   }
@@ -131,6 +134,10 @@ export function plainError(status: number, code = '', message = '', what: What =
   if (status === 429) return 'Pikzels is busy right now. Try again in a minute.'
   if (status >= 500) return 'Pikzels had a problem on its side. Try again later.'
   if (status === 0) return 'Could not reach Pikzels. Check the internet connection.'
+  if (status === 400 || status === 422) {
+    const why = [message.replace(/\.$/, ''), code && !message.toLowerCase().includes(code.toLowerCase()) ? `(${code})` : ''].filter(Boolean).join(' ')
+    return `Pikzels rejected the request: ${why || 'it was not valid'}.`
+  }
   return message || `Pikzels error (HTTP ${status})`
 }
 
@@ -150,6 +157,15 @@ function imageExt(contentType: string | null, url: string): string {
 }
 
 const b64 = (path: string) => readFileSync(path).toString('base64')
+
+const IMAGE_TYPES: Record<string, string> = { '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.png': 'image/png', '.webp': 'image/webp' }
+const dataUri = (path: string) => `data:${IMAGE_TYPES[extname(path).toLowerCase()] ?? 'image/jpeg'};base64,${b64(path)}`
+
+/** A thumbnail picked from YouTube is saved as <videoId>__<size>.jpg; its public link is rebuilt from that name. */
+export function youtubeThumbnailUrl(path: string): string | null {
+  const m = /^([A-Za-z0-9_-]{11})__(maxresdefault|sddefault|hqdefault)\.jpg$/.exec(basename(path))
+  return m ? `https://i.ytimg.com/vi/${m[1]}/${m[2]}.jpg` : null
+}
 
 /** Any web link is passed to Pikzels as image_url (YouTube watch links work there). */
 const isWebUrl = (s: string) => /^https?:\/\//i.test(s.trim())
@@ -212,7 +228,9 @@ export function createPikzelsService(ctx: AppContext, deps: PikzelsDeps = {}): P
         await sleep(wait)
         continue
       }
-      throw new PikzelsError(plainError(status, code, message, what), status, code || undefined, requestId)
+      // Keep Pikzels' whole error answer (minus anything huge) so the log says exactly what it rejected.
+      const details = JSON.parse(JSON.stringify(data, (_k, v) => (typeof v === 'string' && v.length > 300 ? v.slice(0, 300) + '…' : v)))
+      throw new PikzelsError(plainError(status, code, message, what), status, code || undefined, requestId, details)
     }
   }
 
@@ -741,16 +759,35 @@ export function createPikzelsService(ctx: AppContext, deps: PikzelsDeps = {}): P
       const missing = imagePaths.find((p) => !existsSync(p))
       if (missing) throw new Error(`Image not found: ${missing}`)
       const r = PIKZELS_API.request
-      const body = { [r.name]: clean, [r.images]: imagePaths.map(b64) }
       const action: PikzelsAction = kind === 'persona' ? 'persona_training' : 'style_training'
-      let data: Record<string, any>
-      try {
-        data = await call('POST', kind === 'persona' ? PIKZELS_API.createPersona : PIKZELS_API.createStyle, body, kind)
-      } catch (err) {
-        const e = err as PikzelsError
-        ctx.appLog.write('thumbnail', `Could not create ${kind} "${clean}": ${e.message}`, { requestId: e.requestId ?? null, errorCode: e.code ?? null, costUsd: 0 })
-        throw new Error(e.message)
+      // The images can go as web links (thumbnails picked from YouTube) or as image data. Each form
+      // is tried in turn only while Pikzels rejects the request as invalid; a rejected request costs nothing.
+      const urls = imagePaths.map(youtubeThumbnailUrl)
+      const attempts: { label: string; body: Record<string, unknown> }[] = []
+      if (urls.every((u): u is string => !!u)) attempts.push({ label: 'image links', body: { [r.name]: clean, [r.imageUrls]: urls } })
+      attempts.push({ label: 'image data', body: { [r.name]: clean, [r.images]: imagePaths.map(b64) } })
+      attempts.push({ label: 'image data with type', body: { [r.name]: clean, [r.images]: imagePaths.map(dataUri) } })
+      let data: Record<string, any> | null = null
+      let lastError: PikzelsError | null = null
+      for (const attempt of attempts) {
+        try {
+          data = await call('POST', kind === 'persona' ? PIKZELS_API.createPersona : PIKZELS_API.createStyle, attempt.body, kind)
+          if (attempt !== attempts[0]) ctx.appLog.write('thumbnail', `Pikzels accepted the ${kind} images as ${attempt.label}`)
+          break
+        } catch (err) {
+          const e = err as PikzelsError
+          lastError = e
+          ctx.appLog.write('thumbnail', `Could not create ${kind} "${clean}" (sent as ${attempt.label}): ${e.message}`, {
+            status: e.status ?? null,
+            requestId: e.requestId ?? null,
+            errorCode: e.code ?? null,
+            pikzelsAnswer: e.details ?? null,
+            costUsd: 0
+          })
+          if (e.status !== 400 && e.status !== 422) break
+        }
       }
+      if (!data) throw new Error(lastError?.message ?? `Could not create the ${kind}`)
       const id = String(data[PIKZELS_API.response.id] ?? '')
       if (!id) throw new Error('Pikzels did not return an id for the new ' + kind)
       const cost = recordSpend(null, action)

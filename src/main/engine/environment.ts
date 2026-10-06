@@ -590,6 +590,8 @@ export function createEnvironmentService(ctx: AppContext): EnvironmentService {
         if (marker) writeFileSync(envMarkerFile(), JSON.stringify({ ...marker, check }, null, 2))
         ctx.appLog.write('app', `Render engine setup finished in ${Math.round((Date.now() - started) / 1000)} s`, check)
         report({ step: 'done', percent: 100, message: 'The render engine is ready.', done: true })
+        // An open project's preview was waiting for the engine.
+        ctx.preview?.invalidate()
       } catch (err) {
         const message = err instanceof SetupError ? err.message : `Setup failed: ${(err as Error).message}`
         ctx.appLog.write('error', 'Render engine setup failed', { error: message, stack: (err as Error).stack })

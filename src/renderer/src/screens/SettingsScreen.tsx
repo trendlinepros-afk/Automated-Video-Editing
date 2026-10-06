@@ -1,7 +1,7 @@
 /** Settings: keys, folders, music folders, Claude connection, profiles, suggested rules, About. */
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import type { MusicTrack, RunnerState, Suggestion } from '@shared/ipc'
-import { CORRECTION_KINDS } from '@shared/settings'
+import { CORRECTION_KINDS, SettingsSchema } from '@shared/settings'
 import { app, call, profileById, refreshProfiles, refreshSettings, toast, updateSettings, type SettingsSection } from '../state/app'
 import { useStore } from '../state/store'
 import { AppTopBar } from '../components/AppTopBar'
@@ -385,16 +385,12 @@ function Claude() {
           <button
             className="btn ghost"
             onClick={() => {
-              setCommand('claude')
-              void updateSettings({ runner: { ...runner, command: 'claude', args: [], resumeArgs: [] } as typeof runner }).then(async () => {
-                // Saving empty lists lets the app fill in its standard arguments again.
-                await refreshSettings()
-                const s = app.get().settings
-                if (s) {
-                  setArgs(s.runner.args.join('\n'))
-                  setResumeArgs(s.runner.resumeArgs.join('\n'))
-                }
-              })
+              const defaults = SettingsSchema.parse({}).runner
+              setCommand(defaults.command)
+              setArgs(defaults.args.join('\n'))
+              setResumeArgs(defaults.resumeArgs.join('\n'))
+              setTools(defaults.allowedTools)
+              saveRunner({ command: defaults.command, args: defaults.args, resumeArgs: defaults.resumeArgs, allowedTools: defaults.allowedTools })
             }}
           >
             Reset to Claude Code defaults

@@ -3,7 +3,7 @@
  * AppContext with every service, the window, and the IPC table.
  */
 import { BrowserWindow, app, protocol, safeStorage, shell } from 'electron'
-import { existsSync, rmSync } from 'node:fs'
+import { existsSync, rmSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { APP_DATA_FOLDER, APP_ID, APP_NAME } from '@shared/appInfo'
 import { API_EVENTS, MEDIA_PROTOCOL } from '@shared/ipcChannels'
@@ -34,7 +34,14 @@ import {
 } from './services/settings'
 import { createUpdaterService, runUpdateSelfTest } from './updater'
 
-const SELF_TEST = process.argv.includes('--update-self-test')
+const UPDATE_SELF_TEST = process.argv.includes('--update-self-test')
+/** CI only: `--secret-check write|read` proves a saved key (Pikzels) survives an update. */
+const SECRET_CHECK = (() => {
+  const i = process.argv.indexOf('--secret-check')
+  const mode = i >= 0 ? process.argv[i + 1] : undefined
+  return mode === 'write' || mode === 'read' ? mode : null
+})()
+const SELF_TEST = UPDATE_SELF_TEST || SECRET_CHECK !== null
 
 // Settings live in %APPDATA%/AI Video Editor whatever the program folder is called.
 app.setPath('userData', join(app.getPath('appData'), APP_DATA_FOLDER))
@@ -205,6 +212,26 @@ async function reopenAfterUpdate(c: AppContext): Promise<void> {
   }
 }
 
+/** Writes or reads a test value through the real secrets store (Windows DPAPI), for the update test in CI. */
+async function runSecretCheck(c: AppContext, mode: 'write' | 'read'): Promise<void> {
+  const resultFile = process.env.AVE_SECRET_TEST_RESULT
+  const expected = process.env.AVE_SECRET_TEST_VALUE ?? ''
+  let result: Record<string, unknown>
+  try {
+    if (mode === 'write') {
+      c.secrets.set('pikzels', expected)
+      result = { mode, ok: c.secrets.get('pikzels') === expected }
+    } else {
+      // Never print the value itself, only whether it matches.
+      result = { mode, ok: c.secrets.get('pikzels') === expected }
+    }
+  } catch (err) {
+    result = { mode, ok: false, error: errorData(err).message }
+  }
+  if (resultFile) writeFileSync(resultFile, JSON.stringify(result))
+  app.exit(result.ok ? 0 : 1)
+}
+
 async function start(): Promise<void> {
   initPaths({
     data: app.getPath('userData'),
@@ -221,6 +248,10 @@ async function start(): Promise<void> {
   const c = buildContext(appLog)
   ctx = c
 
+  if (SECRET_CHECK) {
+    await runSecretCheck(c, SECRET_CHECK)
+    return
+  }
   if (SELF_TEST) {
     await runUpdateSelfTest(c)
     return

@@ -117,6 +117,14 @@ jobs:
           $marker = @{ written = (Get-Date).ToString('o'); note = 'must survive the update' } | ConvertTo-Json
           Set-Content -Encoding utf8 -Path (Join-Path $data 'e2e-marker.json') -Value $marker
           (Get-FileHash (Join-Path $data 'e2e-marker.json')).Hash | Out-File -Encoding ascii "$env:RUNNER_TEMP\marker.sha"
+      - name: Save a Pikzels key with A (Windows credential protection)
+        env:
+          AVE_SECRET_TEST_VALUE: pkz_e2e_not_a_real_key_1234567890
+          AVE_SECRET_TEST_RESULT: ${{ runner.temp }}\secret-write.json
+        run: |
+          $p = Start-Process -FilePath $env:APP_EXE -ArgumentList '--secret-check','write' -PassThru -Wait
+          Get-Content $env:AVE_SECRET_TEST_RESULT
+          if ((Get-Content $env:AVE_SECRET_TEST_RESULT | ConvertFrom-Json).ok -ne $true) { throw 'A could not save the key' }
       - name: Serve B on the local feed
         run: |
           New-Item -ItemType Directory -Force -Path feed | Out-Null
@@ -162,6 +170,15 @@ jobs:
           $before = (Get-Content "$env:RUNNER_TEMP\marker.sha").Trim()
           if ((Get-FileHash $file).Hash -ne $before) { throw 'A settings file changed during the update' }
           Write-Host 'Settings are unchanged.'
+      - name: The Pikzels key survived the update
+        env:
+          AVE_SECRET_TEST_VALUE: pkz_e2e_not_a_real_key_1234567890
+          AVE_SECRET_TEST_RESULT: ${{ runner.temp }}\secret-read.json
+        run: |
+          $p = Start-Process -FilePath $env:APP_EXE -ArgumentList '--secret-check','read' -PassThru -Wait
+          Get-Content $env:AVE_SECRET_TEST_RESULT
+          if ((Get-Content $env:AVE_SECRET_TEST_RESULT | ConvertFrom-Json).ok -ne $true) { throw 'B could not read the key saved before the update' }
+          Write-Host 'The Pikzels key is still there after the update.'
       - name: App log
         if: always()
         run: |

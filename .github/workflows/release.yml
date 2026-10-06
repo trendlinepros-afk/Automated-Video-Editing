@@ -39,7 +39,9 @@ jobs:
             echo "::error::Tag $GITHUB_REF_NAME does not match package.json version $PKG_VERSION"
             exit 1
           fi
-          if [ "$GITHUB_REF_TYPE" != "tag" ] && gh release view "v$PKG_VERSION" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+          # A finished release has latest.yml (what installed apps read). One without it is
+          # incomplete and may be published again to repair it.
+          if [ "$GITHUB_REF_TYPE" != "tag" ] && gh release view "v$PKG_VERSION" --repo "$GITHUB_REPOSITORY" --json assets --jq '.assets[].name' 2>/dev/null | grep -qx latest.yml; then
             echo "::error::v$PKG_VERSION is already released. Bump the version in package.json."
             exit 1
           fi
@@ -215,8 +217,25 @@ jobs:
         run: node .github/scripts/release-notes.mjs "$(node -p "require('./package.json').version")" release-notes.md
       - name: Build
         run: npm run build
+      - name: Build the installer
+        shell: bash
+        run: npx electron-builder --win --publish never -c.releaseInfo.releaseNotesFile=release-notes.md
+      # One step creates the release and uploads every file, so parallel uploads can never race
+      # to create it. An incomplete release from an earlier run gets its files replaced.
       - name: Publish to GitHub Releases
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         shell: bash
-        run: npx electron-builder --win --publish always -c.releaseInfo.releaseNotesFile=release-notes.md
+        run: |
+          set -euo pipefail
+          VERSION="$(node -p "require('./package.json').version")"
+          TAG="v$VERSION"
+          FILES=(dist/latest.yml "dist/AI-Video-Editor-Setup-$VERSION.exe" "dist/AI-Video-Editor-Setup-$VERSION.exe.blockmap")
+          ls -l "${FILES[@]}"
+          if gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            gh release upload "$TAG" "${FILES[@]}" --clobber --repo "$GITHUB_REPOSITORY"
+            gh release edit "$TAG" --notes-file release-notes.md --draft=false --prerelease=false --latest --repo "$GITHUB_REPOSITORY"
+          else
+            gh release create "$TAG" "${FILES[@]}" --title "$VERSION" --notes-file release-notes.md --target "$GITHUB_SHA" --latest --repo "$GITHUB_REPOSITORY"
+          fi
+          gh release view "$TAG" --repo "$GITHUB_REPOSITORY" --json assets --jq '.assets[].name'

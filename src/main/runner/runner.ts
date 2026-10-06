@@ -14,6 +14,7 @@ import { MCP_SERVER_NAME } from '@shared/appInfo'
 import type { RunnerState } from '@shared/ipc'
 import type { EditRequest } from '@shared/project'
 import type { AppContext, RunnerService } from '../context'
+import type { McpServiceImpl } from '../mcp/server'
 import type { ProjectStore } from '../project/store'
 import { buildRunPrompt, buildSystemPrompt } from './prompts'
 
@@ -182,6 +183,7 @@ export function createRunnerService(ctx: AppContext, deps: RunnerDeps = {}): Run
   let held = false // after Stop: no automatic restart until the owner acts
   let runsWithoutProgress = 0
   let forceFresh = false
+  let waitingForHand = false
   let unwatchStore: (() => void) | null = null
 
   const queuedCount = (): number => {
@@ -195,6 +197,17 @@ export function createRunnerService(ctx: AppContext, deps: RunnerDeps = {}): Run
   const connectedCount = (): number => {
     try {
       return ctx.mcp.connectedClients()
+    } catch {
+      return 0
+    }
+  }
+
+  /** Clients connected by hand (Claude Code or the desktop app), not the one this runner started. */
+  const handCount = (): number => {
+    try {
+      const mcp = ctx.mcp as Partial<McpServiceImpl>
+      if (mcp.handClients) return mcp.handClients()
+      return current ? 0 : ctx.mcp.connectedClients()
     } catch {
       return 0
     }
@@ -247,7 +260,8 @@ export function createRunnerService(ctx: AppContext, deps: RunnerDeps = {}): Run
     ctx.mcp.onClientsChanged(() => {
       update({})
       // A client that connected by hand picks up queued work itself.
-      if (!current && state.status === 'waiting' && connectedCount() === 0 && !held) kick()
+      // When the hand-connected client goes away, the app starts Claude itself for what is still queued.
+      if (!current && waitingForHand && handCount() === 0 && !held) kick()
     })
     ctx.projects.onOpened((store) => {
       watchStore(store)
@@ -339,6 +353,7 @@ export function createRunnerService(ctx: AppContext, deps: RunnerDeps = {}): Run
   const finishRun = (run: Run, exitCode: number | null) => {
     if (current === run) current = null
     rmSync(run.configFile, { force: true })
+    void (ctx.mcp as Partial<McpServiceImpl>).closeSessions?.(run.projectId)
     const outcome = classifyOutcome({ ...run, exitCode })
     const store = run.store
     const stillOpen = (() => {
@@ -497,9 +512,11 @@ export function createRunnerService(ctx: AppContext, deps: RunnerDeps = {}): Run
     const open = ctx.requests.open()
     if (!open.length) return update({ status: 'idle', activeRequestId: undefined, waitingReason: undefined })
     const settings = ctx.settings.get().runner
-    if (connectedCount() > 0) {
+    waitingForHand = false
+    if (handCount() > 0) {
       // Claude connected by hand (Claude Code or the desktop app) picks up queued requests through get_requests.
       const reason = 'Claude is connected by hand: it picks this up when it checks get_requests.'
+      waitingForHand = true
       ctx.requests.setWaitingReason(reason)
       return update({ status: 'waiting', waitingReason: reason })
     }

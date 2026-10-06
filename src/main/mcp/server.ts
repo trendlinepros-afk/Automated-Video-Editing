@@ -25,7 +25,7 @@ import { registerSecret } from '../log'
 import type { ProjectStore } from '../project/store'
 import { ALL_TOOLS, type ToolDef, type ToolEnv, type ToolResult } from './tools'
 
-/** A session counts as connected while it holds an open event stream or was active this recently. */
+/** A session that never opens an event stream counts as connected while it was active this recently. */
 const ACTIVE_MS = 120_000
 /** Sessions with no stream and no activity for this long are closed. */
 const IDLE_CLOSE_MS = 30 * 60_000
@@ -43,6 +43,8 @@ interface Session {
   transport: StreamableHTTPServerTransport
   server: Server
   streams: number
+  /** The client opened an event stream at some point: it then counts as connected only while one is open. */
+  everStreamed: boolean
   lastSeen: number
   client?: string
 }
@@ -136,6 +138,10 @@ function readBody(req: IncomingMessage): Promise<unknown> {
 export interface McpServiceImpl extends McpService {
   /** Port the server is listening on (0 when stopped). */
   port(): number
+  /** Clients connected by hand on /mcp (not started by the app's runner). */
+  handClients(): number
+  /** Close the sessions of a project endpoint (the runner's Claude has exited). */
+  closeSessions(projectId: string): Promise<void>
 }
 
 export function createMcpService(ctx: AppContext, opts: { tools?: ToolDef[] } = {}): McpServiceImpl {
@@ -169,10 +175,12 @@ export function createMcpService(ctx: AppContext, opts: { tools?: ToolDef[] } = 
     return given.length === want.length && timingSafeEqual(given, want)
   }
 
-  const countConnected = (): number => {
+  const isConnected = (s: Session, now: number) => s.streams > 0 || (!s.everStreamed && now - s.lastSeen < ACTIVE_MS)
+
+  const countConnected = (filter: (s: Session) => boolean = () => true): number => {
     const now = Date.now()
     let n = 0
-    for (const s of sessions.values()) if (s.streams > 0 || now - s.lastSeen < ACTIVE_MS) n++
+    for (const s of sessions.values()) if (filter(s) && isConnected(s, now)) n++
     return n
   }
 
@@ -278,6 +286,7 @@ export function createMcpService(ctx: AppContext, opts: { tools?: ToolDef[] } = 
       s.lastSeen = Date.now()
       if (req.method === 'GET') {
         s.streams++
+        s.everStreamed = true
         res.on('close', () => {
           s.streams = Math.max(0, s.streams - 1)
           s.lastSeen = Date.now()
@@ -298,7 +307,7 @@ export function createMcpService(ctx: AppContext, opts: { tools?: ToolDef[] } = 
     }
     if (!isInitializeRequest(body)) return rpcError(res, 400, 'No session. Send an initialize request first.')
 
-    const session = { id: '', projectId, streams: 0, lastSeen: Date.now() } as Session
+    const session = { id: '', projectId, streams: 0, everStreamed: false, lastSeen: Date.now() } as Session
     const transport = new StreamableHTTPServerTransport({
       sessionIdGenerator: () => randomUUID(),
       onsessioninitialized: (id) => {
@@ -384,6 +393,19 @@ export function createMcpService(ctx: AppContext, opts: { tools?: ToolDef[] } = 
 
     port() {
       return boundPort
+    },
+
+    handClients() {
+      return countConnected((s) => s.projectId === null)
+    },
+
+    async closeSessions(projectId) {
+      for (const s of [...sessions.values()]) {
+        if (s.projectId !== projectId) continue
+        sessions.delete(s.id)
+        await s.transport.close().catch(() => undefined)
+      }
+      changed()
     }
   }
 }

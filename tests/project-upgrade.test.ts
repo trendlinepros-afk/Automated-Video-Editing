@@ -221,7 +221,7 @@ describe('settings and profiles follow the same rules', () => {
     const { data, ctx } = freshData()
     // Simulate an older settings format (0) with a step that renames a field.
     SETTINGS_STEPS[0] = (d) => {
-      const out = { ...d, defaultProjectsFolder: d.projectsDir }
+      const out: Record<string, any> = { ...d, defaultProjectsFolder: d.projectsDir }
       delete out.projectsDir
       return out
     }

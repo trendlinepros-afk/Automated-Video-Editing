@@ -26,6 +26,7 @@ jobs:
         with:
           python-version: '3.11'
           cache: pip
+          cache-dependency-path: engine/requirements*.txt
       - name: Install ffmpeg
         run: sudo apt-get update && sudo apt-get install -y ffmpeg
       - name: Install Node packages

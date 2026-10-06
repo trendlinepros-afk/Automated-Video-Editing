@@ -27,6 +27,7 @@ jobs:
         with:
           python-version: '3.11'
           cache: pip
+          cache-dependency-path: engine/requirements*.txt
       - name: Tag matches package.json and CHANGELOG.md
         run: |
           TAG_VERSION="${GITHUB_REF_NAME#v}"

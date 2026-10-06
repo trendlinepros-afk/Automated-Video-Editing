@@ -125,6 +125,25 @@ describe('secrets service', () => {
     expect(logText).not.toContain(key)
   })
 
+  it('prefers the direct Windows store and moves keys saved by an older version to it', () => {
+    const data = tempDir('ave-data-')
+    initPaths({ data, runtime: join(data, 'runtime'), resources: data })
+    const ctx = fakeContext({ logDir: data })
+    const direct: SafeStorageLike = {
+      isEncryptionAvailable: () => true,
+      encryptString: (s) => Buffer.from('D' + s, 'utf8'),
+      decryptString: (b) => b.toString('utf8').slice(1)
+    }
+    // A key saved by 1.0.0 through safeStorage alone.
+    createSecretsService(ctx, fakeSafe()).set('pikzels', 'pkz_oldVersionKey1234')
+    expect(readFileSync(join(data, 'secrets.json'), 'utf8')).not.toContain('dpapi:')
+    // The new version reads it and rewrites it with the direct store.
+    expect(createSecretsService(ctx, fakeSafe(), direct).get('pikzels')).toBe('pkz_oldVersionKey1234')
+    expect(readFileSync(join(data, 'secrets.json'), 'utf8')).toContain('dpapi:')
+    // Even if safeStorage later loses its master key, the key still reads.
+    expect(createSecretsService(ctx, fakeSafe(false), direct).get('pikzels')).toBe('pkz_oldVersionKey1234')
+  })
+
   it('refuses to store a key when Windows credential protection is unavailable', () => {
     const data = tempDir('ave-data-')
     initPaths({ data, runtime: join(data, 'runtime'), resources: data })

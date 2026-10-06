@@ -1,0 +1,736 @@
+{
+  "formatVersion": 2,
+  "id": "prj_9f2c41aa07",
+  "name": "Cheap fast RC car review",
+  "createdAt": "2026-10-20T09:12:00.000Z",
+  "updatedAt": "2026-10-20T11:40:12.000Z",
+  "appVersion": "1.0.0",
+  "engineVersion": "1.0.0",
+  "profileId": "prof_rc",
+  "footageFolder": "D:\\Footage\\Cheap fast car",
+  "status": "ready_for_review",
+  "inspiration": "Keep it punchy. Big reaction on the speed test.",
+  "scope": {
+    "mode": "intro",
+    "introMaxSeconds": 30,
+    "introEnd": {
+      "kind": "word",
+      "wordId": "w_17",
+      "offset": 0.4
+    },
+    "introApproved": true
+  },
+  "output": {
+    "width": 3840,
+    "height": 2160,
+    "fps": 60
+  },
+  "settings": {
+    "exportPreset": {
+      "name": "4K 60 fps",
+      "width": 3840,
+      "height": 2160,
+      "fps": 60,
+      "quality": "best",
+      "codec": "h264"
+    },
+    "mix": {
+      "musicUnderSpeechDb": -15,
+      "targetLufs": -14,
+      "truePeakDb": -1,
+      "voiceCleanup": true,
+      "limiter": true
+    },
+    "brandKit": {
+      "fonts": [
+        {
+          "name": "Anton",
+          "path": "C:\\Users\\Adam\\Fonts\\Anton-Regular.ttf"
+        }
+      ],
+      "colors": {
+        "primary": "#FF3B30",
+        "secondary": "#111111",
+        "accent": "#FFD400"
+      },
+      "logo": {
+        "path": "C:\\Users\\Adam\\Brand\\logo.png",
+        "enabled": true,
+        "position": "bottom-right",
+        "size": 0.08,
+        "opacity": 0.8
+      },
+      "intro": "",
+      "outro": "",
+      "captionStyle": {
+        "font": "",
+        "size": 0.055,
+        "position": "bottom",
+        "color": "#FFFFFF",
+        "highlightColor": "#FFD400",
+        "outlineColor": "#000000",
+        "maxWords": 4
+      },
+      "soundSignature": "lib_whoosh_01"
+    },
+    "musicFolderIds": [
+      "mf_1"
+    ],
+    "descriptionTemplate": "Gear I use: https://example.com/gear",
+    "captionExport": "both"
+  },
+  "sources": [
+    {
+      "id": "src_main",
+      "path": "D:\\Footage\\Cheap fast car\\C0001.MP4",
+      "kind": "video",
+      "duration": 64.2,
+      "width": 1920,
+      "height": 1080,
+      "fps": 59.94,
+      "hasAudio": true,
+      "origin": "footage",
+      "size": 812345678,
+      "mtimeMs": 1760950000000
+    },
+    {
+      "id": "src_main2",
+      "path": "D:\\Footage\\Cheap fast car\\C0002.MP4",
+      "kind": "video",
+      "duration": 20.0,
+      "width": 1920,
+      "height": 1080,
+      "fps": 59.94,
+      "hasAudio": true,
+      "origin": "footage"
+    },
+    {
+      "id": "src_broll",
+      "path": "D:\\Footage\\Cheap fast car\\broll_speedrun.MP4",
+      "kind": "video",
+      "duration": 30.0,
+      "width": 3840,
+      "height": 2160,
+      "fps": 60,
+      "hasAudio": true,
+      "origin": "footage"
+    },
+    {
+      "id": "src_music",
+      "path": "E:\\Music\\upbeat\\Neon Drive.mp3",
+      "kind": "audio",
+      "duration": 180.5,
+      "hasAudio": true,
+      "origin": "music"
+    },
+    {
+      "id": "src_still",
+      "path": "D:\\Footage\\Cheap fast car\\box.jpg",
+      "kind": "image",
+      "duration": 0,
+      "width": 4000,
+      "height": 3000,
+      "hasAudio": false,
+      "origin": "other"
+    }
+  ],
+  "transcript": {
+    "file": "transcript.json",
+    "updatedAt": "2026-10-20T10:00:00.000Z"
+  },
+  "tracks": [
+    {
+      "id": "aroll",
+      "kind": "aroll",
+      "name": "A-roll",
+      "muted": false,
+      "solo": false,
+      "volume": 0,
+      "hidden": false
+    },
+    {
+      "id": "broll",
+      "kind": "broll",
+      "name": "B-roll",
+      "muted": false,
+      "solo": false,
+      "volume": 0,
+      "hidden": false
+    },
+    {
+      "id": "graphics",
+      "kind": "graphics",
+      "name": "Graphics",
+      "muted": false,
+      "solo": false,
+      "volume": 0,
+      "hidden": false
+    },
+    {
+      "id": "effects",
+      "kind": "effects",
+      "name": "Effects",
+      "muted": false,
+      "solo": false,
+      "volume": 0,
+      "hidden": false
+    },
+    {
+      "id": "captions",
+      "kind": "captions",
+      "name": "Captions",
+      "muted": false,
+      "solo": false,
+      "volume": 0,
+      "hidden": false
+    },
+    {
+      "id": "music",
+      "kind": "music",
+      "name": "Music",
+      "muted": false,
+      "solo": false,
+      "volume": -3,
+      "hidden": false
+    },
+    {
+      "id": "sfx",
+      "kind": "sfx",
+      "name": "Sound effects",
+      "muted": false,
+      "solo": false,
+      "volume": 0,
+      "hidden": false
+    },
+    {
+      "id": "sfx_2",
+      "kind": "sfx",
+      "name": "Sound effects 2",
+      "muted": true,
+      "solo": false,
+      "volume": 0,
+      "hidden": false,
+      "colorTag": "purple"
+    }
+  ],
+  "items": [
+    {
+      "id": "seg_1",
+      "trackId": "aroll",
+      "createdBy": "claude",
+      "type": "segment",
+      "sourceId": "src_main",
+      "in": 0.7,
+      "out": 5.75,
+      "speed": 1,
+      "volume": 0,
+      "fadeIn": 0,
+      "fadeOut": 0
+    },
+    {
+      "id": "seg_2",
+      "trackId": "aroll",
+      "createdBy": "claude",
+      "type": "segment",
+      "sourceId": "src_main",
+      "in": 6.1,
+      "out": 11.0,
+      "speed": 1,
+      "volume": 0,
+      "fadeIn": 0,
+      "fadeOut": 0.02
+    },
+    {
+      "id": "seg_freeze",
+      "trackId": "aroll",
+      "createdBy": "claude",
+      "type": "segment",
+      "sourceId": "src_main",
+      "in": 11.0,
+      "out": 11.5,
+      "speed": 1,
+      "volume": 0,
+      "fadeIn": 0,
+      "fadeOut": 0,
+      "hold": 1.2,
+      "label": "Freeze on the price"
+    },
+    {
+      "id": "seg_3",
+      "trackId": "aroll",
+      "createdBy": "claude",
+      "type": "segment",
+      "sourceId": "src_main",
+      "in": 11.5,
+      "out": 15.2,
+      "speed": 1.0,
+      "volume": -1.5,
+      "fadeIn": 0,
+      "fadeOut": 0
+    },
+    {
+      "id": "seg_4",
+      "trackId": "aroll",
+      "createdBy": "claude",
+      "type": "segment",
+      "sourceId": "src_main2",
+      "in": 0.4,
+      "out": 4.3,
+      "speed": 1,
+      "volume": 0,
+      "fadeIn": 0,
+      "fadeOut": 0,
+      "claudeNote": "best take of the outro line"
+    },
+    {
+      "id": "clip_speed",
+      "trackId": "broll",
+      "createdBy": "claude",
+      "type": "clip",
+      "sourceId": "src_broll",
+      "anchor": {
+        "kind": "word",
+        "wordId": "w_5",
+        "offset": 0.1
+      },
+      "duration": 3.2,
+      "in": 4.0,
+      "speed": 1,
+      "volume": -120,
+      "fadeIn": 0,
+      "fadeOut": 0.2,
+      "transform": {
+        "x": 0,
+        "y": 0,
+        "scale": 1,
+        "rotation": 0,
+        "opacity": 1
+      },
+      "keyframes": [
+        {
+          "t": 0,
+          "x": 0,
+          "y": 0
+        },
+        {
+          "t": 3.2,
+          "x": 0.05,
+          "y": 0,
+          "scale": 1.1
+        }
+      ]
+    },
+    {
+      "id": "clip_box",
+      "trackId": "broll",
+      "createdBy": "claude",
+      "type": "clip",
+      "sourceId": "src_still",
+      "anchor": {
+        "kind": "word",
+        "wordId": "w_14",
+        "offset": 0
+      },
+      "duration": 2.0,
+      "in": 0,
+      "speed": 1,
+      "volume": -120,
+      "fadeIn": 0.1,
+      "fadeOut": 0.1
+    },
+    {
+      "id": "clip_processed",
+      "trackId": "broll",
+      "createdBy": "claude",
+      "type": "clip",
+      "file": "media/zoom_punch.mp4",
+      "anchor": {
+        "kind": "word",
+        "wordId": "w_22",
+        "offset": -0.2
+      },
+      "duration": 1.5,
+      "in": 0,
+      "speed": 1,
+      "volume": -120,
+      "fadeIn": 0,
+      "fadeOut": 0
+    },
+    {
+      "id": "gfx_price",
+      "trackId": "graphics",
+      "createdBy": "claude",
+      "type": "graphic",
+      "file": "graphics/price_tag.py",
+      "anchor": {
+        "kind": "word",
+        "wordId": "w_0",
+        "offset": 0.3
+      },
+      "duration": 2.4,
+      "params": {
+        "text": "$500",
+        "color": "#FFD400"
+      },
+      "transform": {
+        "x": 0.25,
+        "y": -0.2,
+        "scale": 1.2,
+        "rotation": -4,
+        "opacity": 1
+      },
+      "libraryAssetId": "lib_price_tag"
+    },
+    {
+      "id": "gfx_subscribe",
+      "trackId": "graphics",
+      "createdBy": "user",
+      "type": "graphic",
+      "file": "graphics/subscribe.py",
+      "anchor": {
+        "kind": "time",
+        "time": 14.0
+      },
+      "duration": 3.0,
+      "params": {}
+    },
+    {
+      "id": "fx_flash",
+      "trackId": "effects",
+      "createdBy": "claude",
+      "type": "effect",
+      "effect": "flash",
+      "anchor": {
+        "kind": "word",
+        "wordId": "w_10",
+        "offset": 0
+      },
+      "duration": 0.3,
+      "params": {
+        "strength": 0.8
+      }
+    },
+    {
+      "id": "fx_custom",
+      "trackId": "effects",
+      "createdBy": "claude",
+      "type": "effect",
+      "effect": "custom",
+      "file": "graphics/vhs_wobble.py",
+      "anchor": {
+        "kind": "word",
+        "wordId": "w_20",
+        "offset": 0
+      },
+      "duration": 1.0,
+      "params": {
+        "amount": 0.4
+      }
+    },
+    {
+      "id": "music_bed",
+      "trackId": "music",
+      "createdBy": "claude",
+      "type": "audio",
+      "sourceId": "src_music",
+      "anchor": {
+        "kind": "time",
+        "time": 0
+      },
+      "duration": 20.5,
+      "in": 12.0,
+      "volume": -6,
+      "fadeIn": 1,
+      "fadeOut": 2,
+      "duck": true,
+      "loop": false
+    },
+    {
+      "id": "sfx_pop",
+      "trackId": "sfx",
+      "createdBy": "claude",
+      "type": "audio",
+      "file": "audio/pop.wav",
+      "anchor": {
+        "kind": "word",
+        "wordId": "w_0",
+        "offset": 0.3
+      },
+      "duration": 0.4,
+      "in": 0,
+      "volume": -4,
+      "fadeIn": 0,
+      "fadeOut": 0,
+      "duck": false,
+      "loop": false
+    },
+    {
+      "id": "sfx_riser",
+      "trackId": "sfx_2",
+      "createdBy": "claude",
+      "type": "audio",
+      "file": "audio/pop.wav",
+      "anchor": {
+        "kind": "word",
+        "wordId": "v_2",
+        "offset": 0
+      },
+      "duration": 0.4,
+      "in": 0,
+      "volume": -8,
+      "fadeIn": 0,
+      "fadeOut": 0,
+      "duck": false,
+      "loop": true
+    }
+  ],
+  "checklist": [
+    {
+      "id": "transcript",
+      "label": "Transcript",
+      "status": "done",
+      "updatedAt": "2026-10-20T11:00:00.000Z"
+    },
+    {
+      "id": "cuts",
+      "label": "Cuts",
+      "status": "done",
+      "updatedAt": "2026-10-20T11:00:00.000Z"
+    },
+    {
+      "id": "broll",
+      "label": "B-roll",
+      "status": "done",
+      "updatedAt": "2026-10-20T11:00:00.000Z"
+    },
+    {
+      "id": "graphics",
+      "label": "Graphics",
+      "status": "done",
+      "updatedAt": "2026-10-20T11:00:00.000Z"
+    },
+    {
+      "id": "audio",
+      "label": "Music and sound",
+      "status": "done",
+      "updatedAt": "2026-10-20T11:00:00.000Z"
+    },
+    {
+      "id": "captions",
+      "label": "Captions",
+      "status": "done",
+      "updatedAt": "2026-10-20T11:00:00.000Z"
+    },
+    {
+      "id": "self_check",
+      "label": "Self-check",
+      "status": "done",
+      "updatedAt": "2026-10-20T11:00:00.000Z"
+    },
+    {
+      "id": "thumbnails",
+      "label": "Thumbnails",
+      "status": "in_progress",
+      "updatedAt": "2026-10-20T11:00:00.000Z"
+    },
+    {
+      "id": "publish",
+      "label": "Publishing pack",
+      "status": "not_started"
+    }
+  ],
+  "handoffNotes": [
+    {
+      "id": "hn_1",
+      "ts": "2026-10-20T10:30:00.000Z",
+      "text": "Intro done; cut at the price reveal. Next: thumbnails.",
+      "stage": "graphics"
+    }
+  ],
+  "requests": [
+    {
+      "id": "req_start",
+      "kind": "start_edit",
+      "status": "done",
+      "createdAt": "2026-10-20T09:15:00.000Z",
+      "text": "Keep it punchy.",
+      "context": {
+        "scope": "intro",
+        "introMaxSeconds": 30
+      },
+      "summary": "Intro edited.",
+      "startedAt": "2026-10-20T09:15:05.000Z",
+      "finishedAt": "2026-10-20T10:31:00.000Z"
+    },
+    {
+      "id": "req_chat1",
+      "kind": "chat",
+      "status": "done",
+      "createdAt": "2026-10-20T11:00:00.000Z",
+      "text": "At 0:05 to 0:09 add a speed graphic",
+      "range": {
+        "start": 5,
+        "end": 9
+      },
+      "context": {
+        "playhead": 6.2,
+        "selectedItemIds": []
+      },
+      "summary": "Added a speed graphic.",
+      "beforeVersionId": "ver_aa11",
+      "review": "kept",
+      "startedAt": "2026-10-20T11:00:10.000Z",
+      "finishedAt": "2026-10-20T11:05:00.000Z"
+    },
+    {
+      "id": "req_q",
+      "kind": "publish_regen",
+      "status": "queued",
+      "createdAt": "2026-10-20T11:39:00.000Z",
+      "text": "Shorter titles",
+      "context": {
+        "part": "titles"
+      },
+      "waitingReason": "Claude is not connected"
+    }
+  ],
+  "chat": [
+    {
+      "id": "msg_1",
+      "role": "user",
+      "text": "At 0:05 to 0:09 add a speed graphic",
+      "ts": "2026-10-20T11:00:00.000Z",
+      "requestId": "req_chat1",
+      "range": {
+        "start": 5,
+        "end": 9
+      }
+    },
+    {
+      "id": "msg_2",
+      "role": "claude",
+      "text": "Added a speed readout over the run.",
+      "ts": "2026-10-20T11:05:00.000Z",
+      "requestId": "req_chat1"
+    }
+  ],
+  "notes": [
+    {
+      "id": "note_1",
+      "text": "Make the price tag funnier",
+      "itemId": "gfx_price",
+      "status": "open",
+      "createdAt": "2026-10-20T11:20:00.000Z"
+    },
+    {
+      "id": "note_2",
+      "text": "Less music here",
+      "range": {
+        "start": 2,
+        "end": 6
+      },
+      "status": "done",
+      "createdAt": "2026-10-20T11:21:00.000Z",
+      "doneAt": "2026-10-20T11:30:00.000Z",
+      "response": "Lowered by 3 dB."
+    }
+  ],
+  "captions": {
+    "enabled": true,
+    "style": {
+      "font": "",
+      "size": 0.055,
+      "position": "bottom",
+      "color": "#FFFFFF",
+      "highlightColor": "#FF3B30",
+      "outlineColor": "#000000",
+      "maxWords": 4
+    }
+  },
+  "thumbnails": {
+    "personaId": "per_adam",
+    "styleId": "sty_bold",
+    "count": 3,
+    "direction": "big bold text, shocked face",
+    "useMyDirection": false,
+    "format": "16:9",
+    "items": [
+      {
+        "id": "th_1",
+        "file": "thumbnails/th_1.png",
+        "prompt": "Shocked man holding a tiny fast RC car, text $500?!",
+        "personaId": "per_adam",
+        "styleId": "sty_bold",
+        "model": "pkz_4_5",
+        "format": "16:9",
+        "requestId": "pkzreq_123",
+        "createdAt": "2026-10-20T11:35:00.000Z",
+        "source": "claude",
+        "status": "done",
+        "batchId": "b1"
+      },
+      {
+        "id": "th_2",
+        "prompt": "RC car mid-air over a ramp",
+        "createdAt": "2026-10-20T11:35:00.000Z",
+        "source": "claude",
+        "status": "failed",
+        "error": "Out of Pikzels credits",
+        "format": "16:9",
+        "batchId": "b1"
+      }
+    ],
+    "chosenId": "th_1"
+  },
+  "publish": {
+    "titles": [
+      "I bought the cheapest fast RC car",
+      "$500 for 60 mph?"
+    ],
+    "description": "Is a cheap fast RC car worth it?",
+    "chapters": [
+      {
+        "id": "ch_1",
+        "title": "Unboxing",
+        "anchor": {
+          "kind": "word",
+          "wordId": "w_17",
+          "offset": 0
+        }
+      },
+      {
+        "id": "ch_2",
+        "title": "Speed run",
+        "anchor": {
+          "kind": "time",
+          "time": 12.5
+        }
+      }
+    ],
+    "tags": [
+      "rc car",
+      "review"
+    ],
+    "updatedAt": "2026-10-20T11:38:00.000Z"
+  },
+  "lock": null,
+  "selfCheck": {
+    "ranAt": "2026-10-20T10:20:00.000Z",
+    "flags": [
+      {
+        "word": "dollars",
+        "time": 1.2,
+        "note": "slightly clipped, fixed"
+      }
+    ]
+  },
+  "claudeSessionId": "2b0f6a4e-8c1d-4f7e-9a51-1f0e3c9d7b22",
+  "futureField": {
+    "addedBy": "a newer app",
+    "keep": [
+      1,
+      2,
+      3
+    ]
+  }
+}

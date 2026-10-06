@@ -1,0 +1,42 @@
+{
+  "version": 1,
+  "id": "prj_0x_rc_bash",
+  "name": "RC basher first run",
+  "created": "2026-09-12T18:04:11.000Z",
+  "profile": "prof_rc",
+  "status": "review",
+  "scope": "whole",
+  "footageFolder": "D:\\Footage\\RC basher",
+  "sources": [
+    { "id": "src_a", "path": "D:\\Footage\\RC basher\\A001.mp4", "kind": "video", "duration": 42.5, "width": 1920, "height": 1080, "fps": 59.94, "hasAudio": true },
+    { "id": "src_b", "path": "D:\\Footage\\RC basher\\B-roll jump.mp4", "kind": "video", "duration": 12.0, "width": 1920, "height": 1080, "fps": 59.94, "hasAudio": true },
+    { "id": "src_m", "path": "E:\\Music\\upbeat\\Garage Run.wav", "kind": "audio", "duration": 95.2, "hasAudio": true, "origin": "music" }
+  ],
+  "transcriptFile": "transcript.json",
+  "tracks": [
+    { "id": "aroll", "kind": "aroll", "name": "A-roll", "gain": 1 },
+    { "id": "broll", "kind": "broll", "name": "B-roll", "gain": 1 },
+    { "id": "graphics", "kind": "graphics", "name": "Graphics", "gain": 1 },
+    { "id": "music", "kind": "music", "name": "Music", "gain": 0.5, "muted": false },
+    { "id": "sfx", "kind": "sfx", "name": "Sound effects", "gain": 0.8 }
+  ],
+  "items": [
+    { "id": "seg_1", "type": "segment", "trackId": "aroll", "sourceId": "src_a", "in": 1.2, "out": 6.8 },
+    { "id": "seg_2", "type": "segment", "trackId": "aroll", "sourceId": "src_a", "in": 9.4, "out": 18.25, "gain": 0.9 },
+    { "id": "seg_3", "type": "segment", "trackId": "aroll", "sourceId": "src_a", "in": 21.0, "out": 30.5 },
+    { "id": "clip_jump", "type": "clip", "trackId": "broll", "sourceId": "src_b", "anchorWord": "w_a_9", "anchorOffset": 0.25, "duration": 3.5, "in": 2.0 },
+    { "id": "gfx_title", "type": "graphic", "trackId": "graphics", "file": "graphics/title_card.py", "anchorWord": "w_a_1", "anchorOffset": 0, "duration": 2.5, "params": { "text": "BASHER RUN" } },
+    { "id": "music_bed", "type": "audio", "trackId": "music", "sourceId": "src_m", "start": 0, "duration": 24.0, "gain": 0.25, "duck": true },
+    { "id": "sfx_whoosh", "type": "audio", "trackId": "sfx", "file": "audio/whoosh.wav", "anchorWord": "w_a_9", "anchorOffset": -0.1, "duration": 0.6 }
+  ],
+  "checklist": { "transcript": "done", "cuts": "done", "broll": "done", "graphics": "in_progress", "audio": "in_progress" },
+  "notes": [
+    { "text": "Title card felt a bit long", "itemId": "gfx_title" },
+    { "text": "Music too loud in the jump", "done": true }
+  ],
+  "aiScratch": {
+    "model": "claude",
+    "retakes": [["w_a_3", "w_a_4"]],
+    "plan": "Tight cold open, then the jump."
+  }
+}

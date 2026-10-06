@@ -1,12 +1,17 @@
 # Copies the pinned uv and ffmpeg downloads into a release of this repository, so the app's
 # one-time environment install never breaks when an upstream build is deleted.
-# Run it by pushing a tag named runtime-<date>. The release is marked pre-release so the
+# Run it from Actions (Run workflow) or by pushing a tag named runtime-<date>. The release is marked pre-release so the
 # app's updater never mistakes it for an app version.
 name: Mirror runtime downloads
 
 on:
   push:
     tags: ['runtime-*']
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Release tag to create
+        default: runtime-2026-10-06
 
 permissions:
   contents: write
@@ -30,7 +35,8 @@ jobs:
       - name: Publish as a pre-release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ inputs.tag || github.ref_name }}
         run: |
-          gh release create "$GITHUB_REF_NAME" files/* --repo "$GITHUB_REPOSITORY" --prerelease \
-            --title "Runtime downloads ($GITHUB_REF_NAME)" \
+          gh release create "$TAG" files/* --repo "$GITHUB_REPOSITORY" --prerelease --target "$GITHUB_SHA" \
+            --title "Runtime downloads ($TAG)" \
             --notes "Pinned uv and ffmpeg (NVENC) builds used by the app's one-time environment install. Not an app release."

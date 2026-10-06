@@ -31,6 +31,8 @@ interface PinnedDownload {
   version: string
   url: string
   sha256: string
+  /** Other places holding the same file (same sha256), tried in order if `url` fails. */
+  mirrors?: string[]
 }
 
 /** engine/runtime.json: the pinned set the managed environment is built from. */
@@ -137,6 +139,26 @@ export function findOnPath(command: string): string | null {
 }
 
 /** Downloads a file, reporting progress, and checks its sha256. Throws in plain words on any problem. */
+/** Downloads a pinned file from its main address, falling back to its mirrors. */
+export async function downloadPinned(
+  pin: PinnedDownload,
+  dest: string,
+  onPercent: (pct: number, receivedMb: number, totalMb: number) => void
+): Promise<void> {
+  const urls = [pin.url, ...(pin.mirrors ?? [])]
+  let lastError: unknown
+  for (const url of urls) {
+    try {
+      await download(url, dest, pin.sha256, onPercent)
+      return
+    } catch (err) {
+      lastError = err
+      rmSync(dest, { force: true })
+    }
+  }
+  throw lastError
+}
+
 export async function download(
   url: string,
   dest: string,
@@ -450,7 +472,7 @@ export function createEnvironmentService(ctx: AppContext): EnvironmentService {
     const tmp = `${dir}.tmp-${randomBytes(3).toString('hex')}`
     try {
       const zip = join(tmp, 'uv.zip')
-      await download(m.uv.url, zip, m.uv.sha256, (pct) =>
+      await downloadPinned(m.uv, zip, (pct) =>
         report({ step: 'uv', percent: Math.round(pct * 0.03), message: `Downloading the installer tool… ${Math.round(pct)}%` })
       )
       await extractZip(zip, join(tmp, 'x'))
@@ -473,7 +495,7 @@ export function createEnvironmentService(ctx: AppContext): EnvironmentService {
     const tmp = `${dir}.tmp-${randomBytes(3).toString('hex')}`
     try {
       const zip = join(tmp, 'ffmpeg.zip')
-      await download(m.ffmpeg.url, zip, m.ffmpeg.sha256, (pct, got, total) =>
+      await downloadPinned(m.ffmpeg, zip, (pct, got, total) =>
         report({
           step: 'ffmpeg',
           percent: 3 + Math.round(pct * 0.12),

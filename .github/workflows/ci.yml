@@ -64,3 +64,37 @@ jobs:
             dist/*.exe
             dist/latest.yml
           retention-days: 7
+
+  # The one-time environment install downloads these on the owner's PC. Fail early if a pin vanishes.
+  runtime-pins:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Pinned downloads are still there
+        run: |
+          set -euo pipefail
+          node -e '
+            const m = require("./engine/runtime.json");
+            for (const k of ["uv", "ffmpeg"]) for (const u of [m[k].url, ...(m[k].mirrors || [])]) console.log(u);
+          ' > urls.txt
+          ok=0
+          while read -r u; do
+            if curl -fsIL -o /dev/null "$u"; then echo "ok   $u"; ok=$((ok+1)); else echo "MISSING $u"; fi
+          done < urls.txt
+          # Each file needs at least one live address (the mirror release or upstream).
+          node -e '
+            const m = require("./engine/runtime.json");
+            const { execSync } = require("child_process");
+            for (const k of ["uv", "ffmpeg"]) {
+              const live = [m[k].url, ...(m[k].mirrors || [])].some((u) => { try { execSync(`curl -fsIL -o /dev/null "${u}"`); return true } catch { return false } });
+              if (!live) { console.error(`No live download for ${k}`); process.exit(1) }
+            }'
+      - name: PyTorch CUDA 12.8 wheels exist for Windows / Python 3.12
+        run: |
+          set -euo pipefail
+          for spec in $(node -p 'require("./engine/runtime.json").torchPackages.join(" ")'); do
+            name="${spec%%==*}"; ver="${spec##*==}"
+            curl -fsSL "https://download.pytorch.org/whl/cu128/${name}/" | grep -q "${name}-${ver}+cu128-cp312-cp312-win_amd64.whl" \
+              || { echo "::error::No ${name} ${ver} cu128 wheel for Windows / Python 3.12"; exit 1; }
+            echo "ok   ${name} ${ver} cu128"
+          done

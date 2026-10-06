@@ -131,11 +131,9 @@ function buildContext(log: ActivityLog): AppContext {
 }
 
 function forwardEvents(c: AppContext): void {
-  c.updater.onState((s) => c.send(API_EVENTS['updates.onState'], s))
-  c.preview.onState((s) => c.send(API_EVENTS['preview.onState'], s))
+  // The updater, preview and render jobs send their own events; the runner reports only through listeners.
   c.runner.onState((s) => c.send(API_EVENTS['claude.onState'], s))
   c.runner.onOutput((line) => c.send(API_EVENTS['claude.onOutput'], line))
-  c.renders.onJob((j) => c.send(API_EVENTS['project.onRenderJob'], j))
 }
 
 // ------------------------------------------------------------------ window

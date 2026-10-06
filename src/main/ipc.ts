@@ -262,6 +262,8 @@ export function registerIpc(ctx: AppContext, getWindow: () => BrowserWindow | nu
       if (decision === 'continue') {
         s.mutate('Intro approved', 'user', (d) => {
           d.project.scope.introApproved = true
+          // From here on it is a whole-video edit (thumbnails and publishing pack included).
+          d.project.scope.mode = 'whole'
           d.project.status = 'editing'
         }, BOOKKEEPING)
         // The approved intro is locked by allowing changes only from its last frame on.

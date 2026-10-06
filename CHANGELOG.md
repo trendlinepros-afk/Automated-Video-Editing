@@ -3,6 +3,11 @@
 Each release's section becomes its GitHub release text and the notes shown in the app's update dialog.
 A release is blocked until the section for its version has notes.
 
+## 1.1.1
+
+- **Continue with the rest of the edit, any time.** After a Just the intro edit, Watch first now shrinks the intro card to a button in the corner of the preview instead of hiding it until the project is reopened. After Stop there, the same button stays, so you can edit the rest of the video whenever you like. The card also shows what continuing is likely to cost.
+- Once you continue, the project counts as a whole-video edit, so thumbnails and the publishing pack are made too.
+
 ## 1.1.0
 
 - **Estimated cost so far.** The editor's top bar shows what this project has cost next to Export: Claude runs (as Claude Code reports them, at API prices) plus Pikzels thumbnails. Click it for the breakdown by part of the edit and by model. It flashes each time a run adds to it, so iterations are easy to follow.

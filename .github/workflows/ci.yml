@@ -94,7 +94,11 @@ jobs:
           set -euo pipefail
           for spec in $(node -p 'require("./engine/runtime.json").torchPackages.join(" ")'); do
             name="${spec%%==*}"; ver="${spec##*==}"
-            curl -fsSL "https://download.pytorch.org/whl/cu128/${name}/" | grep -q "${name}-${ver}+cu128-cp312-cp312-win_amd64.whl" \
-              || { echo "::error::No ${name} ${ver} cu128 wheel for Windows / Python 3.12"; exit 1; }
+            curl -fsSL "https://download.pytorch.org/whl/cu128/${name}/" -o index.html
+            if ! grep -Eq "${name}-${ver}(\+|%2B)cu128-cp312-cp312-win_amd64\.whl" index.html; then
+              echo "Available Windows / Python 3.12 cu128 builds of ${name}:"
+              grep -Eo "${name}-[0-9.]+(\+|%2B)cu128-cp312-cp312-win_amd64\.whl" index.html | sort -uV | tail -8
+              echo "::error::No ${name} ${ver} cu128 wheel for Windows / Python 3.12"; exit 1
+            fi
             echo "ok   ${name} ${ver} cu128"
           done

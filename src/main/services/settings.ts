@@ -235,8 +235,17 @@ interface SecretsFile {
   values: Partial<Record<SecretName, string>> // base64 of the encrypted bytes
 }
 
-export function createSecretsService(ctx: AppContext, safeStorage: SafeStorageLike): SecretsService {
+/** Values written with the direct DPAPI store carry this prefix; older values came from safeStorage. */
+const DPAPI_PREFIX = 'dpapi:'
+
+/**
+ * @param safeStorage Electron's safeStorage (used when no direct store is given, and to read older values)
+ * @param direct      the preferred store; on Windows, DPAPI called directly (see dpapi.ts)
+ */
+export function createSecretsService(ctx: AppContext, safeStorage: SafeStorageLike, direct?: SafeStorageLike): SecretsService {
   let cache: SecretsFile | null = null
+  // Decrypted values for this launch, so each key is decrypted once.
+  const plain = new Map<SecretName, string>()
 
   function load(): SecretsFile {
     if (cache) return cache
@@ -250,14 +259,46 @@ export function createSecretsService(ctx: AppContext, safeStorage: SafeStorageLi
     return cache
   }
 
+  const preferred = (): { store: SafeStorageLike; prefix: string } | null => {
+    if (direct?.isEncryptionAvailable()) return { store: direct, prefix: DPAPI_PREFIX }
+    if (safeStorage.isEncryptionAvailable()) return { store: safeStorage, prefix: '' }
+    return null
+  }
+
+  const encrypt = (value: string): string => {
+    const p = preferred()
+    if (!p) {
+      throw new Error('Windows credential protection is not available on this PC, so the key cannot be stored safely. It was not saved.')
+    }
+    return p.prefix + p.store.encryptString(value).toString('base64')
+  }
+
   return {
     get(name) {
+      const known = plain.get(name)
+      if (known !== undefined) return known
       const stored = load().values[name]
       if (!stored) return null
       try {
-        if (!safeStorage.isEncryptionAvailable()) return null
-        const value = safeStorage.decryptString(Buffer.from(stored, 'base64'))
+        let value: string
+        if (stored.startsWith(DPAPI_PREFIX)) {
+          if (!direct?.isEncryptionAvailable()) return null
+          value = direct.decryptString(Buffer.from(stored.slice(DPAPI_PREFIX.length), 'base64'))
+        } else {
+          if (!safeStorage.isEncryptionAvailable()) return null
+          value = safeStorage.decryptString(Buffer.from(stored, 'base64'))
+          // Move a key saved by an older version to the direct store.
+          if (direct?.isEncryptionAvailable()) {
+            try {
+              load().values[name] = encrypt(value)
+              writeJsonAtomic(paths.secretsFile, load())
+            } catch {
+              /* keep the old value; it still works */
+            }
+          }
+        }
         registerSecret(value)
+        plain.set(name, value)
         return value
       } catch {
         log(ctx, `A saved key (${name}) could not be decrypted on this PC; enter it again in Settings`)
@@ -268,19 +309,16 @@ export function createSecretsService(ctx: AppContext, safeStorage: SafeStorageLi
       const file = load()
       if (value === null || value.trim() === '') {
         delete file.values[name]
+        plain.delete(name)
         writeJsonAtomic(paths.secretsFile, file)
         log(ctx, `Key removed: ${name}`)
         return
       }
       const clean = value.trim()
       registerSecret(clean)
-      if (!safeStorage.isEncryptionAvailable()) {
-        throw new Error(
-          'Windows credential protection is not available on this PC, so the key cannot be stored safely. It was not saved.'
-        )
-      }
-      file.values[name] = safeStorage.encryptString(clean).toString('base64')
+      file.values[name] = encrypt(clean)
       writeJsonAtomic(paths.secretsFile, file)
+      plain.set(name, clean)
       log(ctx, `Key saved: ${name}`)
     }
   }

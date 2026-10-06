@@ -33,6 +33,7 @@ import {
   createSettingsService
 } from './services/settings'
 import { createUpdaterService, runUpdateSelfTest } from './updater'
+import { windowsDpapi } from './services/dpapi'
 
 const UPDATE_SELF_TEST = process.argv.includes('--update-self-test')
 /** CI only: `--secret-check write|read` proves a saved key (Pikzels) survives an update. */
@@ -111,7 +112,7 @@ function buildContext(log: ActivityLog): AppContext {
   // Factories only keep a reference to the context; services reach each other at call time.
   c.settings = createSettingsService(c)
   c.profiles = createProfileService(c)
-  c.secrets = createSecretsService(c, safeStorage)
+  c.secrets = createSecretsService(c, safeStorage, process.platform === 'win32' ? windowsDpapi() : undefined)
   c.recent = createRecentService(c)
   c.projects = createProjectManager(c, { documentsDir: app.getPath('documents') })
   c.requests = createRequestService(c)

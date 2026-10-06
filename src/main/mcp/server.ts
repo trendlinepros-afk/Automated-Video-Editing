@@ -157,10 +157,23 @@ export function createMcpService(ctx: AppContext, opts: { tools?: ToolDef[] } = 
 
   const ensureToken = (): string => {
     if (cachedToken) return cachedToken
-    let t = ctx.secrets.get('mcpToken')
+    let t: string | null = null
+    try {
+      t = ctx.secrets.get('mcpToken')
+    } catch {
+      t = null
+    }
     if (!t) {
       t = randomBytes(32).toString('base64url')
-      ctx.secrets.set('mcpToken', t)
+      try {
+        ctx.secrets.set('mcpToken', t)
+      } catch (err) {
+        // No protected storage on this machine (Linux without a keyring): keep the token in memory for this
+        // launch only. It is never written in plain text; Claude connected by hand must copy setup again next launch.
+        ctx.appLog.write('app', 'The Claude connection token cannot be stored securely here; using a new token for this launch only', {
+          error: err instanceof Error ? err.message : String(err)
+        })
+      }
     }
     registerSecret(t)
     cachedToken = t

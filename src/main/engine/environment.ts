@@ -53,6 +53,22 @@ interface InstallMarker {
   check?: Record<string, unknown>
 }
 
+/**
+ * Pinned downloads. engine/runtime.json carries the same "uv" and "ffmpeg" keys and wins when present;
+ * these are the fallback so the pins are never lost if that file is rewritten.
+ */
+export const DEFAULT_UV: PinnedDownload = {
+  version: '0.12.23',
+  url: 'https://github.com/astral-sh/uv/releases/download/0.12.23/uv-x86_64-pc-windows-msvc.zip',
+  sha256: '75d05de6762778c31ee183398de7dd15093fad0ed90b1f236d8205ea5ec00c90'
+}
+/** BtbN FFmpeg-Builds, win64 GPL, ffmpeg 8.1.3 with NVENC (release autobuild-2026-10-05-13-07). */
+export const DEFAULT_FFMPEG: PinnedDownload = {
+  version: '8.1.3-14-g330caae0c1',
+  url: 'https://github.com/BtbN/FFmpeg-Builds/releases/download/autobuild-2026-10-05-13-07/ffmpeg-n8.1.3-14-g330caae0c1-win64-gpl-8.1.zip',
+  sha256: 'ce8f117aa804906c4a190367babfeeb0b9c8b2ea85ac128fa381b407f964af85'
+}
+
 export class SetupError extends Error {}
 
 type GpuInfo = SetupStatus['gpu']
@@ -262,7 +278,9 @@ export function createEnvironmentService(ctx: AppContext): EnvironmentService {
     const file = manifestFile()
     if (!existsSync(file)) throw new SetupError(`The engine's runtime list is missing (${file}). Reinstall the app.`)
     const m = JSON.parse(readFileSync(file, 'utf8')) as RuntimeManifest
-    if (!m.uv?.url || !m.ffmpeg?.url || !m.python) throw new SetupError('The engine runtime list is incomplete. Reinstall the app.')
+    if (!m.uv?.url || !m.uv?.sha256) m.uv = DEFAULT_UV
+    if (!m.ffmpeg?.url || !m.ffmpeg?.sha256) m.ffmpeg = DEFAULT_FFMPEG
+    if (!m.python) throw new SetupError('The engine runtime list is incomplete. Reinstall the app.')
     return m
   }
 

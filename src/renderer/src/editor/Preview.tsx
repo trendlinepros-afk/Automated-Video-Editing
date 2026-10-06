@@ -17,6 +17,8 @@ export function Preview() {
   const preview = useStore(editor, (s) => s.preview)
   const beforeId = useStore(editor, (s) => s.beforeRequestId)
   const status = useStore(editor, (s) => s.snapshot!.doc.project.status)
+  // Just the intro, stopped there (or not yet continued): the rest of the edit is still on offer.
+  const introOnly = useStore(editor, (s) => s.snapshot!.doc.project.scope.mode === 'intro' && s.snapshot!.doc.project.scope.introEnd != null)
   const hasCuts = useStore(editor, (s) => s.snapshot!.doc.project.items.some((i) => i.type === 'segment'))
   const box = useRef<HTMLDivElement>(null)
   const video = useRef<HTMLVideoElement>(null)
@@ -60,6 +62,7 @@ export function Preview() {
         {!showingBefore && <GraphicHandle stage={stage} video={video} />}
         {status === 'new' && !startHidden && <StartPanel onStarted={() => setStartHidden(true)} />}
         {status === 'intro_ready' && <IntroPanel />}
+        {status === 'ready_for_review' && introOnly && <IntroPanel stopped />}
       </div>
       <ReviewBar />
       <ListenReminder />

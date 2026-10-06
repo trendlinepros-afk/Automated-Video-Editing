@@ -4,7 +4,7 @@
  */
 import { useEffect, useState } from 'react'
 import type { ClaudeEstimate } from '@shared/ipc'
-import { EstimateNote } from './EstimateNote'
+import { EstimateNote, useEstimate } from './EstimateNote'
 import { toast } from '../state/app'
 import { errorMessage } from '../util'
 import { applyOp, editor } from '../state/editor'
@@ -105,8 +105,13 @@ export function StartPanel({ onStarted }: { onStarted: () => void }) {
   )
 }
 
-export function IntroPanel() {
-  const [mode, setMode] = useState<'choose' | 'redo' | 'hidden'>('choose')
+/**
+ * After a Just the intro edit: continue, redo or stop. Watch first shrinks it to a button in the
+ * corner, and after Stop there the same button stays so the rest of the edit can start any time.
+ */
+export function IntroPanel({ stopped = false }: { stopped?: boolean }) {
+  const [mode, setMode] = useState<'choose' | 'redo' | 'min' | 'hidden'>(stopped ? 'min' : 'choose')
+  const est = useEstimate('continue_intro')
   const [direction, setDirection] = useState('')
   const decide = async (decision: 'continue' | 'redo' | 'stop') => {
     try {
@@ -115,19 +120,27 @@ export function IntroPanel() {
       toast(`Could not send that: ${errorMessage(e)}`, { kind: 'error' })
       return
     }
-    setMode('hidden')
+    setMode(decision === 'stop' ? 'min' : 'hidden')
     if (decision === 'continue') toast('Claude keeps the intro exactly as it is and edits on from its last frame.')
     if (decision === 'redo') toast('Claude is redoing the intro with your direction.')
-    if (decision === 'stop') toast('Stopped after the intro. You can export it or continue later from the chat.')
+    if (decision === 'stop') toast('Stopped after the intro. You can export it, or press Continue with the rest of the edit any time.')
   }
   if (mode === 'hidden') return null
+  if (mode === 'min')
+    return (
+      <div className="intro-pill">
+        <button className="btn primary small" onClick={() => setMode('choose')} title="Continue the edit past the intro, or redo the intro">
+          {stopped ? 'Continue with the rest of the edit…' : 'Intro ready: continue or redo…'}
+        </button>
+      </div>
+    )
   return (
     <div className="start-panel" style={{ background: 'transparent', alignItems: 'flex-end', paddingBottom: 16, pointerEvents: 'none' }}>
       <div className="card" style={{ pointerEvents: 'auto', background: 'var(--bg-2)' }}>
         <div className="row">
-          <h3 className="grow">The intro is ready</h3>
-          <button className="btn ghost small" onClick={() => setMode('hidden')} title="Watch it first; this comes back next time you open the project">
-            Watch first
+          <h3 className="grow">{stopped ? 'Edit the rest of the video?' : 'The intro is ready'}</h3>
+          <button className="btn ghost small" onClick={() => setMode('min')} title="Watch it first; the button in the corner of the preview brings this back">
+            {stopped ? 'Not now' : 'Watch first'}
           </button>
         </div>
         {mode === 'choose' ? (
@@ -138,9 +151,13 @@ export function IntroPanel() {
             <button className="btn" onClick={() => setMode('redo')}>
               Redo the intro with new direction
             </button>
-            <button className="btn ghost" onClick={() => void decide('stop')}>
-              Stop there
-            </button>
+            {!stopped && (
+              <button className="btn ghost" onClick={() => void decide('stop')}>
+                Stop there
+              </button>
+            )}
+            <span className="spacer" />
+            <EstimateNote estimate={est} />
           </div>
         ) : (
           <>

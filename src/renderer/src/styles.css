@@ -391,3 +391,11 @@ button:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
 .cost-pop tr.total td { border-top: 1px solid var(--line-2); font-weight: 600; padding-top: 6px; }
 .cost-chip.pulse { animation: cost-flash 1.6s ease-out; }
 @keyframes cost-flash { 0% { background: rgba(79, 140, 255, 0.35); color: #fff; } 100% { background: transparent; } }
+
+/* After Just the intro: the way back to Continue / Redo stays in the corner of the preview. */
+.intro-pill {
+  position: absolute;
+  right: 16px;
+  bottom: 16px;
+  z-index: 5;
+}

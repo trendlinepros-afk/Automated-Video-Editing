@@ -141,22 +141,26 @@ class NumpyBackend:
             out = cv2.warpAffine(padded, m, (out_w, out_h), flags=cv2.INTER_LINEAR | cv2.WARP_INVERSE_MAP,
                                  borderMode=cv2.BORDER_CONSTANT, borderValue=(0, 0, 0, 0))
             return out.reshape(out_h, out_w, c)
-        ys, xs = np.mgrid[0:out_h, 0:out_w].astype(np.float32)
-        u = m[0, 0] * xs + m[0, 1] * ys + m[0, 2]
-        v = m[1, 0] * xs + m[1, 1] * ys + m[1, 2]
+        xs = np.arange(out_w, dtype=np.float32)[None, :]
+        ys = np.arange(out_h, dtype=np.float32)[:, None]
+        u = (m[0, 0] * xs + m[0, 1] * ys + m[0, 2]).astype(np.float32)
+        v = (m[1, 0] * xs + m[1, 1] * ys + m[1, 2]).astype(np.float32)
         inside = (u > -1) & (u < w + 2) & (v > -1) & (v < h + 2)
         u0 = np.floor(u)
         v0 = np.floor(v)
         fu = (u - u0)[..., None]
         fv = (v - v0)[..., None]
-        u0 = np.clip(u0.astype(np.int64), 0, w + 1)
-        v0 = np.clip(v0.astype(np.int64), 0, h + 1)
-        u1 = np.clip(u0 + 1, 0, w + 1)
-        v1 = np.clip(v0 + 1, 0, h + 1)
-        out = (padded[v0, u0] * (1 - fu) * (1 - fv) + padded[v0, u1] * fu * (1 - fv)
-               + padded[v1, u0] * (1 - fu) * fv + padded[v1, u1] * fu * fv)
+        pw = w + 2
+        i0 = np.clip(u0, 0, w + 1).astype(np.intp)
+        j0 = np.clip(v0, 0, h + 1).astype(np.intp)
+        i1 = np.minimum(i0 + 1, w + 1)
+        j1 = np.minimum(j0 + 1, h + 1)
+        flat = padded.reshape(-1, c)
+        top = flat[j0 * pw + i0] * (1 - fu) + flat[j0 * pw + i1] * fu
+        bot = flat[j1 * pw + i0] * (1 - fu) + flat[j1 * pw + i1] * fu
+        out = top * (1 - fv) + bot * fv
         out[~inside] = 0
-        return out.astype(np.float32)
+        return out.astype(np.float32, copy=False)
 
     def to_yuv420p(self, x) -> bytes | None:
         return None  # ffmpeg converts rgb24 on the CPU path

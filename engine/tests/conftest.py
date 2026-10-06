@@ -56,10 +56,11 @@ def build_media(d) -> dict:
     d = Path(d)
     m = {}
     # A-roll: two "cameras" with a talking-like tone (bursts with pauses), 1080p 30 fps. The test
-    # patterns are softened slightly, like camera footage; raw test patterns have pixel-sharp,
-    # fully saturated edges that no real footage has.
+    # patterns are softened and desaturated slightly, like camera footage: raw test patterns have
+    # pixel-sharp, fully saturated colour edges that 4:2:0 video cannot hold at any size, which would
+    # measure the codec rather than the renderer.
     speech = "aevalsrc='0.35*sin(2*PI*180*t)*(0.6+0.4*sin(2*PI*3*t))*lt(mod(t,2.5),1.7)':s=48000:d=34"
-    soft = ['-vf', 'gblur=sigma=1.5']
+    soft = ['-vf', 'gblur=sigma=1.5,eq=saturation=0.8']
     m['a1'] = str(d / 'a1.mp4')
     ff('-f', 'lavfi', '-i', 'testsrc2=s=1920x1080:r=30:d=34', '-f', 'lavfi', '-i', speech, *soft,
        '-c:v', 'libx264', '-preset', 'ultrafast', '-crf', '16', '-g', '45', '-pix_fmt', 'yuv420p',
@@ -70,7 +71,7 @@ def build_media(d) -> dict:
        '-c:a', 'aac', '-b:a', '192k', '-shortest', m['a2'])
     # B-roll: a different aspect (4:3) colour pattern, no audio.
     m['b1'] = str(d / 'b1.mp4')
-    ff('-f', 'lavfi', '-i', 'smptehdbars=s=1440x1080:r=30:d=20', '-vf', "hue=H=2*PI*t/5,gblur=sigma=1.5",
+    ff('-f', 'lavfi', '-i', 'smptehdbars=s=1440x1080:r=30:d=20', '-vf', "hue=H=2*PI*t/5,gblur=sigma=1.5,eq=saturation=0.8",
        '-c:v', 'libx264', '-preset', 'ultrafast', '-crf', '16', '-pix_fmt', 'yuv420p', m['b1'])
     # Music: a steady chord.
     m['music'] = str(d / 'music.wav')

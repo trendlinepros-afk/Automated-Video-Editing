@@ -35,11 +35,11 @@ GFX_MIN_HEIGHT = 720
 
 def reduce_premultiplied(rgba: np.ndarray, k: int) -> np.ndarray:
     """uint8 straight-alpha RGBA -> float32 premultiplied RGBA, averaged over k x k blocks."""
+    if k > 1:
+        img = Image.fromarray(np.ascontiguousarray(rgba), 'RGBA').convert('RGBa').reduce(k)
+        return np.asarray(img, dtype=np.float32) * (1.0 / 255.0)
     a = rgba.astype(np.float32) * (1.0 / 255.0)
     a[..., :3] *= a[..., 3:4]
-    if k > 1:
-        h, w = a.shape[0] // k, a.shape[1] // k
-        a = a[: h * k, : w * k].reshape(h, k, w, k, 4).mean(axis=(1, 3))
     return a
 
 

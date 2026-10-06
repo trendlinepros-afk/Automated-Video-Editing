@@ -10,7 +10,7 @@ import { Empty, Spinner } from '../components/bits'
 import { Icon } from '../components/Icon'
 import { IMAGE_EXTS, dateTime, mediaUrl } from '../util'
 import { CostPerAction, costLabel, usePikzelsPricing } from '../panels/ThumbnailsPanelCosts'
-import type { PikzelsPricing } from '@shared/ipc'
+import type { PikzelsPricing, YouTubeThumbnailList } from '@shared/ipc'
 
 export function PersonasScreen() {
   const [list, setList] = useState<Pikzonality[] | null>(null)
@@ -92,6 +92,20 @@ function CreateForm({ disabled, onCreated, pricing }: { disabled: boolean; onCre
   const [name, setName] = useState('')
   const [images, setImages] = useState<string[]>([])
   const [busy, setBusy] = useState(false)
+  const [link, setLink] = useState('')
+  const [loading, setLoading] = useState(false)
+  const [found, setFound] = useState<YouTubeThumbnailList | null>(null)
+
+  const loadFromYouTube = async () => {
+    setLoading(true)
+    const list = await call(() => window.api.pikzels.thumbnailsFromLink(link.trim()), 'Could not load thumbnails from YouTube')
+    setLoading(false)
+    if (list) setFound(list)
+  }
+
+  // Clicking a thumbnail selects it; a fourth click replaces the oldest pick.
+  const toggle = (file: string) =>
+    setImages((cur) => (cur.includes(file) ? cur.filter((f) => f !== file) : [...cur, file].slice(-3)))
 
   const pick = async () => {
     const files = await call(() =>
@@ -113,6 +127,7 @@ function CreateForm({ disabled, onCreated, pricing }: { disabled: boolean; onCre
       toast(`${name.trim()} is training at Pikzels. It is marked ready when done.`)
       setName('')
       setImages([])
+      setFound(null)
     }
   }
 
@@ -158,6 +173,53 @@ function CreateForm({ disabled, onCreated, pricing }: { disabled: boolean; onCre
         {kind === 'persona' ? 'Three clear, well-lit photos of the same face work best.' : 'Three thumbnails in the look you want.'} Names can be up to 25
         characters.
       </span>
+      <div className="col" style={{ gap: 8, marginTop: 6 }}>
+        <h3>Or pick from YouTube</h3>
+        <div className="row">
+          <input
+            type="text"
+            className="grow"
+            placeholder="Paste a channel, video or playlist link, e.g. youtube.com/@yourchannel"
+            value={link}
+            onChange={(e) => setLink(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' && link.trim() && !loading) void loadFromYouTube()
+            }}
+          />
+          <button className="btn" disabled={!link.trim() || loading} onClick={loadFromYouTube}>
+            {loading ? 'Loading…' : 'Show thumbnails'}
+          </button>
+        </div>
+        <span className="hint">
+          {kind === 'persona'
+            ? 'Pick three thumbnails where your face is clear. Several links can be pasted at once.'
+            : 'Pick three thumbnails in the look you want. Several links can be pasted at once.'}
+        </span>
+        {found && (
+          <>
+            <div className="row small muted">
+              <span className="grow">
+                {found.items.length} thumbnails from {found.source}. {images.length} of 3 picked.
+              </span>
+              <button className="btn ghost small" onClick={() => setFound(null)}>
+                Hide
+              </button>
+            </div>
+            <div className="yt-grid">
+              {found.items.map((t) => {
+                const n = images.indexOf(t.file)
+                return (
+                  <button key={t.videoId} className={`yt-thumb${n >= 0 ? ' on' : ''}`} onClick={() => toggle(t.file)} title={t.title || t.videoId}>
+                    <img src={mediaUrl(t.file)} alt="" loading="lazy" />
+                    {n >= 0 && <span className="yt-pick">{n + 1}</span>}
+                    {t.title && <span className="yt-title">{t.title}</span>}
+                  </button>
+                )
+              })}
+            </div>
+          </>
+        )}
+      </div>
     </div>
   )
 }

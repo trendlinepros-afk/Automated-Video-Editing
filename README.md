@@ -85,7 +85,7 @@ Releases go straight to this repository's GitHub Releases, and installed apps re
 4. GitHub Actions (`.github/workflows/release.yml`) then runs:
    - **gate**: a pushed tag must match `package.json`, and the version must not be released already; typecheck; every unit test, including opening and upgrading each sample project, the section lock and log redaction; the engine tests, including preview/export match.
    - **update-e2e** (Windows): builds this code twice, as `0.0.1` and as the release version, both reading updates from a local feed. It installs `0.0.1` silently, writes a file in `%APPDATA%\AI Video Editor`, serves the new build, and runs the installed app with `--update-self-test`. The app checks, downloads (sha512-verified), and installs the new build over itself. The job then checks that the installed program reports the new version and that the settings file is untouched.
-   - **publish**: builds the installer and publishes it with `latest.yml` and the blockmap to a GitHub release named after the version.
+   - **publish**: builds the installer, then creates the `vX.Y.Z` release and uploads the installer, `latest.yml` and the blockmap in one step. Running the release again for a version whose release is missing `latest.yml` repairs it.
 
 Every push and pull request runs `.github/workflows/ci.yml`: the same tests plus a Windows installer build that is not published.
 

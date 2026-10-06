@@ -1,0 +1,49 @@
+{
+  "formatVersion": 1,
+  "id": "starter-title-card",
+  "name": "Title card",
+  "type": "graphic",
+  "description": "Big centred title with a kicker line and a growing underline over a dimmed picture.",
+  "whenToUse": "Chapter starts, the video title in the intro, or a big reveal. 2-4 seconds.",
+  "tags": [
+    "title",
+    "chapter",
+    "heading",
+    "intro",
+    "text"
+  ],
+  "scope": "shared",
+  "file": "title_card.py",
+  "preview": "preview.png",
+  "inputs": {
+    "title": {
+      "type": "string",
+      "default": "THE BIG REVEAL",
+      "description": "Main title"
+    },
+    "kicker": {
+      "type": "string",
+      "default": "CHAPTER 1",
+      "description": "Small line above the title; empty hides it"
+    },
+    "backdrop": {
+      "type": "number",
+      "default": 0.45,
+      "description": "How much to darken the video behind (0 = none)"
+    },
+    "color": {
+      "type": "color",
+      "default": "primary",
+      "description": "Underline and kicker color"
+    },
+    "textColor": {
+      "type": "color",
+      "default": "#FFFFFF",
+      "description": "Title color"
+    }
+  },
+  "preferred": false,
+  "uses": 0,
+  "createdAt": "2026-10-06T00:00:00.000Z",
+  "updatedAt": "2026-10-06T00:00:00.000Z"
+}

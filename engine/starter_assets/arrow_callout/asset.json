@@ -1,0 +1,60 @@
+{
+  "formatVersion": 1,
+  "id": "starter-arrow-callout",
+  "name": "Arrow callout",
+  "type": "graphic",
+  "description": "Curved arrow that draws in towards a point with a label at its tail. The tip follows the item position, so keyframes track a moving object.",
+  "whenToUse": "Point at something on screen: a part, a button, a detail. Use keyframes when the target moves.",
+  "tags": [
+    "arrow",
+    "pointer",
+    "callout",
+    "look here",
+    "highlight",
+    "keyframes"
+  ],
+  "scope": "shared",
+  "file": "arrow_callout.py",
+  "preview": "preview.png",
+  "inputs": {
+    "label": {
+      "type": "string",
+      "default": "LOOK HERE",
+      "description": "Text at the tail; empty hides it"
+    },
+    "angle": {
+      "type": "number",
+      "default": 225,
+      "description": "Direction the arrow comes from, degrees (0 = from the right, 90 = from below, 180 = from the left, 270 = from above)"
+    },
+    "length": {
+      "type": "number",
+      "default": 0.35,
+      "description": "Arrow length (fraction of frame height)"
+    },
+    "bend": {
+      "type": "number",
+      "default": 0.25,
+      "description": "How curved the arrow is (-1..1)"
+    },
+    "targetX": {
+      "type": "number",
+      "default": 0.0,
+      "description": "Tip offset from centre, fraction of width"
+    },
+    "targetY": {
+      "type": "number",
+      "default": 0.0,
+      "description": "Tip offset from centre, fraction of height"
+    },
+    "color": {
+      "type": "color",
+      "default": "accent",
+      "description": "Arrow color"
+    }
+  },
+  "preferred": false,
+  "uses": 0,
+  "createdAt": "2026-10-06T00:00:00.000Z",
+  "updatedAt": "2026-10-06T00:00:00.000Z"
+}

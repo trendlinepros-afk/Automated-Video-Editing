@@ -1,0 +1,44 @@
+{
+  "formatVersion": 1,
+  "id": "starter-music-engine",
+  "name": "Music engine",
+  "type": "music",
+  "description": "Composes a music bed in code: a seed picks one melody, and each mood (upbeat, chill, tense, epic, funny, inspiring) plays it with its own chords, instruments and groove. Run: python music_engine.py --mood upbeat --seconds 90 --seed 7 --out music.wav (--bpm to change the tempo, --list for moods).",
+  "whenToUse": "Default for music: compose the score with one seed for the whole video and switch moods between sections so it stays one theme. Place the WAV on the Music track with duck on.",
+  "tags": [
+    "music",
+    "score",
+    "composer",
+    "synth",
+    "background music",
+    "mood"
+  ],
+  "scope": "shared",
+  "file": "music_engine.py",
+  "preview": "preview.png",
+  "inputs": {
+    "mood": {
+      "type": "string",
+      "default": "upbeat",
+      "description": "upbeat, chill, tense, epic, funny, inspiring"
+    },
+    "bpm": {
+      "type": "number",
+      "description": "Tempo (default depends on the mood)"
+    },
+    "seconds": {
+      "type": "number",
+      "default": 60,
+      "description": "Length"
+    },
+    "seed": {
+      "type": "number",
+      "default": 1,
+      "description": "Picks the melody; keep it the same across a video"
+    }
+  },
+  "preferred": false,
+  "uses": 0,
+  "createdAt": "2026-10-06T00:00:00.000Z",
+  "updatedAt": "2026-10-06T00:00:00.000Z"
+}

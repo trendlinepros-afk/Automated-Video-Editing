@@ -1,0 +1,54 @@
+{
+  "formatVersion": 1,
+  "id": "starter-progress-countdown",
+  "name": "Countdown and progress bar",
+  "type": "graphic",
+  "description": "A countdown in an emptying ring, or (mode 'bar') a labelled progress bar that fills.",
+  "whenToUse": "Countdowns before a launch or a reveal; a progress bar for \"step 2 of 5\" or a timed challenge.",
+  "tags": [
+    "countdown",
+    "timer",
+    "progress",
+    "bar",
+    "steps"
+  ],
+  "scope": "shared",
+  "file": "progress_countdown.py",
+  "preview": "preview.png",
+  "inputs": {
+    "mode": {
+      "type": "string",
+      "default": "countdown",
+      "description": "'countdown' or 'bar'"
+    },
+    "from": {
+      "type": "number",
+      "default": 0,
+      "description": "Countdown start number; 0 = the item length in seconds"
+    },
+    "label": {
+      "type": "string",
+      "default": "",
+      "description": "Text next to the bar, or under the countdown"
+    },
+    "start": {
+      "type": "number",
+      "default": 0.0,
+      "description": "Bar: fill at the start (0..1)"
+    },
+    "end": {
+      "type": "number",
+      "default": 1.0,
+      "description": "Bar: fill at the end (0..1)"
+    },
+    "color": {
+      "type": "color",
+      "default": "primary",
+      "description": "Ring / bar color"
+    }
+  },
+  "preferred": false,
+  "uses": 0,
+  "createdAt": "2026-10-06T00:00:00.000Z",
+  "updatedAt": "2026-10-06T00:00:00.000Z"
+}

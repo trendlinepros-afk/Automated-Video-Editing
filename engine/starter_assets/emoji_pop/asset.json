@@ -1,0 +1,44 @@
+{
+  "formatVersion": 1,
+  "id": "starter-emoji-pop",
+  "name": "Emoji pop",
+  "type": "graphic",
+  "description": "A big drawn emoji springs in, wiggles and floats away. laugh, shock, heart, fire, star, cool, think.",
+  "whenToUse": "Reaction beats: a joke, a shock moment, something cool. 1-2 seconds.",
+  "tags": [
+    "emoji",
+    "reaction",
+    "funny",
+    "meme",
+    "pop"
+  ],
+  "scope": "shared",
+  "file": "emoji_pop.py",
+  "preview": "preview.png",
+  "inputs": {
+    "emoji": {
+      "type": "string",
+      "default": "laugh",
+      "description": "laugh | shock | heart | fire | star | cool | think"
+    },
+    "size": {
+      "type": "number",
+      "default": 0.28,
+      "description": "Size as a fraction of frame height"
+    },
+    "x": {
+      "type": "number",
+      "default": 0.0,
+      "description": "Horizontal offset from centre (fraction of width)"
+    },
+    "y": {
+      "type": "number",
+      "default": 0.0,
+      "description": "Vertical offset from centre (fraction of height)"
+    }
+  },
+  "preferred": false,
+  "uses": 0,
+  "createdAt": "2026-10-06T00:00:00.000Z",
+  "updatedAt": "2026-10-06T00:00:00.000Z"
+}

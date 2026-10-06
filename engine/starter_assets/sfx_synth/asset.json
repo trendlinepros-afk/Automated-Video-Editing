@@ -1,0 +1,47 @@
+{
+  "formatVersion": 1,
+  "id": "starter-sfx-synth",
+  "name": "Sound effect synthesizer",
+  "type": "sound",
+  "description": "Python synthesizer for whoosh, pop, ding, riser, impact, typing and record scratch, at any length and pitch. Run: python sfx_synth.py <kind> --out file.wav [--seconds S] [--pitch P] [--seed N], or \"all --out-dir DIR\".",
+  "whenToUse": "When a ready-made sound effect is the wrong length or pitch, or a variation is needed. Place the WAV it writes on the Sound effects track.",
+  "tags": [
+    "sfx",
+    "synth",
+    "generator",
+    "sound effect",
+    "whoosh",
+    "pop",
+    "ding",
+    "riser",
+    "impact"
+  ],
+  "scope": "shared",
+  "file": "sfx_synth.py",
+  "preview": "preview.png",
+  "inputs": {
+    "kind": {
+      "type": "string",
+      "default": "whoosh",
+      "description": "whoosh | pop | ding | riser | impact | typing | record_scratch"
+    },
+    "seconds": {
+      "type": "number",
+      "description": "Length in seconds (default depends on the kind)"
+    },
+    "pitch": {
+      "type": "number",
+      "default": 1.0,
+      "description": "1.0 = normal, 2.0 = an octave up"
+    },
+    "seed": {
+      "type": "number",
+      "default": 1,
+      "description": "Variation"
+    }
+  },
+  "preferred": false,
+  "uses": 0,
+  "createdAt": "2026-10-06T00:00:00.000Z",
+  "updatedAt": "2026-10-06T00:00:00.000Z"
+}

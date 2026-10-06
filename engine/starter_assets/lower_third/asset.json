@@ -1,0 +1,49 @@
+{
+  "formatVersion": 1,
+  "id": "starter-lower-third",
+  "name": "Lower third",
+  "type": "graphic",
+  "description": "Bold name bar with a smaller second line; slides in from the side and back out.",
+  "whenToUse": "Introduce a person, a place or a product the first time it appears. 4-6 seconds.",
+  "tags": [
+    "lower third",
+    "name",
+    "title",
+    "text",
+    "introduce"
+  ],
+  "scope": "shared",
+  "file": "lower_third.py",
+  "preview": "preview.png",
+  "inputs": {
+    "title": {
+      "type": "string",
+      "default": "Your Name",
+      "description": "Main line (name or topic)"
+    },
+    "subtitle": {
+      "type": "string",
+      "default": "Channel host",
+      "description": "Smaller second line; empty hides it"
+    },
+    "side": {
+      "type": "string",
+      "default": "left",
+      "description": "'left' or 'right'"
+    },
+    "color": {
+      "type": "color",
+      "default": "primary",
+      "description": "Bar color: a brand color name or '#RRGGBB'"
+    },
+    "height": {
+      "type": "number",
+      "default": 0.72,
+      "description": "Vertical position of the bar (fraction of frame height)"
+    }
+  },
+  "preferred": false,
+  "uses": 0,
+  "createdAt": "2026-10-06T00:00:00.000Z",
+  "updatedAt": "2026-10-06T00:00:00.000Z"
+}

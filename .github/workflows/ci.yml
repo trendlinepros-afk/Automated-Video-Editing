@@ -1,0 +1,104 @@
+# Every push and pull request: typecheck, unit tests (project upgrades, section lock, log redaction,
+# updater), engine tests (preview/export match), and a Windows installer build as a smoke test.
+name: CI
+
+on:
+  push:
+    branches: ['**']
+    tags-ignore: ['v*'] # tags run release.yml
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: pip
+          cache-dependency-path: engine/requirements*.txt
+      - name: Install ffmpeg
+        run: sudo apt-get update && sudo apt-get install -y ffmpeg
+      - name: Install Node packages
+        run: npm ci
+      - name: Install engine test packages
+        run: bash .github/scripts/install-engine-test-deps.sh
+      - name: Typecheck
+        run: npm run typecheck
+      - name: Unit tests
+        run: npx vitest run
+      - name: Engine tests
+        env:
+          AVE_ALLOW_CPU: '1'
+        run: python -m pytest engine/tests -q
+
+  build-windows:
+    runs-on: windows-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: Install Node packages
+        run: npm ci
+      - name: Build
+        run: npm run build
+      - name: Package installer (not published)
+        run: npx electron-builder --win --publish never
+      - uses: actions/upload-artifact@v4
+        with:
+          name: installer-${{ github.sha }}
+          path: |
+            dist/*.exe
+            dist/latest.yml
+          retention-days: 7
+
+  # The one-time environment install downloads these on the owner's PC. Fail early if a pin vanishes.
+  runtime-pins:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Pinned downloads are still there
+        run: |
+          set -euo pipefail
+          node -e '
+            const m = require("./engine/runtime.json");
+            for (const k of ["uv", "ffmpeg"]) for (const u of [m[k].url, ...(m[k].mirrors || [])]) console.log(u);
+          ' > urls.txt
+          ok=0
+          while read -r u; do
+            if curl -fsIL -o /dev/null "$u"; then echo "ok   $u"; ok=$((ok+1)); else echo "MISSING $u"; fi
+          done < urls.txt
+          # Each file needs at least one live address (the mirror release or upstream).
+          node -e '
+            const m = require("./engine/runtime.json");
+            const { execSync } = require("child_process");
+            for (const k of ["uv", "ffmpeg"]) {
+              const live = [m[k].url, ...(m[k].mirrors || [])].some((u) => { try { execSync(`curl -fsIL -o /dev/null "${u}"`); return true } catch { return false } });
+              if (!live) { console.error(`No live download for ${k}`); process.exit(1) }
+            }'
+      - name: PyTorch CUDA 12.8 wheels exist for Windows / Python 3.12
+        run: |
+          set -euo pipefail
+          for spec in $(node -p 'require("./engine/runtime.json").torchPackages.join(" ")'); do
+            name="${spec%%==*}"; ver="${spec##*==}"
+            curl -fsSL "https://download.pytorch.org/whl/cu128/${name}/" -o index.html
+            if ! grep -Eq "${name}-${ver}(\+|%2B)cu128-cp312-cp312-win_amd64\.whl" index.html; then
+              echo "Available Windows / Python 3.12 cu128 builds of ${name}:"
+              grep -Eo "${name}-[0-9.]+(\+|%2B)cu128-cp312-cp312-win_amd64\.whl" index.html | sort -uV | tail -8
+              echo "::error::No ${name} ${ver} cu128 wheel for Windows / Python 3.12"; exit 1
+            fi
+            echo "ok   ${name} ${ver} cu128"
+          done

@@ -9,6 +9,7 @@ import { CopyButton, Empty, Spinner, Toggle } from '../components/bits'
 import { Icon } from '../components/Icon'
 import { UpdateButton } from '../components/Updates'
 import { ProfilesSection } from '../settings/ProfilesSection'
+import { ModelsSection } from '../settings/ModelsSection'
 import { fmt } from '../util'
 import { PriceEditor } from '../panels/ThumbnailsPanelCosts'
 
@@ -16,6 +17,7 @@ const SECTIONS: [SettingsSection, string][] = [
   ['general', 'General'],
   ['music', 'Music folders'],
   ['claude', 'Claude connection'],
+  ['models', 'Claude models'],
   ['profiles', 'Profiles'],
   ['suggestions', 'Suggested rules'],
   ['about', 'About']
@@ -50,6 +52,8 @@ export function SettingsScreen() {
                 <Music />
               ) : section === 'claude' ? (
                 <Claude />
+              ) : section === 'models' ? (
+                <ModelsSection />
               ) : section === 'profiles' ? (
                 <ProfilesSection />
               ) : section === 'suggestions' ? (

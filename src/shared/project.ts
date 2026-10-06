@@ -430,7 +430,32 @@ export const ProjectSchema = z.looseObject({
     ranAt: z.string().optional(),
     flags: z.array(z.looseObject({ word: z.string(), time: num, note: z.string().optional() })).default([])
   }).default({ flags: [] }),
-  claudeSessionId: z.string().optional()
+  claudeSessionId: z.string().optional(),
+  /** The model the saved Claude session ran on; a stage on another model starts a fresh session. */
+  claudeSessionModel: z.string().optional(),
+  /** What Claude runs on this project cost, as Claude Code reports it. Absent until the first run. */
+  claudeCosts: z
+    .looseObject({
+      totalUsd: z.number().default(0),
+      runs: z
+        .array(
+          z.looseObject({
+            ts: z.string(),
+            kinds: z.array(z.string()).default([]),
+            stages: z.array(z.string()).default([]),
+            section: z.string(),
+            model: z.string(),
+            costUsd: z.number(),
+            durationMs: z.number().optional(),
+            turns: z.number().optional(),
+            byModel: z.record(z.string(), z.looseObject({ costUsd: z.number() })).optional()
+          })
+        )
+        .default([]),
+      /** Finished edits already counted in the per-minute average. */
+      editsCounted: z.array(z.string()).optional()
+    })
+    .optional()
 })
 export type Project = z.infer<typeof ProjectSchema>
 

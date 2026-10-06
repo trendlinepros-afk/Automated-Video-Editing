@@ -1,5 +1,7 @@
 /** Cut tools: the transcript and the edit decision list. The app applies every cut exactly as given. */
 import { z } from 'zod'
+import { existsSync, readFileSync } from 'node:fs'
+import { isAbsolute, join } from 'node:path'
 import type { SegmentItem, Word } from '@shared/project'
 import { round3, segmentDuration } from '@shared/timeline'
 import { newId } from '../../project/store'
@@ -23,20 +25,58 @@ const segmentInput = z.object({
 
 const EPS = 1e-6
 
+type FileWord = { id?: string; text: string; start: number; end: number; prob?: number }
+
+/** Reads the word list from a transcription JSON file (faster-whisper / WhisperX style, {words}, or a plain list). */
+export function readTranscriptFile(path: string): { words: FileWord[]; language?: string } {
+  if (!existsSync(path)) throw new ToolError(`Transcript file not found: ${path}`)
+  let data: any
+  try {
+    data = JSON.parse(readFileSync(path, 'utf8').replace(/^\uFEFF/, ''))
+  } catch (err) {
+    throw new ToolError(`The transcript file is not valid JSON: ${(err as Error).message}`)
+  }
+  const list: any[] = Array.isArray(data)
+    ? data
+    : Array.isArray(data?.words)
+      ? data.words
+      : Array.isArray(data?.segments)
+        ? data.segments.flatMap((s: any) => (Array.isArray(s?.words) ? s.words : []))
+        : []
+  const words: FileWord[] = []
+  for (const w of list) {
+    const text = String(w?.text ?? w?.word ?? '').trim()
+    const start = Number(w?.start)
+    const end = Number(w?.end)
+    if (!text || !Number.isFinite(start) || !Number.isFinite(end)) continue
+    const prob = Number(w?.prob ?? w?.probability ?? w?.score)
+    words.push({ ...(typeof w?.id === 'string' && w.id ? { id: w.id } : {}), text, start: Math.max(0, start), end: Math.max(0, end), ...(Number.isFinite(prob) ? { prob } : {}) })
+  }
+  if (!words.length) throw new ToolError('No words with start and end times were found in the transcript file. Transcribe with word timestamps.')
+  const language = typeof data?.language === 'string' ? data.language : typeof data?.info?.language === 'string' ? data.info.language : undefined
+  return { words, ...(language ? { language } : {}) }
+}
+
 export const cutTools = [
   defineTool({
     name: 'save_transcript',
     description:
       'Save the transcript of one source (you transcribe it yourself, e.g. faster-whisper on the GPU with word timings). ' +
+      'Prefer file: the path of the JSON your transcription wrote (faster-whisper style {segments:[{words:[{word,start,end,probability}]}]}, ' +
+      'or {words:[...]} or a plain word list). It costs far fewer tokens than sending the words. Otherwise pass ' +
       'words: [{id?, text, start, end, prob?}] in source seconds. Ids are given as "<sourceId>_w<index>" when you leave them out. ' +
       'When re-saving a source, pass the existing ids of words that stay, so anchors, captions and chapters keep pointing at them. ' +
       'Replaces the saved words of that source.',
     input: {
       source_id: z.string(),
       language: z.string().optional(),
-      words: z.array(z.object({ id: z.string().min(1).optional(), text: z.string(), start: num.min(0), end: num.min(0), prob: num.optional() }))
+      file: z.string().optional().describe('Path to a transcript JSON file (absolute, or relative to the project folder)'),
+      words: z.array(z.object({ id: z.string().min(1).optional(), text: z.string(), start: num.min(0), end: num.min(0), prob: num.optional() })).optional()
     },
-    run: (args, env) => {
+    run: (raw, env) => {
+      const fromFile = raw.file ? readTranscriptFile(isAbsolute(raw.file) ? raw.file : join(env.store.dir, raw.file)) : null
+      if (!fromFile && !raw.words) throw new ToolError('Give file (the transcript JSON path) or words.')
+      const args = { ...raw, words: fromFile?.words ?? raw.words ?? [], language: raw.language ?? fromFile?.language }
       const doc = env.store.snapshotDoc()
       sourceById(doc, args.source_id)
       const previous = new Map((doc.transcript.clips[args.source_id]?.words ?? []).map((w) => [w.id, w]))

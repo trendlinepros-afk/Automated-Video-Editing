@@ -63,6 +63,15 @@ export const SettingsSchema = z.looseObject({
     /** All-time Pikzels spend on this PC (successful calls only). */
     spend: PikzelsSpendSchema.default({ total: 0, byAction: {} })
   }).default({ model: 'pkz_4_5', pikzonalities: [], prices: {}, spend: { total: 0, byAction: {} } }),
+  /** Claude model per part of the edit, and what runs have cost on this PC. */
+  claude: z.looseObject({
+    /** Section id -> model id ('' = Claude Code's default). Missing sections use the recommended model. */
+    models: z.record(z.string(), z.string()).default({}),
+    /** Measured averages used for estimates before a run: key -> { total USD, count }. */
+    stats: z.record(z.string(), z.looseObject({ total: z.number().default(0), count: z.number().default(0) })).default({}),
+    /** All-time Claude cost on this PC as reported by Claude Code (API-equivalent USD). */
+    totalUsd: z.number().default(0)
+  }).default({ models: {}, stats: {}, totalUsd: 0 }),
   setupDone: z.boolean().default(false),
   previewHeight: z.number().int().default(540),
   previewFps: z.number().default(30)

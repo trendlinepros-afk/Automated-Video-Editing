@@ -137,6 +137,15 @@ function buildDoc(): ProjectDoc {
     transcript: { file: 'transcript.json' },
     tracks: defaultTracks(),
     items,
+    claudeCosts: {
+      totalUsd: 4.6731,
+      runs: [
+        { ts: '2026-10-06T10:00:00Z', kinds: ['start_edit'], stages: ['transcript'], section: 'transcript', model: 'claude-haiku-4-5', costUsd: 0.0931, byModel: { 'claude-haiku-4-5': { costUsd: 0.0931 } } },
+        { ts: '2026-10-06T10:20:00Z', kinds: ['start_edit'], stages: ['cuts', 'broll'], section: 'cuts', model: 'claude-opus-5-5', costUsd: 2.412, byModel: { 'claude-opus-5-5': { costUsd: 2.412 } } },
+        { ts: '2026-10-06T10:50:00Z', kinds: ['start_edit'], stages: ['graphics', 'audio', 'captions'], section: 'graphics', model: 'claude-sonnet-5-5', costUsd: 1.218, byModel: { 'claude-sonnet-5-5': { costUsd: 1.218 } } },
+        { ts: '2026-10-06T11:30:00Z', kinds: ['chat'], stages: [], section: 'chat', model: 'claude-opus-5-5', costUsd: 0.95, durationMs: 62000, byModel: { 'claude-opus-5-5': { costUsd: 0.95 } } }
+      ]
+    },
     checklist: defaultChecklist().map((c, i) => ({ ...c, status: i < 6 ? 'done' : i === 6 ? 'in_progress' : 'not_started', detail: i === 6 ? '3 boundaries left to check' : undefined })),
     handoffNotes: [
       { id: 'h1', ts: now(), stage: 'Graphics', text: 'Placed 80 graphics in the brand kit style. Price tag reused from the library.' },
@@ -557,7 +566,8 @@ export function installMockApi(): void {
       resume: async () => {
         runner = { status: 'running', connected: true, queue: 0, lastActivity: 'Resuming at Self-check' }
         ev.runner.emit(runner)
-      }
+      },
+      estimate: async () => ({ usd: 0.35, measured: false, basis: 'a first guess until this PC has measured one' })
     },
     library: {
       list: async (f) => library.filter((a) => (!f?.scope || a.scope === f.scope) && (!f?.type || a.type === f.type) && (!f?.query || a.name.toLowerCase().includes(f.query.toLowerCase()))),

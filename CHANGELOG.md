@@ -3,6 +3,14 @@
 Each release's section becomes its GitHub release text and the notes shown in the app's update dialog.
 A release is blocked until the section for its version has notes.
 
+## 1.1.0
+
+- **Estimated cost so far.** The editor's top bar shows what this project has cost next to Export: Claude runs (as Claude Code reports them, at API prices) plus Pikzels thumbnails. Click it for the breakdown by part of the edit and by model. It flashes each time a run adds to it, so iterations are easy to follow.
+- **Estimates before you run.** Start edit, chat, Re-edit section and Fix clipped audio show what they are likely to cost. The first numbers are rough guesses; they become your own measured averages as you edit.
+- **Claude models (Settings).** Each part of an edit now runs on its own model: transcribing, cutting, B-roll, graphics, music and sound, captions, self-check, thumbnails, publishing pack, plus chat, re-edits and Fix clipped audio. The recommended set keeps Opus 5.5 where judgment decides quality and uses Sonnet 5.5 or Haiku 4.5 for well-specified work, about a quarter cheaper with no noticeable quality drop. Reset to recommended at any time.
+- **Fewer tokens for the same work.** Claude now hands the app the transcript file faster-whisper wrote instead of typing every word, and the cutting stage writes a plan the later stages follow.
+- Popovers under the top bar (progress, cost, update errors) are no longer cut off.
+
 ## 1.0.2
 
 - **Creating a persona or style no longer fails with "The request is invalid".** Thumbnails picked from YouTube are sent to Pikzels as links, and image files as image data; if Pikzels rejects one form, the next is tried. A rejected request costs nothing.

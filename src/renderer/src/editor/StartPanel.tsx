@@ -2,7 +2,9 @@
  * Start edit (new projects): optional inspiration, Whole video or Just the intro, and Start edit.
  * Intro ready: Continue with the rest, Redo the intro with new direction, or Stop there.
  */
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
+import type { ClaudeEstimate } from '@shared/ipc'
+import { EstimateNote } from './EstimateNote'
 import { toast } from '../state/app'
 import { errorMessage } from '../util'
 import { applyOp, editor } from '../state/editor'
@@ -16,6 +18,14 @@ export function StartPanel({ onStarted }: { onStarted: () => void }) {
   const [auto, setAuto] = useState(project.scope.introMaxSeconds === null)
   const [maxSeconds, setMaxSeconds] = useState(String(project.scope.introMaxSeconds ?? 60))
   const [busy, setBusy] = useState(false)
+  const [est, setEst] = useState<ClaudeEstimate | null>(null)
+  useEffect(() => {
+    let live = true
+    window.api.claude.estimate('start_edit', { scope }).then((e) => live && setEst(e), () => undefined)
+    return () => {
+      live = false
+    }
+  }, [scope])
 
   const saveInspiration = () => {
     if (inspiration !== project.inspiration) void applyOp({ op: 'setInspiration', text: inspiration })
@@ -84,6 +94,7 @@ export function StartPanel({ onStarted }: { onStarted: () => void }) {
           )}
         </div>
         <div className="row">
+          <EstimateNote estimate={est} />
           <span className="spacer" />
           <button className="btn primary" disabled={busy || readOnly} onClick={start}>
             {busy ? 'Starting…' : 'Start edit'}

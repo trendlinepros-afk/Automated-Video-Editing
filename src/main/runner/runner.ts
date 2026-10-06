@@ -12,11 +12,12 @@ import { delimiter, dirname, extname, isAbsolute, join } from 'node:path'
 import { createInterface } from 'node:readline'
 import { MCP_SERVER_NAME } from '@shared/appInfo'
 import type { RunnerState } from '@shared/ipc'
-import type { EditRequest } from '@shared/project'
 import type { AppContext, RunnerService } from '../context'
 import type { McpServiceImpl } from '../mcp/server'
 import type { ProjectStore } from '../project/store'
 import { buildRunPrompt, buildSystemPrompt } from './prompts'
+import { recordRunCost } from './costs'
+import { doneStageCount, planRun, stageInstructions, type RunPlan } from './stages'
 
 type OutputLine = { ts: string; text: string; kind: 'text' | 'tool' | 'error' | 'info' }
 
@@ -168,6 +169,8 @@ interface Run {
   stopping: boolean
   exited: Promise<void>
   command: string
+  plan: RunPlan
+  doneBefore: number
 }
 
 const MAX_RUNS_WITHOUT_PROGRESS = 2
@@ -283,12 +286,17 @@ export function createRunnerService(ctx: AppContext, deps: RunnerDeps = {}): Run
     return `Claude disconnected, edit paused at: ${next.label}`
   }
 
-  const saveSessionId = (store: ProjectStore, id: string | undefined) => {
-    if (store.readOnly || store.project.claudeSessionId === id) return
+  const saveSessionId = (store: ProjectStore, id: string | undefined, model?: string) => {
+    if (store.readOnly || (store.project.claudeSessionId === id && (model === undefined || store.project.claudeSessionModel === model))) return
     try {
       store.mutate('Claude session', 'app', (d) => {
-        if (id) d.project.claudeSessionId = id
-        else delete d.project.claudeSessionId
+        if (id) {
+          d.project.claudeSessionId = id
+          if (model !== undefined) d.project.claudeSessionModel = model
+        } else {
+          delete d.project.claudeSessionId
+          delete d.project.claudeSessionModel
+        }
       }, { bypassLock: true, noHistory: true })
     } catch (err) {
       store.log.write('error', 'Could not save the Claude session id', { error: String(err) })
@@ -298,7 +306,7 @@ export function createRunnerService(ctx: AppContext, deps: RunnerDeps = {}): Run
   const handleEvent = (run: Run, ev: Record<string, any>) => {
     if (typeof ev.session_id === 'string' && ev.session_id && ev.session_id !== run.sessionId) {
       run.sessionId = ev.session_id
-      saveSessionId(run.store, ev.session_id)
+      saveSessionId(run.store, ev.session_id, run.plan.model)
       update({ sessionId: ev.session_id })
     }
     switch (ev.type) {
@@ -344,7 +352,8 @@ export function createRunnerService(ctx: AppContext, deps: RunnerDeps = {}): Run
         if (!ev.is_error) {
           const turns = typeof ev.num_turns === 'number' ? `${ev.num_turns} turns` : ''
           const secs = typeof ev.duration_ms === 'number' ? `${Math.round(ev.duration_ms / 1000)} s` : ''
-          output('info', `Claude finished${turns || secs ? ` (${[turns, secs].filter(Boolean).join(', ')})` : ''}`)
+          const cost = typeof ev.total_cost_usd === 'number' ? `est. $${ev.total_cost_usd.toFixed(2)}` : ''
+          output('info', `Claude finished${turns || secs || cost ? ` (${[turns, secs, cost].filter(Boolean).join(', ')})` : ''}`)
         }
         break
     }
@@ -356,6 +365,14 @@ export function createRunnerService(ctx: AppContext, deps: RunnerDeps = {}): Run
     void (ctx.mcp as Partial<McpServiceImpl>).closeSessions?.(run.projectId)
     const outcome = classifyOutcome({ ...run, exitCode })
     const store = run.store
+    // What the run cost, as Claude Code reports it, whatever the outcome: tokens were used either way.
+    if (run.result) {
+      try {
+        recordRunCost(ctx, store, run.plan, run.result)
+      } catch (err) {
+        store.log.write('error', 'Could not record what the Claude run cost', { error: String(err) })
+      }
+    }
     const stillOpen = (() => {
       const s = ctx.projects.current()
       return s && s.project.id === run.projectId ? ctx.requests.open() : []
@@ -372,8 +389,12 @@ export function createRunnerService(ctx: AppContext, deps: RunnerDeps = {}): Run
 
     if (outcome.kind === 'ok') {
       const finished = run.startOpenIds.filter((id) => !stillOpen.some((r) => r.id === id))
-      runsWithoutProgress = finished.length ? 0 : runsWithoutProgress + 1
-      if (stillOpen.some((r) => r.status === 'in_progress')) ctx.requests.requeueInProgress('Claude stopped before finishing this request')
+      // A staged run makes progress by finishing checklist stages, not requests.
+      const stagesAdvanced = doneStageCount(store.project) > run.doneBefore
+      runsWithoutProgress = finished.length || stagesAdvanced ? 0 : runsWithoutProgress + 1
+      if (stillOpen.some((r) => r.status === 'in_progress')) {
+        ctx.requests.requeueInProgress(stagesAdvanced ? 'Continuing with the next stage' : 'Claude stopped before finishing this request')
+      }
       const queued = sameProject ? ctx.requests.open() : []
       if (queued.length && !held) {
         if (runsWithoutProgress >= MAX_RUNS_WITHOUT_PROGRESS) {
@@ -405,15 +426,20 @@ export function createRunnerService(ctx: AppContext, deps: RunnerDeps = {}): Run
   const startNext = (): void => {
     const store = ctx.projects.current()
     if (!store || store.readOnly) return update({ status: 'idle', activeRequestId: undefined })
-    const open = ctx.requests.open()
-    if (!open.length) return update({ status: 'idle', activeRequestId: undefined })
-    startRun(store, open)
+    const plan = planRun(ctx.requests.open(), store.project, ctx.settings.get().claude?.models ?? {})
+    if (!plan) return update({ status: 'idle', activeRequestId: undefined })
+    startRun(store, plan)
   }
 
-  const startRun = (store: ProjectStore, open: EditRequest[]) => {
+  const startRun = (store: ProjectStore, plan: RunPlan) => {
     const settings = ctx.settings.get().runner
     const project = store.project
-    const sessionId = forceFresh ? undefined : project.claudeSessionId
+    const open = plan.requests
+    // A session is continued only on the model it ran on; another model starts fresh from the
+    // checklist and handoff notes (cheaper than carrying the whole history over).
+    // (A session saved before models were tracked has no model recorded: continue it.)
+    const sameModel = project.claudeSessionModel === undefined || project.claudeSessionModel === plan.model
+    const sessionId = forceFresh || !sameModel ? undefined : project.claudeSessionId
     forceFresh = false
     const configDir = store.paths.cache
     mkdirSync(configDir, { recursive: true })
@@ -425,13 +451,15 @@ export function createRunnerService(ctx: AppContext, deps: RunnerDeps = {}): Run
       { mode: 0o600 }
     )
     const vars = {
-      prompt: buildRunPrompt(open, project, { resumed: !!sessionId }),
+      prompt: [buildRunPrompt(open, project, { resumed: !!sessionId }), stageInstructions(plan)].filter(Boolean).join('\n\n'),
       systemPrompt: buildSystemPrompt(ctx.profiles.get(project.profileId)),
       mcpConfig: configFile,
       allowedTools: settings.allowedTools,
       sessionId: sessionId ?? ''
     }
     const args = [...templateArgs(settings.args, vars), ...(sessionId ? templateArgs(settings.resumeArgs, vars) : [])]
+    // The model for this part of the edit (Settings > Claude models). '' leaves Claude Code's own default.
+    if (plan.model && !args.includes('--model')) args.push('--model', plan.model)
     const cmd = resolveCommand(settings.command, args, platform)
     const { ANTHROPIC_API_KEY: _drop, ...env } = process.env // Claude Code uses its own sign-in, never a key from the app
     let proc: ChildProcess
@@ -445,7 +473,9 @@ export function createRunnerService(ctx: AppContext, deps: RunnerDeps = {}): Run
       result: null,
       text: '',
       stopping: false,
-      command: settings.command
+      command: settings.command,
+      plan,
+      doneBefore: doneStageCount(project)
     } as unknown as Run
     try {
       proc = spawnFn(cmd.file, cmd.args, { cwd: store.dir, env, windowsHide: true, detached: platform !== 'win32', shell: cmd.shell, stdio: ['ignore', 'pipe', 'pipe'] })
@@ -457,8 +487,10 @@ export function createRunnerService(ctx: AppContext, deps: RunnerDeps = {}): Run
     run.proc = proc
     current = run
     held = false
-    store.log.write('claude', `Starting Claude${sessionId ? ' (continuing the earlier session)' : ''}`, {
+    store.log.write('claude', `Starting Claude${sessionId ? ' (continuing the earlier session)' : ''} on ${plan.model || 'its default model'}`, {
       command: settings.command,
+      section: plan.section,
+      stages: plan.stages,
       requests: open.map((r) => `${r.id} ${r.kind}`)
     })
     ctx.requests.setWaitingReason(undefined)
@@ -526,7 +558,8 @@ export function createRunnerService(ctx: AppContext, deps: RunnerDeps = {}): Run
       ctx.requests.setWaitingReason(reason)
       return update({ status: 'waiting', waitingReason: reason })
     }
-    startRun(store, ctx.requests.open())
+    const plan = planRun(ctx.requests.open(), store.project, ctx.settings.get().claude?.models ?? {})
+    if (plan) startRun(store, plan)
   }
 
   async function stop(): Promise<void> {

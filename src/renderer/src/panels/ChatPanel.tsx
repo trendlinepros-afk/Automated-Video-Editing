@@ -2,6 +2,7 @@
  * Chat: requests in plain words. Times typed in the message are highlighted on the timeline as you type,
  * and the playhead and any selected item are attached, so "here" and "this" work.
  */
+import { EstimateNote, useEstimate } from '../editor/EstimateNote'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import type { EditRequest } from '@shared/project'
 import { findTimeRange } from '@shared/timeline'
@@ -135,6 +136,7 @@ function Compose() {
   const playhead = useStore(editor, (s) => Math.floor(s.playhead * 10) / 10)
   const d = useDerived()
   const typed = useMemo(() => findTimeRange(text), [text])
+  const chatEstimate = useEstimate('chat')
 
   // Highlight a typed time range on the timeline as you type.
   useEffect(() => {
@@ -197,6 +199,7 @@ function Compose() {
         ))}
         {items.length > 3 && <span className="chip">+{items.length - 3}</span>}
         <span className="spacer" />
+        <EstimateNote estimate={chatEstimate} prefix="Est." />
         <button className="btn primary small" disabled={!text.trim() || busy} onClick={send}>
           <Icon name="sparkle" size={13} /> Send
         </button>

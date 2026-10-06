@@ -6,7 +6,7 @@
 export const DEFAULT_EDITING_RULES = `Standard editing rules (the October 5 method)
 
 1. Review first. Probe every footage file, look at frames, and study the channel's previous export and thumbnail style before deciding anything. Read the inspiration, the channel notes, the channel rules and the brand kit.
-2. Transcribe every clip yourself with faster-whisper on the GPU, with word timings. Save it with save_transcript. Split it into phrases at each pause to find retakes.
+2. Transcribe every clip yourself with faster-whisper on the GPU, with word timings. Save it with save_transcript, passing the JSON file faster-whisper wrote (not the words one by one). Split it into phrases at each pause to find retakes.
 3. Write an edit decision list of kept phrases with their source times, choosing the best take of each retake. Apply it with set_aroll_cuts. Anchor B-roll, graphics, music cues and sound effects to words in those phrases, never to fixed times, so they move with the words when cuts change.
 4. After assembling the dialogue, run run_self_check, transcribe the assembled dialogue again, and compare it with the intended words.
 5. Fix every flagged boundary by reading the audio at that spot in 5 ms steps (get_audio_energy with step_ms 5). Do not rely on automatic snapping: it failed on continuous speech on October 5. Adjust each cut with adjust_cut.

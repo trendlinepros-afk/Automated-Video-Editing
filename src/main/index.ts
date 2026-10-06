@@ -135,6 +135,13 @@ function forwardEvents(c: AppContext): void {
   // The updater, preview and render jobs send their own events; the runner reports only through listeners.
   c.runner.onState((s) => c.send(API_EVENTS['claude.onState'], s))
   c.runner.onOutput((line) => c.send(API_EVENTS['claude.onOutput'], line))
+  // A newly chosen asset library folder is created and given the starter assets at once,
+  // so first-launch setup shows it as ready.
+  let libraryFolder = c.settings.get().libraryFolder
+  c.settings.onChange((s) => {
+    if (s.libraryFolder && s.libraryFolder !== libraryFolder) c.library.root()
+    libraryFolder = s.libraryFolder
+  })
 }
 
 // ------------------------------------------------------------------ window

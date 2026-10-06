@@ -3,6 +3,11 @@
 Each release's section becomes its GitHub release text and the notes shown in the app's update dialog.
 A release is blocked until the section for its version has notes.
 
+## 1.0.1
+
+- Choosing the asset library folder during first-launch setup now creates it straight away and fills it with the starter assets (like and subscribe, lower third, title card, callouts, sound effects and the music engine), so setup shows it as ready.
+- This release also proves the update path: 1.0.0 updates itself to 1.0.1 from the Check for updates button.
+
 ## 1.0.0
 
 The first release of AI Video Editor: Claude edits your video through MCP, and you watch the edit land on a timeline, fix what is off, export, and get thumbnails.

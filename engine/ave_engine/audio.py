@@ -426,7 +426,7 @@ def _save_npy(path: str, a: np.ndarray) -> None:
     tmp = path + '.part'
     with open(tmp, 'wb') as f:
         np.save(f, a)
-    os.replace(tmp, path)
+    media.replace_file(tmp, path)
 
 
 def _prune(cdir: str, keep: int = 6) -> None:

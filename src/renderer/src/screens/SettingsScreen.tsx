@@ -10,6 +10,7 @@ import { Icon } from '../components/Icon'
 import { UpdateButton } from '../components/Updates'
 import { ProfilesSection } from '../settings/ProfilesSection'
 import { fmt } from '../util'
+import { PriceEditor } from '../panels/ThumbnailsPanelCosts'
 
 const SECTIONS: [SettingsSection, string][] = [
   ['general', 'General'],
@@ -145,6 +146,7 @@ function General() {
           </div>
         )}
       </div>
+      <PriceEditor />
       <FolderRow
         label="Asset library folder"
         hint="Saved graphics, animations and sounds. Any drive works, including a synced one."

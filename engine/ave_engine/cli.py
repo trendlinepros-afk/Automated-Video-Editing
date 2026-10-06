@@ -100,7 +100,7 @@ def cmd_proxy(a) -> None:
 
     try:
         media.run_with_progress(args, total, on)
-        os.replace(tmp, a.out)
+        media.replace_file(tmp, a.out)
         prog.step(1000 - last[0], force=True)
     finally:
         _remove(tmp)
@@ -174,7 +174,7 @@ def cmd_render_chunks(a) -> None:
                 w.abort()
                 _remove(tmp)
                 raise
-            os.replace(tmp, out)
+            media.replace_file(tmp, out)
             chunk_done(int(j['index']), out)
             done.append({'index': int(j['index']), 'out': out, 'frames': n})
     finally:
@@ -189,7 +189,7 @@ def _save_png(B, F, path: str) -> str:
     os.makedirs(os.path.dirname(os.path.abspath(path)), exist_ok=True)
     tmp = path + '.part.png'
     Image.fromarray(B.to_uint8(F), 'RGB').save(tmp, compress_level=3)
-    os.replace(tmp, path)
+    media.replace_file(tmp, path)
     return path
 
 
@@ -230,13 +230,13 @@ def cmd_frames(a) -> None:
 def cmd_graphic_preview(a) -> None:
     from PIL import Image
 
-    from .graphics import checkerboard, merge_brand, render_graphic
+    from .graphics import checkerboard, merge_brand, render_graphic, resolve_brand_paths
 
     params = json.loads(a.params) if a.params else {}
     if not isinstance(params, dict):
         raise ValueError('--params must be a JSON object')
     brand = _load_json(a.brand) if a.brand else None
-    brand = merge_brand(brand)
+    brand = resolve_brand_paths(merge_brand(brand), os.path.dirname(os.path.abspath(a.brand)) if a.brand else None)
     W, H = int(a.width), int(a.height)
     os.makedirs(a.out_dir, exist_ok=True)
     stem = os.path.splitext(os.path.basename(a.file))[0]
@@ -326,7 +326,7 @@ def cmd_snippet(a) -> None:
         media.run([media.ffmpeg_path(), '-y', '-hide_banner', '-nostdin', '-loglevel', 'error',
                    '-ss', f'{max(0.0, start):.6f}', '-t', f'{max(0.0, end - start):.6f}', '-i', a.path,
                    '-vn', '-map', '0:a:0', '-ac', '2', '-ar', '48000', '-c:a', 'pcm_s16le', '-f', 'wav', tmp], 'Snippet')
-        os.replace(tmp, a.out)
+        media.replace_file(tmp, a.out)
     finally:
         _remove(tmp)
     result({'out': a.out})
@@ -396,7 +396,7 @@ def cmd_export(a) -> None:
             w.write(_frame_bytes(r.B, F, yuv))
             prog.step()
         w.close()
-        os.replace(tmp, out)
+        media.replace_file(tmp, out)
         finished = True
     finally:
         if not finished:

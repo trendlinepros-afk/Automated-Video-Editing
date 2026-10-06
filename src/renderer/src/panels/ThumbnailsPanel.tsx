@@ -1,16 +1,23 @@
 /**
- * Thumbnails: persona and style for this project, your own prompt (works without Claude), count,
- * "Use my direction", the options side by side, and the full history with prompts.
+ * Thumbnails: persona and style for this project, the Pikzels model, your own prompt (works without
+ * Claude), count, "Use my direction", the other Pikzels tools (recreate, edit, face swap, titles),
+ * the options side by side with scores, the full history with prompts, and what it all cost.
  */
 import { useEffect, useMemo, useRef, useState } from 'react'
+import type { PikzelsPricing } from '@shared/ipc'
+import { PIKZELS_MODELS, PIKZELS_MODEL_LABELS, formatUsd, supportsPikzonality } from '@shared/pikzelsPricing'
 import type { Thumbnail } from '@shared/project'
 import type { Pikzonality } from '@shared/settings'
-import { call, go, openSettings, toast } from '../state/app'
+import { app, call, go, openSettings, toast } from '../state/app'
 import { applyOp, editor } from '../state/editor'
 import { useStore } from '../state/store'
 import { Empty, Toggle } from '../components/bits'
 import { Icon } from '../components/Icon'
 import { errorMessage, mediaUrl, relativeTime } from '../util'
+import { CostPerAction, costLabel, usePikzelsPricing } from './ThumbnailsPanelCosts'
+import { EditTool, FaceSwapTool, RecreateTool, TOOL_LABELS, TitlesTool, type ToolName } from './ThumbnailsPanelTools'
+
+const KIND_LABELS: Record<string, string> = { text: 'From prompt', recreate: 'Recreated', edit: 'Edited', faceswap: 'Face swap' }
 
 const MAX_PROMPT = 750
 
@@ -22,6 +29,16 @@ export function ThumbnailsPanel() {
   const [hasKey, setHasKey] = useState(true)
   const [prompt, setPrompt] = useState(th.direction)
   const [busy, setBusy] = useState(false)
+  const [model, setModel] = useState(() => app.get().settings?.pikzels.model || 'pkz_4_5')
+  const [tool, setTool] = useState<ToolName | null>(null)
+  const [targetId, setTargetId] = useState<string | null>(null)
+  const [pricing, reloadPricing] = usePikzelsPricing(th.spend?.total)
+  const target = th.items.find((t) => t.id === targetId) ?? null
+  const pikzOk = supportsPikzonality(model)
+  const openTool = (name: ToolName, id?: string) => {
+    setTool(name)
+    if (id) setTargetId(id)
+  }
   const saveTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
 
   useEffect(() => {
@@ -45,12 +62,13 @@ export function ThumbnailsPanel() {
   const generate = async () => {
     setBusy(true)
     try {
-      await window.api.thumbnails.generate({ prompt: prompt.trim(), count: th.count, referenceTime: undefined })
+      await window.api.thumbnails.generate({ prompt: prompt.trim(), count: th.count, referenceTime: undefined, model })
       toast(`Generating ${th.count} ${th.count === 1 ? 'option' : 'options'} at Pikzels. They download into the project as they finish.`)
     } catch (e) {
       toast(errorMessage(e), { kind: 'error' })
     }
     setBusy(false)
+    reloadPricing()
   }
 
   const batches = useMemo(() => groupBatches(th.items), [th.items])
@@ -68,13 +86,25 @@ export function ThumbnailsPanel() {
       )}
       <div className="col" style={{ gap: 6 }}>
         <div className="row">
+          <span className="label" style={{ width: 60 }}>Model</span>
+          <select className="grow" value={model} disabled={ro} onChange={(e) => setModel(e.target.value)}>
+            {PIKZELS_MODELS.map((m) => (
+              <option key={m} value={m}>
+                {PIKZELS_MODEL_LABELS[m]}
+                {pricing ? ` · ${formatUsd(pricing.prices[`thumbnail:${m}`] ?? 0)}` : ''}
+              </option>
+            ))}
+          </select>
+        </div>
+        <div className="row">
           <span className="label" style={{ width: 60 }}>Persona</span>
-          <PikzSelect value={th.personaId} options={personas} disabled={ro} onChange={(v) => patch({ personaId: v })} />
+          <PikzSelect value={th.personaId} options={personas} disabled={ro || !pikzOk} onChange={(v) => patch({ personaId: v })} />
         </div>
         <div className="row">
           <span className="label" style={{ width: 60 }}>Style</span>
-          <PikzSelect value={th.styleId} options={styles} disabled={ro} onChange={(v) => patch({ styleId: v })} />
+          <PikzSelect value={th.styleId} options={styles} disabled={ro || !pikzOk} onChange={(v) => patch({ styleId: v })} />
         </div>
+        {!pikzOk && <span className="hint warn">Persona and style only work on PKZ-4.5 and PKZ-4. This model makes thumbnails without them.</span>}
         <span className="hint">
           These apply to this project only. <a onClick={() => openSettings('profiles', snap.doc.project.profileId)}>Profile defaults</a> ·{' '}
           <a onClick={() => go('personas')}>Personas & Styles</a>
@@ -100,7 +130,7 @@ export function ThumbnailsPanel() {
           </div>
           <span className="spacer" />
           <button className="btn primary" disabled={ro || busy || !prompt.trim() || !hasKey} onClick={generate}>
-            <Icon name="sparkle" size={14} /> {busy ? 'Sending…' : 'Generate'}
+            <Icon name="sparkle" size={14} /> {busy ? 'Sending…' : `Generate ${th.count}${costLabel(pricing, 'thumbnail', model, th.count)}`}
           </button>
         </div>
         <Toggle
@@ -111,12 +141,33 @@ export function ThumbnailsPanel() {
         />
       </div>
 
+      <div className="col" style={{ gap: 6 }}>
+        <div className="row">
+          <h4 className="grow">More tools</h4>
+          <div className="seg">
+            {(Object.keys(TOOL_LABELS) as ToolName[]).map((k) => (
+              <button key={k} className={tool === k ? 'on' : ''} onClick={() => setTool(tool === k ? null : k)}>
+                {TOOL_LABELS[k]}
+              </button>
+            ))}
+          </div>
+        </div>
+        {tool &&
+          (() => {
+            const props = { pricing, model, dir: snap.path, target, thumbs: th.items, setTarget: setTargetId, disabled: ro || !hasKey, onDone: reloadPricing }
+            if (tool === 'recreate') return <RecreateTool {...props} />
+            if (tool === 'edit') return <EditTool {...props} />
+            if (tool === 'faceswap') return <FaceSwapTool {...props} />
+            return <TitlesTool {...props} chosenId={th.chosenId} />
+          })()}
+      </div>
+
       {latest ? (
         <div className="col" style={{ gap: 6 }}>
           <h4>Options</h4>
           <div className="thumb-grid">
             {latest.items.map((t) => (
-              <ThumbCard key={t.id} t={t} chosen={th.chosenId === t.id} dir={snap.path} ro={ro} />
+              <ThumbCard key={t.id} t={t} chosen={th.chosenId === t.id} dir={snap.path} ro={ro} pricing={pricing} title={snap.doc.project.publish.titles[0]} onTool={openTool} onScored={reloadPricing} />
             ))}
           </div>
         </div>
@@ -142,10 +193,14 @@ export function ThumbnailsPanel() {
                     {t.status === 'pending' && <span className="warn">· generating</span>}
                     {t.status === 'failed' && <span className="bad">· failed</span>}
                     {th.chosenId === t.id && <span className="ok">· chosen</span>}
+                    {t.kind && <span>· {KIND_LABELS[t.kind] ?? t.kind}</span>}
+                    {t.cost !== undefined && <span title="What Pikzels charged">· {formatUsd(t.cost)}</span>}
+                    {t.score && <span className="ok">· score {t.score.main}</span>}
                     {t.requestId && <span title="Pikzels request ID">· {t.requestId.slice(0, 8)}</span>}
                   </div>
                   <div className="small selectable" style={{ wordBreak: 'break-word' }}>{t.prompt}</div>
                   {t.error && <div className="small bad">{t.error}</div>}
+                  {t.warning && <div className="small warn">{t.warning}</div>}
                   {t.status === 'done' && th.chosenId !== t.id && !ro && (
                     <div>
                       <a className="small" onClick={() => void call(() => window.api.thumbnails.choose(t.id))}>
@@ -158,6 +213,8 @@ export function ThumbnailsPanel() {
             ))}
         </div>
       )}
+
+      <CostPerAction pricing={pricing} projectSpend={th.spend} only={['thumbnail', 'recreate', 'edit', 'faceswap', 'score', 'title']} />
     </div>
   )
 }
@@ -177,7 +234,24 @@ function groupBatches(items: Thumbnail[]): { id: string; items: Thumbnail[] }[] 
   return out
 }
 
-function ThumbCard({ t, chosen, dir, ro }: { t: Thumbnail; chosen: boolean; dir: string; ro: boolean }) {
+function ThumbCard(props: {
+  t: Thumbnail
+  chosen: boolean
+  dir: string
+  ro: boolean
+  pricing: PikzelsPricing | null
+  title?: string
+  onTool: (tool: ToolName, id: string) => void
+  onScored: () => void
+}) {
+  const { t, chosen, dir, ro, pricing } = props
+  const [scoring, setScoring] = useState(false)
+  const score = async () => {
+    setScoring(true)
+    await call(() => window.api.thumbnails.score(t.id, props.title), 'Could not score the thumbnail')
+    setScoring(false)
+    props.onScored()
+  }
   return (
     <div className={`thumb${chosen ? ' chosen' : ''}`}>
       <div className="img" title={t.prompt}>
@@ -202,6 +276,16 @@ function ThumbCard({ t, chosen, dir, ro }: { t: Thumbnail; chosen: boolean; dir:
           <Icon name="refresh" size={13} />
         </button>
         {t.status === 'done' && (
+          <>
+            <button className="btn small" disabled={ro || scoring} onClick={score} title={props.title ? `Score against the title "${props.title}"` : 'Score the thumbnail'}>
+              {scoring ? '…' : `Score${costLabel(pricing, 'score')}`}
+            </button>
+            <button className="btn small" disabled={ro} title="Edit, recreate or face swap this one" onClick={() => props.onTool('edit', t.id)}>
+              <Icon name="wand" size={13} />
+            </button>
+          </>
+        )}
+        {t.status === 'done' && (
           <button
             className="btn small"
             title="Save the image somewhere"
@@ -214,6 +298,18 @@ function ThumbCard({ t, chosen, dir, ro }: { t: Thumbnail; chosen: boolean; dir:
           </button>
         )}
       </div>
+      {t.score && (
+        <div className="col tiny" style={{ gap: 2, padding: '4px 2px' }} title={t.score.title ? `Scored against "${t.score.title}"` : undefined}>
+          <span>
+            Score <b>{t.score.main}</b>
+            {Object.entries(t.score.subscores ?? {})
+              .slice(0, 4)
+              .map(([k, v]) => ` · ${k.replace(/_/g, ' ')} ${typeof v === 'object' ? JSON.stringify(v) : String(v)}`)
+              .join('')}
+          </span>
+          {t.score.suggestion && <span className="faint">{t.score.suggestion}</span>}
+        </div>
+      )}
     </div>
   )
 }

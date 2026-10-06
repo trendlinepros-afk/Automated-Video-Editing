@@ -7,7 +7,9 @@ import { SettingsSchema } from '@shared/settings'
 import type { AppContext } from '../src/main/context'
 import { ActivityLog } from '../src/main/log'
 import { ProjectStore } from '../src/main/project/store'
-import { PIKZELS_API, createPikzelsService, plainError, stripLinks } from '../src/main/services/pikzels'
+import { FEATURE_CHANGED, PIKZELS_API, createPikzelsService, plainError, stripLinks } from '../src/main/services/pikzels'
+import { createSecretsService, createSettingsService } from '../src/main/services/settings'
+import { initPaths, paths } from '../src/main/paths'
 
 const KEY = 'pkz_live_secretkey_0123456789'
 let dir: string
@@ -25,17 +27,35 @@ function makeCtx(key: string | null = KEY): AppContext {
   settings = SettingsSchema.parse({})
   return {
     appLog: new ActivityLog(join(dir, 'app.log')),
-    settings: { get: () => settings, update: (p: object) => Object.assign(settings, p) },
+    settings: { get: () => settings, update: (p: object) => (settings = SettingsSchema.parse({ ...settings, ...p })) },
+    engine: {
+      frame: async (_doc: unknown, _dir: string, time: number, o: { out: string }) => {
+        writeFileSync(o.out, `FRAME@${time}`)
+        return o.out
+      }
+    },
     secrets: { get: (n: string) => (n === 'pikzels' ? key : null), set: () => {} },
     projects: { current: () => store }
   } as unknown as AppContext
 }
 
-/** A fake Pikzels: thumbnail requests answer 429 `busy` times first, then an image URL. */
-function fakeFetch(opts: { busy?: number; status?: number; error?: { code: string; message: string } } = {}) {
+/**
+ * A fake Pikzels. Thumbnail requests answer 429 `busy` times first, then an image URL.
+ * `failCall` makes the n-th text-thumbnail call (1-based) fail with 402; `routes` overrides any path.
+ */
+function fakeFetch(
+  opts: {
+    busy?: number
+    status?: number
+    error?: { code: string; message: string }
+    failCall?: number
+    routes?: Record<string, (body: any, method: string) => { status: number; json: unknown }>
+  } = {}
+) {
   const calls: Call[] = []
   let busyLeft = opts.busy ?? 0
   let n = 0
+  let textCalls = 0
   const fn = (async (input: any, init: any = {}) => {
     const url = String(input)
     const call: Call = { url, method: init.method ?? 'GET', headers: init.headers ?? {}, body: init.body ? JSON.parse(init.body) : undefined }
@@ -43,20 +63,45 @@ function fakeFetch(opts: { busy?: number; status?: number; error?: { code: strin
     if (url.startsWith('https://cdn.example.com/')) {
       return new Response(Buffer.from('PNGDATA' + url), { status: 200, headers: { 'content-type': 'image/png' } })
     }
-    if (url.endsWith(PIKZELS_API.thumbnailFromText)) {
+    const path = url.slice(PIKZELS_API.baseUrl.length)
+    const route = opts.routes?.[path]
+    if (route) {
+      const r = route(call.body, call.method)
+      return new Response(JSON.stringify(r.json), { status: r.status })
+    }
+    if (path === PIKZELS_API.thumbnailFromText) {
       if (busyLeft > 0) {
         busyLeft--
         return new Response(JSON.stringify({ error: { code: 'rate_limited', message: 'Too many requests' }, request_id: 'req_busy' }), { status: 429 })
       }
+      textCalls++
       if (opts.status) return new Response(JSON.stringify({ error: opts.error, request_id: 'req_err' }), { status: opts.status })
+      if (opts.failCall === textCalls) return new Response(JSON.stringify({ error: { code: 'insufficient_credits', message: 'No credits' }, request_id: 'req_402' }), { status: 402 })
+    }
+    if ([PIKZELS_API.thumbnailFromText, PIKZELS_API.thumbnailFromImage, PIKZELS_API.thumbnailEdit, PIKZELS_API.thumbnailFaceSwap].includes(path as any)) {
       n++
-      return new Response(JSON.stringify({ output: `https://cdn.example.com/img${n}.png`, request_id: `req_${n}`, model: 'pkz_4_5' }), { status: 200 })
+      return new Response(JSON.stringify({ output: `https://cdn.example.com/img${n}.png`, request_id: `req_${n}`, model: call.body?.model }), { status: 200 })
+    }
+    if (path === PIKZELS_API.thumbnailScore) {
+      return new Response(JSON.stringify({ main_score: 8.2, subscores: { clarity: 9, emotion: 7 }, suggestion: 'Bigger text', request_id: 'req_score' }), { status: 200 })
+    }
+    if (path === PIKZELS_API.titleFromText) {
+      return new Response(JSON.stringify({ outputs: ['Title A', 'Title B'], reasoning: 'why', request_id: 'req_titles' }), { status: 200 })
     }
     if (url.includes('/v2/pikzonality/persona')) return new Response(JSON.stringify({ id: 'pz_1' }), { status: 200 })
     if (url.includes('/v2/pikzonality/pz_1')) return new Response(JSON.stringify({ status: 'completed', progress: 100 }), { status: 200 })
     return new Response('{}', { status: 404 })
   }) as typeof fetch
   return { fn, calls }
+}
+
+/** A finished thumbnail record in the project, with an image file. */
+function addDoneThumb(id = 'thumb_base'): string {
+  writeFileSync(join(store.paths.thumbnails, `${id}.png`), 'PNG')
+  store.mutate('t', 'app', (d) => {
+    d.project.thumbnails.items.push({ id, file: `thumbnails/${id}.png`, prompt: 'base', format: '16:9', createdAt: new Date().toISOString(), source: 'user', status: 'done' })
+  }, { noHistory: true })
+  return id
 }
 
 beforeEach(() => {
@@ -172,5 +217,163 @@ describe('Pikzels', () => {
     expect(post.body.image_base64s).toHaveLength(3)
     const list = await svc.refresh()
     expect(list[0]).toMatchObject({ id: 'pz_1', status: 'completed', progress: 100 })
+  })
+
+  it('recreates from an image file, a video frame and a YouTube link', async () => {
+    const { fn, calls } = fakeFetch()
+    const svc = createPikzelsService(makeCtx(), { fetch: fn, sleep: async () => {} })
+    const img = join(dir, 'ref.png')
+    writeFileSync(img, 'REFIMG')
+    const a = await svc.recreate({ from: { path: img }, prompt: 'Make it red', source: 'user' })
+    expect(a).toMatchObject({ kind: 'recreate', status: 'done', model: 'pkz_4_5' })
+    const b1 = calls.filter((c) => c.url.endsWith(PIKZELS_API.thumbnailFromImage))[0].body
+    expect(b1).toMatchObject({ image_base64: Buffer.from('REFIMG').toString('base64'), prompt: 'Make it red', model: 'pkz_4_5', persona: 'persona_a', style: 'style_b' })
+
+    await svc.recreate({ from: { url: 'https://www.youtube.com/watch?v=abc123' }, source: 'user' })
+    const b2 = calls.filter((c) => c.url.endsWith(PIKZELS_API.thumbnailFromImage))[1].body
+    expect(b2.image_url).toBe('https://www.youtube.com/watch?v=abc123')
+    expect(b2.image_base64).toBeUndefined()
+
+    // Older model: no persona or style, image_weight only on pkz_2.
+    await svc.recreate({ from: { time: 12.5 }, model: 'pkz_2', imageWeight: 'high', source: 'claude' })
+    const b3 = calls.filter((c) => c.url.endsWith(PIKZELS_API.thumbnailFromImage))[2].body
+    expect(b3.image_base64).toBe(Buffer.from('FRAME@12.5').toString('base64'))
+    expect(b3).toMatchObject({ model: 'pkz_2', image_weight: 'high' })
+    expect(b3.persona).toBeUndefined()
+    expect(store.project.thumbnails.spend?.byAction).toEqual({ 'recreate:pkz_4_5': 0.26, 'recreate:pkz_2': 0.2 })
+    for (const t of store.project.thumbnails.items) expect(existsSync(join(store.dir, t.file!))).toBe(true)
+  })
+
+  it('edits a thumbnail with a painted mask and a support image, keeping the original', async () => {
+    const { fn, calls } = fakeFetch()
+    const base = addDoneThumb()
+    const support = join(dir, 'support.png')
+    writeFileSync(support, 'SUP')
+    const t = await createPikzelsService(makeCtx(), { fetch: fn, sleep: async () => {} }).edit({ thumbnailId: base, prompt: 'Text says WOW', maskBase64: 'data:image/png;base64,TUFTSw==', supportImagePath: support, source: 'user' })
+    expect(t).toMatchObject({ kind: 'edit', status: 'done', parentId: base, cost: 0.12 })
+    const body = calls.find((c) => c.url.endsWith(PIKZELS_API.thumbnailEdit))!.body
+    expect(body).toMatchObject({ prompt: 'Text says WOW', image_base64: Buffer.from('PNG').toString('base64'), mask_base64: 'TUFTSw==', support_image_base64: Buffer.from('SUP').toString('base64'), format: '16:9' })
+    expect(store.project.thumbnails.items.find((x) => x.id === base)!.status).toBe('done')
+  })
+
+  it('face swaps, and explains plainly when the endpoint has changed', async () => {
+    const face = join(dir, 'face.png')
+    writeFileSync(face, 'FACE')
+    const base = addDoneThumb()
+    const ok = fakeFetch()
+    const t = await createPikzelsService(makeCtx(), { fetch: ok.fn, sleep: async () => {} }).faceSwap({ thumbnailId: base, facePath: face })
+    expect(t).toMatchObject({ kind: 'faceswap', status: 'done', source: 'user' })
+    expect(ok.calls.find((c) => c.url.endsWith(PIKZELS_API.thumbnailFaceSwap))!.body).toEqual({ image_base64: Buffer.from('PNG').toString('base64'), face_image_base64: Buffer.from('FACE').toString('base64') })
+
+    const changed = fakeFetch({ routes: { [PIKZELS_API.thumbnailFaceSwap]: () => ({ status: 404, json: { error: { code: 'not_found', message: 'Not found' } } }) } })
+    const before = store.project.thumbnails.spend?.total
+    const f = await createPikzelsService(makeCtx(), { fetch: changed.fn, sleep: async () => {} }).faceSwap({ thumbnailId: base, facePath: face })
+    expect(f.status).toBe('failed')
+    expect(f.error).toBe(FEATURE_CHANGED)
+    expect(store.project.thumbnails.spend?.total).toBe(before)
+    expect(readFileSync(store.log.file, 'utf8')).toContain(FEATURE_CHANGED)
+  })
+
+  it('scores a thumbnail and stores the result on its record', async () => {
+    const { fn, calls } = fakeFetch()
+    const base = addDoneThumb()
+    const res = await createPikzelsService(makeCtx(), { fetch: fn, sleep: async () => {} }).score(base, 'My video')
+    expect(res).toMatchObject({ main: 8.2, subscores: { clarity: 9, emotion: 7 }, suggestion: 'Bigger text', title: 'My video', requestId: 'req_score' })
+    expect(calls.find((c) => c.url.endsWith(PIKZELS_API.thumbnailScore))!.body).toEqual({ image_base64: Buffer.from('PNG').toString('base64'), title: 'My video' })
+    expect(store.project.thumbnails.items.find((t) => t.id === base)!.score).toMatchObject({ main: 8.2, suggestion: 'Bigger text' })
+    expect(store.project.thumbnails.spend).toEqual({ total: 0.03, byAction: { score: 0.03 } })
+  })
+
+  it('generates titles into the Publish tab title options', async () => {
+    const { fn, calls } = fakeFetch()
+    store.mutate('t', 'app', (d) => void (d.project.publish.titles = ['Old title', 'Title B']), { noHistory: true })
+    const base = addDoneThumb()
+    const out = await createPikzelsService(makeCtx(), { fetch: fn, sleep: async () => {} }).titles({ thumbnailId: base, source: 'user' })
+    expect(out).toEqual(['Title A', 'Title B'])
+    const body = calls.find((c) => c.url.endsWith(PIKZELS_API.titleFromText))!.body
+    expect(body.prompt).toBe('Thumbs') // no transcript yet: the project name
+    expect(body.support_image_base64).toBe(Buffer.from('PNG').toString('base64'))
+    expect(store.project.publish.titles).toEqual(['Title A', 'Title B', 'Old title'])
+    expect(store.project.thumbnails.spend?.byAction).toEqual({ title: 0.08 })
+  })
+
+  it('renames and updates instructions with PATCH, names up to 25 characters', async () => {
+    const patches: any[] = []
+    const { fn } = fakeFetch({ routes: { '/v2/pikzonality/pz_9': (body, method) => (patches.push({ body, method }), { status: 200, json: {} }) } })
+    const ctx = makeCtx()
+    settings.pikzels.pikzonalities = [{ id: 'pz_9', kind: 'style', name: 'Old', status: 'completed', progress: 100, specialInstructions: '', createdAt: '' }]
+    const svc = createPikzelsService(ctx, { fetch: fn, sleep: async () => {} })
+    await expect(svc.rename('pz_9', 'x'.repeat(26))).rejects.toThrow(/25 characters/)
+    const u = await svc.rename('pz_9', 'Bold RC')
+    expect(u.name).toBe('Bold RC')
+    await svc.updateInstructions('pz_9', 'Red text always')
+    expect(patches).toEqual([
+      { method: 'PATCH', body: { name: 'Bold RC' } },
+      { method: 'PATCH', body: { special_instructions: 'Red text always' } }
+    ])
+    expect(svc.list()[0]).toMatchObject({ name: 'Bold RC', specialInstructions: 'Red text always' })
+  })
+
+  it('counts only successful calls in the project and all-time spend', async () => {
+    const { fn } = fakeFetch({ failCall: 2 })
+    const ctx = makeCtx()
+    const svc = createPikzelsService(ctx, { fetch: fn, sleep: async () => {} })
+    await svc.generate({ prompts: ['a', 'b', 'c'], source: 'user' })
+    const items = store.project.thumbnails.items
+    expect(items.filter((t) => t.status === 'done')).toHaveLength(2)
+    expect(items.find((t) => t.status === 'failed')!.error).toBe('Out of Pikzels credits')
+    expect(store.project.thumbnails.spend).toEqual({ total: 0.26, byAction: { 'thumbnail:pkz_4_5': 0.26 } })
+    expect(settings.pikzels.spend.total).toBeCloseTo(0.26, 6)
+    // Training is counted all-time only.
+    const imgs = [1, 2, 3].map((i) => {
+      const p = join(dir, `s${i}.png`)
+      writeFileSync(p, 'x')
+      return p
+    })
+    await svc.create('persona', 'Me', imgs)
+    expect(settings.pikzels.spend.byAction.persona_training).toBe(0.38)
+    expect(svc.pricing().spend.total).toBeCloseTo(0.64, 6)
+    expect(store.project.thumbnails.spend?.total).toBe(0.26)
+    expect(readFileSync(store.log.file, 'utf8')).toContain('"costUsd":0.13')
+  })
+
+  it('uses the owner\'s price overrides and resets to the published prices', async () => {
+    const { fn } = fakeFetch()
+    const svc = createPikzelsService(makeCtx(), { fetch: fn, sleep: async () => {} })
+    expect(svc.pricing().prices['thumbnail:pkz_4_5']).toBe(0.13)
+    const p = svc.setPrices({ 'thumbnail:pkz_4_5': 0.2, score: 0.03, bogus: 9 })
+    expect(p.overrides).toEqual({ 'thumbnail:pkz_4_5': 0.2 }) // equal-to-default and unknown keys are not stored
+    expect(settings.pikzels.prices).toEqual({ 'thumbnail:pkz_4_5': 0.2 })
+    expect(() => svc.setPrices({ score: -1 })).toThrow()
+    await svc.generate({ prompts: ['a'], source: 'user' })
+    expect(store.project.thumbnails.items[0].cost).toBe(0.2)
+    expect(store.project.thumbnails.spend?.total).toBe(0.2)
+    const reset = svc.setPrices(null)
+    expect(reset.overrides).toEqual({})
+    expect(reset.prices['thumbnail:pkz_4_5']).toBe(0.13)
+  })
+
+  it('keeps the API key in the user data folder across an app update', () => {
+    const data = join(dir, 'userdata')
+    initPaths({ data, runtime: join(dir, 'runtime'), resources: join(dir, 'install', 'resources') })
+    // Reversible stand-in for Windows DPAPI.
+    const safe = {
+      isEncryptionAvailable: () => true,
+      encryptString: (t: string) => Buffer.from(`enc:${Buffer.from(t).toString('hex')}`),
+      decryptString: (b: Buffer) => Buffer.from(b.toString().slice(4), 'hex').toString()
+    }
+    const ctx = { appLog: new ActivityLog(join(dir, 'app.log')) } as unknown as AppContext
+    createSecretsService(ctx, safe).set('pikzels', KEY)
+    ctx.settings = createSettingsService(ctx)
+    ctx.settings.update({ pikzels: { ...ctx.settings.get().pikzels, prices: { score: 0.05 } } })
+    expect(paths.secretsFile.startsWith(data)).toBe(true)
+    expect(readFileSync(paths.secretsFile, 'utf8')).not.toContain(KEY)
+
+    // An update replaces the program files only: the install folder goes, the user data folder stays.
+    rmSync(join(dir, 'install'), { recursive: true, force: true })
+    initPaths({ data, runtime: join(dir, 'runtime'), resources: join(dir, 'install-1.0.1', 'resources') })
+    const after = { appLog: new ActivityLog(join(dir, 'app2.log')) } as unknown as AppContext
+    expect(createSecretsService(after, safe).get('pikzels')).toBe(KEY)
+    expect(createSettingsService(after).get().pikzels.prices).toEqual({ score: 0.05 })
   })
 })

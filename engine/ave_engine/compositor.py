@@ -25,7 +25,7 @@ from .backend import get_backend
 from .captions import CaptionDrawer
 from .decode import ReaderPool, load_image
 from .effects import TIME_EFFECTS, apply_effect, p_float
-from .graphics import merge_brand, render_graphic
+from .graphics import merge_brand, render_graphic, resolve_brand_paths
 
 EPS = 1e-6
 # Footage within this aspect ratio of the frame fills it (edges cropped); further off, it is fitted
@@ -151,7 +151,7 @@ class Renderer:
         self.height = int(height or out.get('height') or 1080)
         self.fps = float(fps or out.get('fps') or 30)
         self.B = backend or get_backend()
-        self.brand = merge_brand(plan.get('brand'))
+        self.brand = resolve_brand_paths(merge_brand(plan.get('brand')), plan.get('projectDir'))
         self.footage_only = footage_only
         layers = plan.get('layers') or []
         self.video = [l for l in layers if l.get('kind') == 'video']
@@ -168,7 +168,10 @@ class Renderer:
         # Graphics and captions are drawn at no less than GFX_MIN_HEIGHT lines and box-reduced, so text
         # in a low-resolution preview matches the export instead of being rasterized at a tiny size.
         self.gfx_k = max(1, math.ceil(GFX_MIN_HEIGHT / self.height))
-        self.captions = None if footage_only else CaptionDrawer(plan.get('captions') or {}, self.brand,
+        captions = dict(plan.get('captions') or {})
+        if isinstance(captions.get('style'), dict):
+            captions['style'] = resolve_brand_paths({'captionStyle': captions['style']}, plan.get('projectDir'))['captionStyle']
+        self.captions = None if footage_only else CaptionDrawer(captions, self.brand,
                                                                 self.width * self.gfx_k, self.height * self.gfx_k)
         self.static_cache: dict = {}
         self._footage_key = None

@@ -414,8 +414,8 @@ export const ProjectSchema = z.looseObject({
     format: z.enum(['16:9', '9:16', '1:1']).default('16:9'),
     items: z.array(ThumbnailSchema).default([]),
     chosenId: z.string().optional(),
-    /** Pikzels spend on this project (successful calls only). */
-    spend: PikzelsSpendSchema.default({ total: 0, byAction: {} })
+    /** Pikzels spend on this project (successful calls only). Absent until the first paid call, so older projects open unchanged. */
+    spend: PikzelsSpendSchema.optional()
   }),
   publish: z.looseObject({
     titles: z.array(z.string()).default([]),

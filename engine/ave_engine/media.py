@@ -288,6 +288,21 @@ def stream_audio(path: str, sr: int, channels: int, block_seconds: float = 10.0)
         raise FfmpegError('Audio decode failed: ' + tail.text()[-2000:])
 
 
+def replace_file(tmp: str, path: str, attempts: int = 20) -> None:
+    """Move a finished temp file into place. On Windows the target may be open for a moment (the
+    preview player reading an older chunk), so retry briefly before giving up."""
+    import time
+
+    for i in range(attempts):
+        try:
+            os.replace(tmp, path)
+            return
+        except PermissionError:
+            if i == attempts - 1:
+                raise
+            time.sleep(0.1 * (i + 1))
+
+
 def write_wav(path: str, audio: np.ndarray, sr: int, pcm16: bool = False) -> None:
     """Write a WAV file (float32 by default). Written to a temp name and renamed into place."""
     from scipy.io import wavfile
@@ -299,4 +314,4 @@ def write_wav(path: str, audio: np.ndarray, sr: int, pcm16: bool = False) -> Non
     os.makedirs(os.path.dirname(os.path.abspath(path)), exist_ok=True)
     with open(tmp, 'wb') as f:
         wavfile.write(f, sr, a)
-    os.replace(tmp, path)
+    replace_file(tmp, path)

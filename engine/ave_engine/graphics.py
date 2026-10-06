@@ -58,6 +58,23 @@ def merge_brand(brand: dict | None) -> dict:
     return b
 
 
+def resolve_brand_paths(brand: dict, base: str | None) -> dict:
+    """Brand font, logo and caption font paths relative to the project folder become absolute."""
+    if not base:
+        return brand
+
+    def fix(p):
+        return p if not p or os.path.isabs(p) else os.path.join(base, p)
+
+    b = dict(brand)
+    b['fonts'] = [{**f, 'path': fix(f.get('path', ''))} for f in brand.get('fonts') or []]
+    if isinstance(brand.get('logo'), dict):
+        b['logo'] = {**brand['logo'], 'path': fix(brand['logo'].get('path', ''))}
+    if isinstance(brand.get('captionStyle'), dict):
+        b['captionStyle'] = {**brand['captionStyle'], 'font': fix(brand['captionStyle'].get('font', ''))}
+    return b
+
+
 @lru_cache(maxsize=256)
 def _truetype(path: str, size: int):
     return ImageFont.truetype(path, size)

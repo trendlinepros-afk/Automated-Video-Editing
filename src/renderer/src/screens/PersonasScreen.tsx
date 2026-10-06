@@ -9,11 +9,14 @@ import { AppTopBar } from '../components/AppTopBar'
 import { Empty, Spinner } from '../components/bits'
 import { Icon } from '../components/Icon'
 import { IMAGE_EXTS, dateTime, mediaUrl } from '../util'
+import { CostPerAction, costLabel, usePikzelsPricing } from '../panels/ThumbnailsPanelCosts'
+import type { PikzelsPricing } from '@shared/ipc'
 
 export function PersonasScreen() {
   const [list, setList] = useState<Pikzonality[] | null>(null)
   const [hasKey, setHasKey] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
+  const [pricing, reloadPricing] = usePikzelsPricing()
 
   const refresh = useCallback(async (remote: boolean) => {
     setRefreshing(true)
@@ -61,7 +64,14 @@ export function PersonasScreen() {
             Only personas and styles created here can be used for thumbnails. Ones made on the Pikzels website need to be created again
             here.
           </p>
-          <CreateForm disabled={!hasKey} onCreated={(p) => setList((l) => [p, ...(l ?? [])])} />
+          <CreateForm
+            disabled={!hasKey}
+            pricing={pricing}
+            onCreated={(p) => {
+              setList((l) => [p, ...(l ?? [])])
+              reloadPricing()
+            }}
+          />
           {list === null ? (
             <Spinner label="Loading…" />
           ) : (
@@ -70,13 +80,14 @@ export function PersonasScreen() {
               <Group title="Styles" items={styles} onChange={setList} empty="No styles yet. A style is a thumbnail look, made from three reference thumbnails." />
             </>
           )}
+          <CostPerAction pricing={pricing} only={['persona_training', 'style_training']} />
         </div>
       </div>
     </>
   )
 }
 
-function CreateForm({ disabled, onCreated }: { disabled: boolean; onCreated: (p: Pikzonality) => void }) {
+function CreateForm({ disabled, onCreated, pricing }: { disabled: boolean; onCreated: (p: Pikzonality) => void; pricing: PikzelsPricing | null }) {
   const [kind, setKind] = useState<'persona' | 'style'>('persona')
   const [name, setName] = useState('')
   const [images, setImages] = useState<string[]>([])
@@ -140,7 +151,7 @@ function CreateForm({ disabled, onCreated }: { disabled: boolean; onCreated: (p:
         )}
         <span className="spacer" />
         <button className="btn primary" disabled={disabled || busy || !name.trim() || images.length !== 3} onClick={create}>
-          {busy ? 'Uploading…' : `Create ${kind}`}
+          {busy ? 'Uploading…' : `Train ${kind}${costLabel(pricing, kind === 'persona' ? 'persona_training' : 'style_training')}`}
         </button>
       </div>
       <span className="hint">
@@ -170,6 +181,18 @@ function Group(props: { title: string; items: Pikzonality[]; empty: string; onCh
 
 function PikzCard({ p, onChange }: { p: Pikzonality; onChange: (fn: (l: Pikzonality[] | null) => Pikzonality[] | null) => void }) {
   const [text, setText] = useState(p.specialInstructions)
+  const [renaming, setRenaming] = useState(false)
+  const [name, setName] = useState(p.name)
+  const rename = async () => {
+    const clean = name.trim()
+    if (!clean || clean === p.name) return setRenaming(false)
+    const u = await call(() => window.api.pikzels.rename(p.id, clean), 'Could not rename')
+    if (u) {
+      onChange((l) => l?.map((x) => (x.id === p.id ? u : x)) ?? null)
+      toast(`Renamed to ${u.name}.`)
+      setRenaming(false)
+    }
+  }
   const saved = useRef(p.specialInstructions)
   useEffect(() => {
     setText(p.specialInstructions)
@@ -189,7 +212,37 @@ function PikzCard({ p, onChange }: { p: Pikzonality; onChange: (fn: (l: Pikzonal
       <div className="pv">{p.sampleImage ? <img src={mediaUrl(p.sampleImage)} alt="" style={{ objectFit: 'cover' }} /> : <Icon name="image" size={28} />}</div>
       <div className="info">
         <div className="row">
-          <b className="grow ellipsis">{p.name}</b>
+          {renaming ? (
+            <>
+              <input
+                type="text"
+                className="grow"
+                autoFocus
+                maxLength={25}
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') void rename()
+                  if (e.key === 'Escape') setRenaming(false)
+                }}
+              />
+              <button className="btn small primary" onClick={() => void rename()}>
+                Save
+              </button>
+            </>
+          ) : (
+            <b
+              className="grow ellipsis"
+              title="Click to rename"
+              style={{ cursor: 'text' }}
+              onClick={() => {
+                setName(p.name)
+                setRenaming(true)
+              }}
+            >
+              {p.name}
+            </b>
+          )}
           {p.status === 'completed' && <span className="chip ok">Ready</span>}
           {p.status === 'processing' && <span className="chip warn">Training</span>}
           {p.status === 'failed' && <span className="chip bad">Failed</span>}

@@ -81,13 +81,9 @@ Releases go straight to this repository's GitHub Releases, and installed apps re
 
 1. Bump `version` in `package.json` (for example `1.0.1`).
 2. Add a `## 1.0.1` section to `CHANGELOG.md`. Its text becomes the GitHub release notes and is shown in the app's update dialog. The release is blocked if the section is missing or empty.
-3. Commit, then tag and push:
-   ```bash
-   git tag -a v1.0.1 -m "1.0.1"
-   git push origin v1.0.1
-   ```
+3. Commit and merge into `main`, then start the release: **Actions → Release → Run workflow** on `main` (or push a tag `vX.Y.Z` matching the version). Publishing creates the `vX.Y.Z` tag and release.
 4. GitHub Actions (`.github/workflows/release.yml`) then runs:
-   - **gate**: the tag must match `package.json`; typecheck; every unit test, including opening and upgrading each sample project, the section lock and log redaction; the engine tests, including preview/export match.
+   - **gate**: a pushed tag must match `package.json`, and the version must not be released already; typecheck; every unit test, including opening and upgrading each sample project, the section lock and log redaction; the engine tests, including preview/export match.
    - **update-e2e** (Windows): builds this code twice, as `0.0.1` and as the release version, both reading updates from a local feed. It installs `0.0.1` silently, writes a file in `%APPDATA%\AI Video Editor`, serves the new build, and runs the installed app with `--update-self-test`. The app checks, downloads (sha512-verified), and installs the new build over itself. The job then checks that the installed program reports the new version and that the settings file is untouched.
    - **publish**: builds the installer and publishes it with `latest.yml` and the blockmap to a GitHub release named after the version.
 

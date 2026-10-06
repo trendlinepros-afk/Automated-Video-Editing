@@ -3,8 +3,6 @@
 Each release's section becomes its GitHub release text and the notes shown in the app's update dialog.
 A release is blocked until the section for its version has notes.
 
-## 1.0.1
-
 ## 1.0.0
 
 The first release of AI Video Editor: Claude edits your video through MCP, and you watch the edit land on a timeline, fix what is off, export, and get thumbnails.
@@ -16,6 +14,7 @@ The first release of AI Video Editor: Claude edits your video through MCP, and y
 - **Editor.** Live timeline with A-roll, B-roll, Graphics, Effects, Captions, Music and Sound effects lanes; nudge cut edges with looping seam audio; move, trim, swap and delete items; notes for Claude; section re-edit with a lock outside the range and Before/After with Keep and Revert; one-click Fix clipped audio.
 - **Rendering.** The GPU compositor renders a chunked low-resolution preview and the final export from the same plan, so they match. Whole video, selected section or quick export; cancel at any time.
 - **Assets and channel memory.** An asset library on any folder with shared and per-channel sections, inputs, previews and use counts. Learned corrections suggest channel rules, and nothing becomes a rule without your yes.
-- **Thumbnails, captions and publishing.** 1 to 3 Pikzels thumbnails with persona and style, word-tied captions in the brand kit style (burned in, subtitle file or both), and a publishing pack of titles, description, chapters and tags.
+- **Thumbnails (Pikzels).** Generate 1 to 3 options on PKZ-4.5, 4, 3 or 2 with your persona and theme; recreate from an image, a video frame or a YouTube link; edit with a painted mask; face swap; score; title suggestions. Create, rename, retrain and delete personas and themes. Every action shows its cost, and spend is tracked per project and in total (prices editable in Settings). Your Pikzels key is kept with Windows credential protection and is never touched by updates.
+- **Captions and publishing.** word-tied captions in the brand kit style (burned in, subtitle file or both), and a publishing pack of titles, description, chapters and tags.
 - **Named versions** with automatic snapshots at key moments, restore and compare.
 - **Logs.** A continuous per-project activity log and an app log, exported as text with every step and no API keys or tokens.

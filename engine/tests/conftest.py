@@ -47,25 +47,34 @@ def run_engine(*args: str, check: bool = True) -> tuple[list[dict], dict | None]
 
 @pytest.fixture(scope='session')
 def media(tmp_path_factory):
-    d = tmp_path_factory.mktemp('media')
+    return build_media(tmp_path_factory.mktemp('media'))
+
+
+def build_media(d) -> dict:
+    from pathlib import Path
+
+    d = Path(d)
     m = {}
-    # A-roll: two "cameras" with a talking-like tone (bursts with pauses), 1080p 30 fps.
-    speech = "aevalsrc='0.35*sin(2*PI*180*t)*(0.6+0.4*sin(2*PI*3*t))*lt(mod(t,2.5),1.7)':s=48000:d=40"
+    # A-roll: two "cameras" with a talking-like tone (bursts with pauses), 1080p 30 fps. The test
+    # patterns are softened slightly, like camera footage; raw test patterns have pixel-sharp,
+    # fully saturated edges that no real footage has.
+    speech = "aevalsrc='0.35*sin(2*PI*180*t)*(0.6+0.4*sin(2*PI*3*t))*lt(mod(t,2.5),1.7)':s=48000:d=34"
+    soft = ['-vf', 'gblur=sigma=1.5']
     m['a1'] = str(d / 'a1.mp4')
-    ff('-f', 'lavfi', '-i', 'testsrc2=s=1920x1080:r=30:d=40', '-f', 'lavfi', '-i', speech,
+    ff('-f', 'lavfi', '-i', 'testsrc2=s=1920x1080:r=30:d=34', '-f', 'lavfi', '-i', speech, *soft,
        '-c:v', 'libx264', '-preset', 'ultrafast', '-crf', '16', '-g', '45', '-pix_fmt', 'yuv420p',
        '-c:a', 'aac', '-b:a', '192k', '-shortest', m['a1'])
     m['a2'] = str(d / 'a2.mp4')
-    ff('-f', 'lavfi', '-i', 'testsrc=s=1920x1080:r=30:d=40', '-f', 'lavfi', '-i', speech.replace('180', '220'),
+    ff('-f', 'lavfi', '-i', 'testsrc=s=1920x1080:r=30:d=34', '-f', 'lavfi', '-i', speech.replace('180', '220'), *soft,
        '-c:v', 'libx264', '-preset', 'ultrafast', '-crf', '16', '-g', '45', '-pix_fmt', 'yuv420p',
        '-c:a', 'aac', '-b:a', '192k', '-shortest', m['a2'])
     # B-roll: a different aspect (4:3) colour pattern, no audio.
     m['b1'] = str(d / 'b1.mp4')
-    ff('-f', 'lavfi', '-i', 'smptehdbars=s=1440x1080:r=30:d=20', '-vf', "hue=H=2*PI*t/5",
+    ff('-f', 'lavfi', '-i', 'smptehdbars=s=1440x1080:r=30:d=20', '-vf', "hue=H=2*PI*t/5,gblur=sigma=1.5",
        '-c:v', 'libx264', '-preset', 'ultrafast', '-crf', '16', '-pix_fmt', 'yuv420p', m['b1'])
     # Music: a steady chord.
     m['music'] = str(d / 'music.wav')
-    ff('-f', 'lavfi', '-i', "aevalsrc='0.2*sin(2*PI*261.6*t)+0.2*sin(2*PI*329.6*t)+0.2*sin(2*PI*392*t)|0.2*sin(2*PI*261.6*t)+0.2*sin(2*PI*329.6*t)+0.2*sin(2*PI*392*t)':s=48000:d=40",
+    ff('-f', 'lavfi', '-i', "aevalsrc='0.2*sin(2*PI*261.6*t)+0.2*sin(2*PI*329.6*t)+0.2*sin(2*PI*392*t)|0.2*sin(2*PI*261.6*t)+0.2*sin(2*PI*329.6*t)+0.2*sin(2*PI*392*t)':s=48000:d=34",
        '-c:a', 'pcm_s16le', m['music'])
     m['sfx'] = os.path.join(STARTER, 'sfx_whoosh', 'whoosh.wav')
     # A still image.

@@ -1,0 +1,34 @@
+{
+  "formatVersion": 1,
+  "id": "starter-glitch",
+  "name": "Glitch",
+  "type": "effect",
+  "description": "Digital glitch bursts: colour split, slices jumping sideways, blocky noise. Place as an Effects item with effect 'custom' and file glitch.py.",
+  "whenToUse": "Tech moments, errors, fails, fast transitions or a \"system crash\" joke. 0.5-2 seconds.",
+  "tags": [
+    "glitch",
+    "digital",
+    "error",
+    "transition",
+    "custom effect"
+  ],
+  "scope": "shared",
+  "file": "glitch.py",
+  "preview": "preview.png",
+  "inputs": {
+    "amount": {
+      "type": "number",
+      "default": 1.0,
+      "description": "Strength (0..2)"
+    },
+    "rate": {
+      "type": "number",
+      "default": 6.0,
+      "description": "Glitch bursts per second"
+    }
+  },
+  "preferred": false,
+  "uses": 0,
+  "createdAt": "2026-10-06T00:00:00.000Z",
+  "updatedAt": "2026-10-06T00:00:00.000Z"
+}

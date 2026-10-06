@@ -26,9 +26,8 @@ export function UpdateButton() {
       title = 'You have the newest version. Click to check again.'
       break
     case 'available':
-      label = u.newVersion ? `Update v${u.newVersion}` : 'Update available'
-      title = 'A new version is out. Click to download it.'
-      primary = true
+      // Found by the quiet check at launch: only a small dot, nothing downloaded until you click.
+      title = `Version ${u.newVersion ?? ''} is out. Click to download it.`
       break
     case 'downloading':
       label = `Downloading ${Math.round(u.percent ?? 0)}%`
@@ -57,7 +56,7 @@ export function UpdateButton() {
         <button className={`btn small update-btn${primary ? ' primary' : ''}`} disabled={busy} onClick={onClick} title={title}>
           {busy && <span className="spinner" style={{ width: 11, height: 11 }} />}
           {label}
-          {u?.dot && !primary && <span className="badge-dot" />}
+          {(u?.dot || u?.status === 'available') && !primary && <span className="badge-dot" />}
         </button>
       )}
       {version && <span className="version">v{version}</span>}

@@ -21,6 +21,18 @@ META = {
 SS = 2
 
 
+def _paste(dst, layer, x, y):
+    """alpha_composite that accepts positions partly off the canvas."""
+    x, y = int(x), int(y)
+    if x < 0 or y < 0:
+        if -x >= layer.width or -y >= layer.height:
+            return
+        layer = layer.crop((max(0, -x), max(0, -y), layer.width, layer.height))
+        x, y = max(0, x), max(0, y)
+    if x < dst.width and y < dst.height:
+        dst.alpha_composite(layer, (x, y))
+
+
 def _rounded(w, h, r, fill, rot=0.0):
     layer = Image.new('RGBA', (max(1, int(w * SS)), max(1, int(h * SS))), (0, 0, 0, 0))
     ImageDraw.Draw(layer).rounded_rectangle([0, 0, layer.width - 1, layer.height - 1], radius=int(r * SS), fill=fill)
@@ -77,8 +89,8 @@ def render(t, ctx):
 
     shadow = _rounded(bw, bh, H * 0.03 * scale, (0, 0, 0, 110), rot)
     badge = _rounded(bw, bh, H * 0.03 * scale, color + (255,), rot)
-    img.alpha_composite(shadow, (int(cx - shadow.width / 2 + H * 0.012 * scale), int(cy - shadow.height / 2 + H * 0.016 * scale)))
-    img.alpha_composite(badge, (int(cx - badge.width / 2), int(cy - badge.height / 2)))
+    _paste(img, shadow, int(cx - shadow.width / 2 + H * 0.012 * scale), int(cy - shadow.height / 2 + H * 0.016 * scale))
+    _paste(img, badge, int(cx - badge.width / 2), int(cy - badge.height / 2))
 
     # Number drawn on its own layer so it rotates with the badge.
     tl = Image.new('RGBA', (int(bw), int(bh)), (0, 0, 0, 0))
@@ -87,7 +99,7 @@ def render(t, ctx):
     d.text(((bw - tw) / 2, (bh - (asc + desc)) / 2 + H * 0.004 * scale), shown, font=font, fill=text_color + (255,),
            stroke_width=max(1, int(H * 0.006 * scale)), stroke_fill=dark + (255,))
     tl = tl.rotate(rot, resample=Image.BICUBIC, expand=True)
-    img.alpha_composite(tl, (int(cx - tl.width / 2), int(cy - tl.height / 2)))
+    _paste(img, tl, int(cx - tl.width / 2), int(cy - tl.height / 2))
 
     if label:
         lk = ctx.ease_out_back(ctx.progress(t, 0.15, 0.3), 2.0) * (1 - out)
@@ -99,9 +111,9 @@ def render(t, ctx):
             pill = _rounded(lw, lh, lh / 2, accent + (255,), rot)
             px = cx - bw * 0.42
             py = cy - bh / 2 - lh * 0.55
-            img.alpha_composite(pill, (int(px - pill.width / 2 + lw / 2), int(py - pill.height / 2)))
+            _paste(img, pill, int(px - pill.width / 2 + lw / 2), int(py - pill.height / 2))
             ll = Image.new('RGBA', (int(lw), int(lh)), (0, 0, 0, 0))
             ImageDraw.Draw(ll).text((H * 0.02 * lk, (lh - (la + ld)) / 2), label, font=lf, fill=dark + (255,))
             ll = ll.rotate(rot, resample=Image.BICUBIC, expand=True)
-            img.alpha_composite(ll, (int(px - ll.width / 2 + lw / 2), int(py - ll.height / 2)))
+            _paste(img, ll, int(px - ll.width / 2 + lw / 2), int(py - ll.height / 2))
     return img

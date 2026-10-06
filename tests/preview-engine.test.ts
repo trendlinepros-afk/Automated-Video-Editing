@@ -15,6 +15,7 @@ import { ProjectStore } from '../src/main/project/store'
 import { createEngineService } from '../src/main/engine/engine'
 import { createPreviewService } from '../src/main/engine/preview'
 import { createRenderJobs } from '../src/main/engine/renders'
+import { frameAt, seamAudio, waveform } from '../src/main/engine/media'
 
 const ENGINE_DIR = resolve('engine')
 
@@ -164,5 +165,17 @@ describe.skipIf(!available)('preview with the real engine', () => {
     expect(info.duration).toBeGreaterThan(3.8)
     expect(info.duration).toBeLessThan(4.3)
     expect(job.out).toMatch(/Tiny test_whole_\d{4}-\d{2}-\d{2}_\d{2}-\d{2}\.mp4$/)
+  })
+
+  it('makes stills, waveforms and the seam audio around a cut', async () => {
+    const png = await frameAt(ctx, 1.5)
+    expect(png && existsSync(png)).toBe(true)
+    const wave = await waveform(ctx, { sourceId: 'src1' })
+    expect(wave?.peaks.length).toBeGreaterThan(400)
+    const seam = await seamAudio(ctx, 'seg2')
+    const info = probe(seam)
+    expect(info.audio).toBe(true)
+    expect(info.duration).toBeGreaterThan(1.9)
+    expect(info.duration).toBeLessThan(2.1)
   })
 })

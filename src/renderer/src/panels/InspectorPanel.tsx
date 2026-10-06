@@ -67,8 +67,6 @@ function ItemInspector({ r, d }: { r: ResolvedItem; d: Derived }) {
     if (canEdit(item.id)) void applyOp({ op: 'updateItem', id: item.id, patch })
   }
   const anchorWord = item.type !== 'segment' && item.anchor.kind === 'word' ? d.resolver.words.get(item.anchor.wordId)?.word : undefined
-  const file = 'file' in item ? item.file : undefined
-  const sourceId = 'sourceId' in item ? item.sourceId : undefined
 
   return (
     <div className="panel">
@@ -152,8 +150,8 @@ function ItemInspector({ r, d }: { r: ResolvedItem; d: Derived }) {
               <Toggle checked={item.duck} disabled={ro} onChange={(v) => update({ duck: v })} label="Lower under speech" />
               <Toggle checked={item.loop} disabled={ro} onChange={(v) => update({ loop: v })} label="Loop" />
               <Row label="File">
-                <span className="small ellipsis grow" title={file ?? sourcePath(sourceId ?? '')}>
-                  {basename(file ?? sourcePath(sourceId ?? '') ?? '')}
+                <span className="small ellipsis grow" title={item.file ?? sourcePath(item.sourceId ?? '')}>
+                  {basename(item.file ?? sourcePath(item.sourceId ?? '') ?? '')}
                 </span>
                 <button
                   className="btn small"

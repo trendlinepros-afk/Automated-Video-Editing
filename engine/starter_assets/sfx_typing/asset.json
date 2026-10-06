@@ -1,0 +1,24 @@
+{
+  "formatVersion": 1,
+  "id": "starter-sfx-typing",
+  "name": "Typing",
+  "type": "sound",
+  "description": "Keyboard typing clicks. Made by the sound effect synthesizer (asset \"Sound effect synthesizer\").",
+  "whenToUse": "On-screen text typing out, searching, writing notes.",
+  "tags": [
+    "typing",
+    "keyboard",
+    "text",
+    "computer",
+    "sfx",
+    "sound effect"
+  ],
+  "scope": "shared",
+  "file": "typing.wav",
+  "preview": "preview.png",
+  "inputs": {},
+  "preferred": false,
+  "uses": 0,
+  "createdAt": "2026-10-06T00:00:00.000Z",
+  "updatedAt": "2026-10-06T00:00:00.000Z"
+}

@@ -28,7 +28,8 @@ export function Timeline() {
   const [scrollLeft, setScrollLeft] = useState(0)
   const [viewW, setViewW] = useState(1000)
 
-  const duration = d?.duration ?? 1
+  // An empty project still shows a minute of ruler, so the lanes do not look broken before Claude starts.
+  const duration = d && d.resolved.size ? d.duration : 60
   const fitZoom = Math.max(0.05, (viewW - HEADER_W - 24) / duration)
   const minZoom = Math.min(fitZoom, 1)
   const zoom = zoomState > 0 ? clamp(zoomState, minZoom, MAX_ZOOM) : fitZoom
@@ -78,6 +79,15 @@ export function Timeline() {
   const t1 = t0 + span + 3 * q
 
   const handlers = useHandlers(zoomRef)
+  const segmentsByTrack = useMemo(() => {
+    const m = new Map<string, PlacedSegment[]>()
+    for (const seg of d?.segments ?? []) {
+      const l = m.get(seg.item.trackId) ?? []
+      l.push(seg)
+      m.set(seg.item.trackId, l)
+    }
+    return m
+  }, [d])
 
   if (!d) return null
   const project = snap.doc.project
@@ -97,7 +107,7 @@ export function Timeline() {
                 key={track.id}
                 track={track}
                 items={d.byTrack.get(track.id) ?? EMPTY_ITEMS}
-                segments={track.kind === 'aroll' ? d.segments.filter((s) => s.item.trackId === track.id) : null}
+                segments={track.kind === 'aroll' ? segmentsByTrack.get(track.id) ?? EMPTY_SEGMENTS : null}
                 captions={track.kind === 'captions' ? d.captions() : null}
                 captionsEnabled={project.captions.enabled}
                 sources={d.sources}
@@ -124,6 +134,7 @@ export function Timeline() {
 }
 
 const EMPTY_ITEMS: ResolvedItem[] = []
+const EMPTY_SEGMENTS: PlacedSegment[] = []
 
 function timeAt(e: { clientX: number }, el: Element, zoom: number): number {
   return Math.max(0, (e.clientX - el.getBoundingClientRect().left) / zoom)
@@ -337,7 +348,7 @@ function Overlays({ zoom, lock }: { zoom: number; lock: Range | null }) {
       {chatRange && <div className="tl-overlay tl-chatrange" style={box(chatRange)} />}
       {seamSeg && (
         <div className="tl-overlay" style={{ left: HEADER_W + (seamSeg.start + dragDt) * zoom, top: RULER_H, width: 2, background: 'var(--warn)', zIndex: 7 }}>
-          <span className="chip warn" style={{ position: 'absolute', top: 4, left: 6 }}>
+          <span className="chip warn" style={{ position: 'absolute', top: 4, left: 6, background: 'var(--bg-2)', border: '1px solid var(--warn)' }}>
             {dragDt > 0 ? '+' : ''}
             {Math.round(dragDt * 1000)} ms
           </span>
@@ -363,6 +374,7 @@ function Toolbar({ zoom, minZoom, setZoom, fit }: { zoom: number; minZoom: numbe
   const range = useStore(editor, (s) => s.range)
   const seam = useStore(editor, (s) => s.seam)
   const readOnly = useStore(editor, (s) => s.snapshot!.readOnly)
+  const empty = useStore(editor, (s) => s.snapshot!.doc.project.items.length === 0)
   const lo = Math.log(minZoom)
   const hi = Math.log(MAX_ZOOM)
   const slider = Math.round(((Math.log(zoom) - lo) / (hi - lo || 1)) * 1000)
@@ -401,6 +413,8 @@ function Toolbar({ zoom, minZoom, setZoom, fit }: { zoom: number; minZoom: numbe
             <Icon name="close" size={14} />
           </button>
         </div>
+      ) : empty ? (
+        <span className="small faint">The edit appears here as Claude builds it.</span>
       ) : (
         <span className="small faint">Drag across the ruler to select a section.</span>
       )}

@@ -30,6 +30,17 @@ EPS = 1e-6
 # Footage within this aspect ratio of the frame fills it (edges cropped); further off, it is fitted
 # over a blurred copy of itself.
 COVER_TOLERANCE = 1.12
+GFX_MIN_HEIGHT = 720
+
+
+def reduce_premultiplied(rgba: np.ndarray, k: int) -> np.ndarray:
+    """uint8 straight-alpha RGBA -> float32 premultiplied RGBA, averaged over k x k blocks."""
+    a = rgba.astype(np.float32) * (1.0 / 255.0)
+    a[..., :3] *= a[..., 3:4]
+    if k > 1:
+        h, w = a.shape[0] // k, a.shape[1] // k
+        a = a[: h * k, : w * k].reshape(h, k, w, k, 4).mean(axis=(1, 3))
+    return a
 
 
 def active(layer: dict, t: float) -> bool:
@@ -151,7 +162,11 @@ class Renderer:
                             and (e.get('params') or {}).get('scope') == 'all']
         self.graphics = [l for l in layers if l.get('kind') == 'graphic']
         self.pool = ReaderPool()
-        self.captions = None if footage_only else CaptionDrawer(plan.get('captions') or {}, self.brand, self.width, self.height)
+        # Graphics and captions are drawn at no less than GFX_MIN_HEIGHT lines and box-reduced, so text
+        # in a low-resolution preview matches the export instead of being rasterized at a tiny size.
+        self.gfx_k = max(1, math.ceil(GFX_MIN_HEIGHT / self.height))
+        self.captions = None if footage_only else CaptionDrawer(plan.get('captions') or {}, self.brand,
+                                                                self.width * self.gfx_k, self.height * self.gfx_k)
         self.static_cache: dict = {}
         self._footage_key = None
         self._footage = None
@@ -302,26 +317,26 @@ class Renderer:
 
     def draw_graphic(self, F, layer: dict, t: float):
         W, H = self.width, self.height
+        k = self.gfx_k
         u = t - layer['start']
         dur = layer['end'] - layer['start']
-        rgba = render_graphic(layer['file'], u, W, H, dur, layer.get('params') or {}, self.fps, self.brand, t)
         x, y, scale, rot, op = transform_at(layer, u)
         op *= fade_opacity(layer, t)
         if op <= 0:
             return F
+        rgba = render_graphic(layer['file'], u, W * k, H * k, dur, layer.get('params') or {}, self.fps, self.brand, t)
         alpha = rgba[..., 3]
         if not alpha.any():
             return F
         if not has_transform(layer):
-            # Upload only the part that has something drawn on it.
+            # Upload only the part that has something drawn on it (aligned to the reduction grid).
             rows = np.flatnonzero(alpha.any(axis=1))
             cols = np.flatnonzero(alpha.any(axis=0))
-            y0, y1, x0, x1 = rows[0], rows[-1] + 1, cols[0], cols[-1] + 1
-            part = self.B.from_uint8(rgba[y0:y1, x0:x1])
-            part = self.B.concat([part[..., :3] * part[..., 3:4], part[..., 3:4]], axis=-1)
-            return self.blend(F, part, int(x0), int(y0), op)
-        src = self.B.from_uint8(rgba)
-        src = self.B.concat([src[..., :3] * src[..., 3:4], src[..., 3:4]], axis=-1)
+            y0, y1 = rows[0] // k * k, -(-(rows[-1] + 1) // k) * k
+            x0, x1 = cols[0] // k * k, -(-(cols[-1] + 1) // k) * k
+            part = self.B.upload(reduce_premultiplied(rgba[y0:y1, x0:x1], k))
+            return self.blend(F, part, int(x0 // k), int(y0 // k), op)
+        src = self.B.upload(reduce_premultiplied(rgba, k))
         return self.draw_box(F, src, x, y, W * scale, H * scale, rot, op)
 
     def draw_captions(self, F, t: float):
@@ -332,10 +347,15 @@ class Renderer:
             return F
         arr, x0, y0 = ov
         if self._caption is None or self._caption[0] is not arr:
-            a = arr.astype(np.float32) / 255.0
-            a[..., :3] *= a[..., 3:4]
-            self._caption = (arr, self.B.upload(a))
-        return self.blend(F, self._caption[1], x0, y0, 1.0)
+            k = self.gfx_k
+            # Pad so the image sits on the reduction grid, then reduce to output size.
+            px, py = x0 % k, y0 % k
+            h, w = arr.shape[0] + py, arr.shape[1] + px
+            h2, w2 = -(-h // k) * k, -(-w // k) * k
+            big = np.zeros((h2, w2, 4), np.uint8)
+            big[py:py + arr.shape[0], px:px + arr.shape[1]] = arr
+            self._caption = (arr, self.B.upload(reduce_premultiplied(big, k)), (x0 - px) // k, (y0 - py) // k)
+        return self.blend(F, self._caption[1], self._caption[2], self._caption[3], 1.0)
 
     def draw_logo(self, F):
         logo = (self.brand.get('logo') or {})

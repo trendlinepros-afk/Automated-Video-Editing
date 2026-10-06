@@ -11,6 +11,7 @@ import { useStore } from '../state/store'
 import { Icon } from '../components/Icon'
 import { fmt, fmtRange, mediaUrl } from '../util'
 import { IntroPanel, StartPanel } from './StartPanel'
+import { GraphicHandle } from './GraphicHandle'
 
 export function Preview() {
   const preview = useStore(editor, (s) => s.preview)
@@ -19,6 +20,7 @@ export function Preview() {
   const hasCuts = useStore(editor, (s) => s.snapshot!.doc.project.items.some((i) => i.type === 'segment'))
   const box = useRef<HTMLDivElement>(null)
   const video = useRef<HTMLVideoElement>(null)
+  const stage = useRef<HTMLDivElement>(null)
   const [startHidden, setStartHidden] = useState(false)
 
   const showingBefore = !!beforeId && !!preview.beforeFile
@@ -40,7 +42,7 @@ export function Preview() {
 
   return (
     <div className="preview" ref={box}>
-      <div className="preview-stage" onDoubleClick={fullscreen}>
+      <div className="preview-stage" ref={stage} onDoubleClick={fullscreen}>
         <video ref={video} src={src} preload="auto" onLoadedMetadata={videoReloaded} onClick={toggle} playsInline />
         {!src && (
           <div className="preview-empty">
@@ -54,10 +56,8 @@ export function Preview() {
           </div>
         )}
         {preview.status === 'error' && <div className="preview-overlay bad">Preview could not be rendered: {preview.message}</div>}
-        {preview.status === 'unavailable' && src === undefined && hasCuts && (
-          <div className="preview-overlay warn">{preview.message ?? 'The preview is not available on this PC.'}</div>
-        )}
         {showingBefore && <div className="preview-badge">BEFORE</div>}
+        {!showingBefore && <GraphicHandle stage={stage} video={video} />}
         {status === 'new' && !startHidden && <StartPanel onStarted={() => setStartHidden(true)} />}
         {status === 'intro_ready' && <IntroPanel />}
       </div>
@@ -71,6 +71,14 @@ export function Preview() {
 function EmptyPreview({ hasCuts }: { hasCuts: boolean }) {
   const runner = useStore(editor, (s) => s.runner)
   const preview = useStore(editor, (s) => s.preview)
+  if (hasCuts && (preview.status === 'unavailable' || preview.status === 'error')) {
+    return (
+      <div className="empty">
+        <h3>No preview</h3>
+        <div className="warn">{preview.message ?? 'The preview is not available on this PC.'}</div>
+      </div>
+    )
+  }
   if (hasCuts) {
     return (
       <div className="empty">

@@ -15,6 +15,18 @@ META = {
 SS = 2
 
 
+def _paste(dst, layer, x, y):
+    """alpha_composite that accepts positions partly off the canvas."""
+    x, y = int(x), int(y)
+    if x < 0 or y < 0:
+        if -x >= layer.width or -y >= layer.height:
+            return
+        layer = layer.crop((max(0, -x), max(0, -y), layer.width, layer.height))
+        x, y = max(0, x), max(0, y)
+    if x < dst.width and y < dst.height:
+        dst.alpha_composite(layer, (x, y))
+
+
 def _bar(w, h, r, fill):
     layer = Image.new('RGBA', (max(1, int(w * SS)), max(1, int(h * SS))), (0, 0, 0, 0))
     ImageDraw.Draw(layer).rounded_rectangle([0, 0, layer.width - 1, layer.height - 1], radius=int(r * SS), fill=fill)
@@ -64,7 +76,7 @@ def render(t, ctx):
         uw = tw * 0.6 * grow
         uh = H * 0.018
         bar = _bar(uw, uh, uh / 2, color + (255,))
-        layer.alpha_composite(bar, (int((W - uw) / 2), int(cy + (asc + desc) / 2 + H * 0.02)))
+        _paste(layer, bar, int((W - uw) / 2), int(cy + (asc + desc) / 2 + H * 0.02))
     if kicker:
         kk = ctx.ease_out_cubic(ctx.progress(t, 0.1, 0.35))
         kf = ctx.font(H * 0.045)

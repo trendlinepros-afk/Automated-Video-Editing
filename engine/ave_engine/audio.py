@@ -388,14 +388,22 @@ def full_mix(plan: dict, dialogue_only: bool = False, want_stems: bool = False, 
         gain_db = target - lufs_pre
     else:
         gain_db = 0.0
-    gain_db = max(-60.0, min(40.0, gain_db))
-    g = undb(gain_db)
-    out = total * g
     tp_ceiling = float(mix_settings.get('truePeakDb', -1) if mix_settings.get('truePeakDb') is not None else -1)
-    if mix_settings.get('limiter', True):
-        out = limiter(out, tp_ceiling, sr)
-    out = out.astype(np.float32)
-    lufs, tp = measure(out, sr)
+    use_limiter = bool(mix_settings.get('limiter', True))
+    measured_gain = fixed is None or dialogue_only
+    for attempt in range(4):
+        gain_db = max(-60.0, min(40.0, gain_db))
+        out = total * undb(gain_db)
+        if use_limiter:
+            out = limiter(out, tp_ceiling, sr)
+        out = out.astype(np.float32)
+        lufs, tp = measure(out, sr)
+        # The limiter takes a little level off loud mixes; nudge the one master gain to land on target.
+        if (attempt == 3 or not measured_gain or not use_limiter or not math.isfinite(lufs)
+                or abs(target - lufs) < 0.05):
+            break
+        gain_db += target - lufs
+    g = undb(gain_db)
     meta = {'lufs': lufs, 'truePeakDb': tp, 'masterGainDb': gain_db, 'sr': sr}
     stems = {n: (buses[n] * g).astype(np.float32) for n in stem_names} if want_stems else None
     if cdir:

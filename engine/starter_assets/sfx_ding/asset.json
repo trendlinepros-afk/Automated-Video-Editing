@@ -1,0 +1,24 @@
+{
+  "formatVersion": 1,
+  "id": "starter-sfx-ding",
+  "name": "Ding",
+  "type": "sound",
+  "description": "Bright bell ding. Made by the sound effect synthesizer (asset \"Sound effect synthesizer\").",
+  "whenToUse": "A correct answer, a good result, a price reveal, a checklist tick.",
+  "tags": [
+    "ding",
+    "bell",
+    "notification",
+    "correct",
+    "sfx",
+    "sound effect"
+  ],
+  "scope": "shared",
+  "file": "ding.wav",
+  "preview": "preview.png",
+  "inputs": {},
+  "preferred": false,
+  "uses": 0,
+  "createdAt": "2026-10-06T00:00:00.000Z",
+  "updatedAt": "2026-10-06T00:00:00.000Z"
+}

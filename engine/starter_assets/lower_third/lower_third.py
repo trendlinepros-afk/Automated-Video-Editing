@@ -18,6 +18,18 @@ META = {
 SS = 2  # supersampling for smooth shape edges
 
 
+def _paste(dst, layer, x, y):
+    """alpha_composite that accepts positions partly off the canvas."""
+    x, y = int(x), int(y)
+    if x < 0 or y < 0:
+        if -x >= layer.width or -y >= layer.height:
+            return
+        layer = layer.crop((max(0, -x), max(0, -y), layer.width, layer.height))
+        x, y = max(0, x), max(0, y)
+    if x < dst.width and y < dst.height:
+        dst.alpha_composite(layer, (x, y))
+
+
 def _rounded(size, radius, fill):
     w, h = size
     layer = Image.new('RGBA', (max(1, int(w * SS)), max(1, int(h * SS))), (0, 0, 0, 0))
@@ -68,8 +80,8 @@ def render(t, ctx):
     bar = _rounded((bar_w, bar_h), H * 0.012, bar_color + (255,))
     sx = bx + bar_w if right else bx - stripe_w * 1.4
     layer = Image.new('RGBA', (W, H), (0, 0, 0, 0))
-    layer.alpha_composite(stripe, (int(sx), int(y)))
-    layer.alpha_composite(bar, (int(bx), int(y)))
+    _paste(layer, stripe, int(sx), int(y))
+    _paste(layer, bar, int(bx), int(y))
     d = ImageDraw.Draw(layer)
     asc, desc = title_font.getmetrics()
     d.text((bx + pad_x, y + (bar_h - (asc + desc)) / 2 + H * 0.002), title, font=title_font, fill=(255, 255, 255, 255))
@@ -78,7 +90,7 @@ def render(t, ctx):
         sxb = place_x(sub_w, 0.25 * (1 - sub_k) if t_out == 0 else 0)
         sub_bar = _rounded((sub_w, sub_h), H * 0.01, dark + (235,))
         sy = y + bar_h + H * 0.008
-        layer.alpha_composite(sub_bar, (int(sxb), int(sy)))
+        _paste(layer, sub_bar, int(sxb), int(sy))
         a2, d2 = sub_font.getmetrics()
         d.text((sxb + pad_x, sy + (sub_h - (a2 + d2)) / 2), sub, font=sub_font, fill=(255, 255, 255, 255))
     if alpha < 1:

@@ -1,0 +1,44 @@
+{
+  "formatVersion": 1,
+  "id": "starter-like-and-subscribe",
+  "name": "Like and subscribe",
+  "type": "graphic",
+  "description": "Like button, subscribe button and bell slide up; a cursor clicks each one and the bell rings.",
+  "whenToUse": "End of an intro or a natural pause when asking viewers to like and subscribe. 4-5 seconds.",
+  "tags": [
+    "subscribe",
+    "like",
+    "call to action",
+    "cta",
+    "bell"
+  ],
+  "scope": "shared",
+  "file": "like_and_subscribe.py",
+  "preview": "preview.png",
+  "inputs": {
+    "subscribeText": {
+      "type": "string",
+      "default": "SUBSCRIBE",
+      "description": "Button text before the click"
+    },
+    "subscribedText": {
+      "type": "string",
+      "default": "SUBSCRIBED",
+      "description": "Button text after the click"
+    },
+    "position": {
+      "type": "string",
+      "default": "bottom",
+      "description": "'bottom', 'middle' or 'top'"
+    },
+    "color": {
+      "type": "color",
+      "default": "primary",
+      "description": "Subscribe button color"
+    }
+  },
+  "preferred": false,
+  "uses": 0,
+  "createdAt": "2026-10-06T00:00:00.000Z",
+  "updatedAt": "2026-10-06T00:00:00.000Z"
+}

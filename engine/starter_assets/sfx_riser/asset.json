@@ -1,0 +1,24 @@
+{
+  "formatVersion": 1,
+  "id": "starter-sfx-riser",
+  "name": "Riser",
+  "type": "sound",
+  "description": "Rising swell that builds tension and stops at its peak. Made by the sound effect synthesizer (asset \"Sound effect synthesizer\").",
+  "whenToUse": "Before a reveal, a drop or a big moment; end it right on the cut.",
+  "tags": [
+    "riser",
+    "build",
+    "tension",
+    "swell",
+    "sfx",
+    "sound effect"
+  ],
+  "scope": "shared",
+  "file": "riser.wav",
+  "preview": "preview.png",
+  "inputs": {},
+  "preferred": false,
+  "uses": 0,
+  "createdAt": "2026-10-06T00:00:00.000Z",
+  "updatedAt": "2026-10-06T00:00:00.000Z"
+}

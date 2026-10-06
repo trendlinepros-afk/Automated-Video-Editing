@@ -221,9 +221,12 @@ def load_module(path: str):
     added = folder not in sys.path
     if added:
         sys.path.insert(0, folder)  # lets an asset import a helper file that sits next to it
+    keep_bytecode = sys.dont_write_bytecode
+    sys.dont_write_bytecode = True  # no __pycache__ folders in project or library folders
     try:
         spec.loader.exec_module(mod)
     finally:
+        sys.dont_write_bytecode = keep_bytecode
         if added:
             try:
                 sys.path.remove(folder)

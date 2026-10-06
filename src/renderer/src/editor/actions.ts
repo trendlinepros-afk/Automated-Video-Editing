@@ -67,10 +67,12 @@ export async function fixAudio(opts: { itemId?: string; segmentId?: string; time
     return
   }
   const runner = editor.get().runner
+  const est = await window.api.claude.estimate('fix_audio').catch(() => null)
+  const cost = est ? ` Estimated cost ≈ $${est.usd < 1 ? est.usd.toFixed(4) : est.usd.toFixed(2)}.` : ''
   toast(
-    runner.connected || runner.status === 'running' || runner.status === 'starting'
+    (runner.connected || runner.status === 'running' || runner.status === 'starting'
       ? `Asked Claude to fix the clipped audio at ${fmt(opts.time)}. It plays back here when done, with Undo if it is not right.`
-      : `Fix for ${fmt(opts.time)} is queued. It runs as soon as Claude connects. You can also drag the cut edge yourself.`
+      : `Fix for ${fmt(opts.time)} is queued. It runs as soon as Claude connects. You can also drag the cut edge yourself.`) + cost
   )
 }
 

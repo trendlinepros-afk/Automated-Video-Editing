@@ -9,7 +9,7 @@ import { createStore } from './store'
 import { editor, openSnapshot } from './editor'
 
 export type Screen = 'loading' | 'setup' | 'home' | 'editor' | 'settings' | 'library' | 'personas'
-export type SettingsSection = 'general' | 'music' | 'claude' | 'profiles' | 'suggestions' | 'about'
+export type SettingsSection = 'general' | 'music' | 'claude' | 'models' | 'profiles' | 'suggestions' | 'about'
 
 export interface ToastAction {
   label: string

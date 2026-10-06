@@ -10,6 +10,7 @@ import { Toggle } from '../components/bits'
 import { CAPTION_EXPORT_LABELS, PresetEditor } from '../components/PresetEditor'
 import { errorMessage, fmt, fmtRange, itemLabel, mediaUrl } from '../util'
 import { listenReminderDismissed } from './Preview'
+import { EstimateNote, useEstimate } from './EstimateNote'
 
 export function EditorDialogs() {
   const dialog = useStore(editor, (s) => s.dialog)
@@ -146,6 +147,7 @@ function ReeditDialog({ onClose }: { onClose: () => void }) {
   const range = useStore(editor, (s) => s.range)
   const connected = useStore(editor, (s) => s.runner.connected || s.runner.status === 'running')
   const [direction, setDirection] = useState('')
+  const est = useEstimate('reedit')
   if (!range) {
     return (
       <Modal title="Re-edit section" onClose={onClose}>
@@ -169,6 +171,8 @@ function ReeditDialog({ onClose }: { onClose: () => void }) {
       onClose={onClose}
       footer={
         <>
+          <EstimateNote estimate={est} />
+          <span className="spacer" />
           <button className="btn" onClick={onClose}>
             Cancel
           </button>

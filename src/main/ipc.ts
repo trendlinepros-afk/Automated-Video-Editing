@@ -8,7 +8,7 @@ import { basename, extname, isAbsolute, join } from 'node:path'
 import { APP_NAME, MCP_SERVER_NAME } from '@shared/appInfo'
 import { API_METHODS, type ApiMethod } from '@shared/ipcChannels'
 import type { EditThumbnailRequest, FaceSwapRequest, LibraryAsset, ProjectSnapshot, RecreateRequest, ThumbnailRequest, TitlesRequest, UserOp } from '@shared/ipc'
-import type { ExportPreset, Item, Range, TrackKind } from '@shared/project'
+import type { ExportPreset, Item, Range, RequestKind, TrackKind } from '@shared/project'
 import type { Profile, Settings } from '@shared/settings'
 import { TimelineResolver, findTimeRange, formatTime, placeSegments } from '@shared/timeline'
 import type { AppContext } from './context'
@@ -19,6 +19,7 @@ import { newId, type ProjectStore } from './project/store'
 import { applyUserOp, probeSource } from './project/userOps'
 import { exportLog, exportPack } from './services/publish'
 import { fetchYouTubeThumbnails } from './services/youtube'
+import { estimate } from './runner/costs'
 
 type Handler = (...args: any[]) => unknown
 
@@ -384,6 +385,7 @@ export function registerIpc(ctx: AppContext, getWindow: () => BrowserWindow | nu
     'claude.state': () => ctx.runner.state(),
     'claude.stop': () => ctx.runner.stop(),
     'claude.resume': () => ctx.runner.resume(),
+    'claude.estimate': (kind: RequestKind, opts?: { scope?: 'whole' | 'intro' }) => estimate(ctx, ctx.projects.current()?.project ?? null, kind, opts),
 
     // ---------------------------------------------------------------- library
     'library.list': (filter?: { scope?: string; type?: string; query?: string }) => ctx.library.list(filter),

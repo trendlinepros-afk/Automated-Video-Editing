@@ -150,7 +150,8 @@ h4 { font-size: 12px; color: var(--text-2); text-transform: uppercase; letter-sp
 /* ---------- App shell ---------- */
 .app { display: flex; flex-direction: column; height: 100%; }
 .topbar {
-  height: var(--topbar-h); flex: none; display: flex; min-width: 0; overflow: hidden; align-items: center; gap: 10px; padding: 0 10px 0 14px;
+  /* Not overflow: hidden: popovers (progress, cost, update errors) open below the bar. */
+  height: var(--topbar-h); flex: none; display: flex; min-width: 0; overflow: visible; position: relative; z-index: 30; align-items: center; gap: 10px; padding: 0 10px 0 14px;
   background: var(--bg-1); border-bottom: 1px solid var(--line);
 }
 .topbar .brand { font-weight: 600; margin-right: 8px; }
@@ -372,3 +373,21 @@ button:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
 .yt-thumb.on { border-color: var(--accent); }
 .yt-pick { position: absolute; top: 6px; left: 6px; min-width: 22px; height: 22px; border-radius: 11px; background: var(--accent); color: #fff; font-size: 12px; font-weight: 600; display: grid; place-items: center; }
 .yt-title { position: absolute; left: 0; right: 0; bottom: 0; padding: 14px 6px 4px; font-size: 11px; color: #fff; text-align: left; background: linear-gradient(transparent, rgba(0, 0, 0, 0.75)); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* Settings > Claude models */
+.model-table { width: 100%; border-collapse: collapse; }
+.model-table th { text-align: left; font-weight: 500; font-size: 12px; color: var(--text-2, #9aa1ad); padding: 6px 8px; border-bottom: 1px solid var(--line-2); }
+.model-table td { padding: 8px; border-bottom: 1px solid var(--line, #262a31); vertical-align: top; }
+.model-table td .hint { margin-top: 2px; }
+.model-table select { min-width: 170px; }
+.model-table select.changed { border-color: var(--accent); }
+.big-number { font-size: 20px; font-weight: 600; font-variant-numeric: tabular-nums; }
+/* Editor top bar: estimated cost so far */
+.cost-chip { font-variant-numeric: tabular-nums; }
+.cost-pop { width: 340px; white-space: normal; line-height: 1.45; }
+.cost-pop table { width: 100%; border-collapse: collapse; margin: 6px 0; }
+.cost-pop td { padding: 3px 0; }
+.cost-pop td:last-child { text-align: right; font-variant-numeric: tabular-nums; }
+.cost-pop tr.total td { border-top: 1px solid var(--line-2); font-weight: 600; padding-top: 6px; }
+.cost-chip.pulse { animation: cost-flash 1.6s ease-out; }
+@keyframes cost-flash { 0% { background: rgba(79, 140, 255, 0.35); color: #fff; } 100% { background: transparent; } }

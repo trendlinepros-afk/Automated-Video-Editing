@@ -4,6 +4,7 @@
  */
 import type {
   ExportPreset,
+  RequestKind,
   Item,
   ProjectDoc,
   Range,
@@ -229,13 +230,21 @@ export interface ThumbnailScore {
   [k: string]: unknown
 }
 
-/** Prices per action (USD), the published defaults, the owner's overrides and the all-time spend. */
 /** Thumbnails listed from a YouTube channel, video or playlist link, saved locally for training. */
 export interface YouTubeThumbnailList {
   source: string
   items: { videoId: string; title: string; file: string }[]
 }
 
+/** A cost estimate shown before a Claude task runs. */
+export interface ClaudeEstimate {
+  usd: number
+  /** True when based on what this PC has measured; false for a first guess. */
+  measured: boolean
+  basis: string
+}
+
+/** Prices per action (USD), the published defaults, the owner's overrides and the all-time spend. */
 export interface PikzelsPricing {
   prices: Record<string, number>
   defaults: Record<string, number>
@@ -361,6 +370,8 @@ export interface Api {
     onOutput(cb: (line: { ts: string; text: string; kind: 'text' | 'tool' | 'error' | 'info' }) => void): () => void
     stop(): Promise<void>
     resume(): Promise<void>
+    /** What a task is likely to cost before it runs (API-equivalent USD). */
+    estimate(kind: RequestKind, opts?: { scope?: 'whole' | 'intro' }): Promise<ClaudeEstimate>
   }
   library: {
     list(filter?: { scope?: string; type?: string; query?: string }): Promise<LibraryAsset[]>

@@ -10,6 +10,7 @@ import { useStore } from '../state/store'
 import { ProfileChip } from '../components/bits'
 import { Icon } from '../components/Icon'
 import { UpdateButton } from '../components/Updates'
+import { CostChip } from './CostChip'
 import { relativeTime } from '../util'
 
 export function EditorTopBar() {
@@ -39,6 +40,7 @@ export function EditorTopBar() {
       </div>
       <div className="spacer" />
       <JobChip />
+      <CostChip />
       <button className="btn small primary" onClick={() => openDialog({ kind: 'export' })}>
         <Icon name="export" size={14} /> Export
       </button>

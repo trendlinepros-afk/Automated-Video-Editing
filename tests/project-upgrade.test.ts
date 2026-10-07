@@ -168,6 +168,18 @@ describe('format 1 (0.x test builds) upgrade loses nothing', () => {
     // The version holds the file as the old app wrote it.
     expect(readJson(join(dir, 'versions', v!.id, 'project.json')).version).toBe(1)
   })
+
+  it('asks the preview to build when a project opens or closes, not only when it changes', async () => {
+    const dir = copyFixture('format-2')
+    const ctx = fakeContext()
+    let calls = 0
+    ctx.preview = { ...ctx.preview, invalidate: () => void calls++ }
+    ctx.projects = createProjectManager(ctx)
+    await ctx.projects.open(dir)
+    expect(calls).toBe(1)
+    await ctx.projects.close()
+    expect(calls).toBe(2)
+  })
 })
 
 describe('format 2 (1.0.0)', () => {

@@ -3,6 +3,10 @@
 Each release's section becomes its GitHub release text and the notes shown in the app's update dialog.
 A release is blocked until the section for its version has notes.
 
+## 1.8.1
+
+- Fixed: opening a project that already had an edit could leave the preview on "Building the preview…" forever. Opening a project now always starts its preview.
+
 ## 1.8.0
 
 - **The preview is ready much sooner.** It used to start over every time Claude changed something, so nothing finished while Claude worked and the whole video rendered at the end. Now a render runs to the end, and only what changed renders after it.

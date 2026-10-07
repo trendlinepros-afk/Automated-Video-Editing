@@ -415,3 +415,11 @@ button:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
 .check-item .check-dot { width: 8px; height: 8px; border-radius: 50%; margin-top: 6px; flex: none; background: var(--muted, #888); }
 .check-item.error .check-dot { background: var(--bad, #e5484d); }
 .check-item.warning .check-dot { background: var(--warn, #f5a524); }
+
+/* Shorts tab */
+.short-card { display: flex; gap: 10px; padding: 10px; border: 1px solid var(--line); border-radius: 8px; }
+.short-video { flex: none; width: 108px; height: 192px; border-radius: 6px; overflow: hidden; background: #000; }
+.short-video video { width: 100%; height: 100%; object-fit: cover; display: block; }
+.short-placeholder { display: flex; align-items: center; justify-content: center; text-align: center; height: 100%; padding: 8px; }
+.short-meta { display: flex; flex-direction: column; gap: 2px; }
+.short-meta .row > .muted:first-child { width: 52px; flex: none; }

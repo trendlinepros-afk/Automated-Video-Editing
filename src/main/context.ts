@@ -21,6 +21,7 @@
  *   updater.ts             -> UpdaterService
  */
 import type { VideoThemesService } from './services/videoThemes'
+import type { ShortsService } from './shorts/service'
 import type {
   ExportPreset,
   ProjectDoc,
@@ -297,6 +298,7 @@ export interface AppContext {
   runner: RunnerService
   library: LibraryService
   themes: VideoThemesService
+  shorts: ShortsService
   pikzels: PikzelsService
   updater: UpdaterService
   /** Send an event to the window (no-op when no window is open). */

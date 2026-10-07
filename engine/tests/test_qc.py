@@ -42,3 +42,19 @@ def test_no_sound(tmp_path):
     video = str(tmp_path / 'mute.mp4')
     ff('-f', 'lavfi', '-i', 'testsrc2=s=320x180:r=30:d=3', '-pix_fmt', 'yuv420p', '-c:v', 'libx264', video)
     assert qc(video)['hasAudio'] is False
+
+
+def test_reframe_follows_a_moving_subject(tmp_path):
+    video = str(tmp_path / 'move.mp4')
+    ff('-f', 'lavfi', '-i', 'color=black:s=1280x720:r=30:d=6', '-f', 'lavfi', '-i', 'color=white:s=120x120:r=30:d=6',
+       '-filter_complex', "[0:v][1:v]overlay=x='100+t*170':y=300,format=yuv420p", '-c:v', 'libx264', video)
+    segs = tmp_path / 'segs.json'
+    segs.write_text(json.dumps([{'path': video, 'in': 0, 'out': 6}, {'path': video, 'in': 4, 'out': 5}]))
+    p = subprocess.run([sys.executable, os.path.join(ENGINE_DIR, 'analysis', 'reframe.py'), '--ffmpeg', FFMPEG, '--segments', str(segs)],
+                       capture_output=True, text=True, check=True)
+    data = json.loads(p.stdout.strip().splitlines()[-1])['data']
+    xs = [pt['x'] for pt in data[0]['points']]
+    assert data[0]['found'] == 'motion'
+    assert xs[0] < 0.35 and xs[-1] > 0.6  # left to right, smoothed
+    assert all(b >= a for a, b in zip(xs, xs[1:]))  # never jumps back
+    assert data[1]['points'][0]['t'] == 0

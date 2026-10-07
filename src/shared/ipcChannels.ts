@@ -12,7 +12,7 @@ export const API_METHODS = [
   'music.list', 'music.rescan', 'music.addFolder', 'music.removeFolder',
   'projects.recent', 'projects.create', 'projects.open', 'projects.locate', 'projects.removeRecent', 'projects.close',
   'project.get', 'project.apply', 'project.undo', 'project.redo', 'project.relinkSource', 'project.startEdit',
-  'project.sendChat', 'project.requestReedit', 'project.requestFixAudio', 'project.requestStabilize', 'project.requestInsertClip', 'project.exportCheck', 'project.addNote', 'project.noteToRule',
+  'project.sendChat', 'project.requestReedit', 'project.requestFixAudio', 'project.requestStabilize', 'project.requestInsertClip', 'project.requestShorts', 'project.exportCheck', 'project.addNote', 'project.noteToRule',
   'project.reviewRequest', 'project.introDecision', 'project.setVideoTheme', 'project.regeneratePublish', 'project.seamAudio', 'project.waveform',
   'project.frameAt',
   'project.versions.list', 'project.versions.save', 'project.versions.restore', 'project.versions.remove',
@@ -25,6 +25,7 @@ export const API_METHODS = [
   'library.list', 'library.changeFolder', 'library.update', 'library.duplicate', 'library.remove', 'library.placeInProject',
   'pikzels.list', 'pikzels.create', 'pikzels.refresh', 'pikzels.updateInstructions', 'pikzels.remove',
   'pikzels.rename', 'pikzels.pricing', 'pikzels.setPrices', 'pikzels.thumbnailsFromLink',
+  'shorts.state', 'shorts.exportShort', 'shorts.exportAll', 'shorts.remove', 'shorts.refresh',
   'themes.list', 'themes.analyze', 'themes.cancel', 'themes.update', 'themes.remove', 'themes.sheets'
 ] as const
 
@@ -42,5 +43,6 @@ export const API_EVENTS = {
   'claude.onState': 'claude:state',
   'claude.onOutput': 'claude:output',
   'themes.onProgress': 'themes:progress',
-  'project.onCheckProgress': 'exportcheck:progress'
+  'project.onCheckProgress': 'exportcheck:progress',
+  'shorts.onState': 'shorts:state'
 } as const

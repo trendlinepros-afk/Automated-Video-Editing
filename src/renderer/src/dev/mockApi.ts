@@ -156,6 +156,11 @@ function buildDoc(): ProjectDoc {
       { id: 'r1', kind: 'chat', status: 'done', createdAt: now(), text: 'At 2:10 to 2:45 add a fire animation where I point', range: { start: 130, end: 165 }, summary: 'Added a flame graphic that follows your hand at 2:12–2:40.', review: 'pending', beforeVersionId: 'v1' },
       { id: 'r2', kind: 'reedit', status: 'queued', createdAt: now(), text: 'tighter', range: { start: 300, end: 330 }, waitingReason: 'Claude is busy with another request' }
     ],
+    shorts: [
+      { id: 'short_1', kind: 'recap', title: 'The $25 drift car in 30 seconds', reason: 'Unboxing to first drift with nothing in between.', segments: [{ sourceId: sources[0].id, in: 12, out: 20 }, { sourceId: sources[1].id, in: 40, out: 62 }], youtubeTitle: 'This $25 drift car should NOT be this good', tiktokCaption: 'Unboxing a $25 drift car… then this happened 😳', description: 'Full review on the channel.', hashtags: ['rccar', 'drift', 'unboxing'], captions: true, createdAt: now() },
+      { id: 'short_2', kind: 'highlight', title: 'First drift on the garage track', reason: 'Strong hook: the car spins out in the first second.', segments: [{ sourceId: sources[1].id, in: 100, out: 124 }], youtubeTitle: 'It drifted on the FIRST try', tiktokCaption: 'First try 🔥', description: '', hashtags: ['rc', 'drift'], captions: true, createdAt: now() },
+      { id: 'short_3', kind: 'highlight', title: 'The gyro test', reason: 'A clear before/after the viewer gets instantly.', segments: [{ sourceId: sources[2].id, in: 30, out: 41 }, { sourceId: sources[2].id, in: 48, out: 60 }], youtubeTitle: 'Does the gyro actually help?', tiktokCaption: 'Gyro on vs off', description: '', hashtags: ['rc', 'gyro'], captions: true, createdAt: now() }
+    ],
     chat: [
       { id: 'c1', role: 'user', text: 'At 2:10 to 2:45, add an animation of a LiPo battery on fire where I am pointing.', ts: now(), requestId: 'r1', range: { start: 130, end: 165 } },
       { id: 'c2', role: 'claude', text: 'Added a flame graphic anchored to "battery", positioned at 5 points along your hand movement. Kept everything else in the range unchanged.', ts: now(), requestId: 'r1' }
@@ -524,6 +529,7 @@ export function installMockApi(): void {
       setVideoTheme: async (id) => void commit((d) => void (d.project.videoTheme = id ? { id, name: themes.find((t) => t.id === id)?.name ?? '' } : null), 'user', 'Video theme'),
       requestStabilize: async () => undefined,
       requestInsertClip: async () => undefined,
+      requestShorts: async () => undefined,
       exportCheck: async () => {
         for (const m of ['Waiting for the preview to finish…', 'Checking the picture and sound…']) {
           ev.check.emit(m)
@@ -639,6 +645,14 @@ export function installMockApi(): void {
         settings = { ...settings, libraryFolder: dest, libraryFolderConfirmed: true }
         return { moved: library.length, skipped: 0 }
       }
+    },
+    shorts: {
+      state: async () => ({ working: { short_3: 'Rendering the preview… 40%' } }),
+      exportShort: async () => 'C:\\Projects\\exports\\Shorts\\LiPo - Short 1.mp4',
+      exportAll: async () => [],
+      remove: async (id) => void commit((d) => void (d.project.shorts = (d.project.shorts ?? []).filter((x) => x.id !== id)), 'user', 'Delete Short'),
+      refresh: async () => undefined,
+      onState: () => () => undefined
     },
     themes: {
       list: async () => themes,

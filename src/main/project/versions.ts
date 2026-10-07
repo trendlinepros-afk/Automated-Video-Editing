@@ -31,7 +31,15 @@ export function readIndex(store: ProjectStore): VersionIndex {
   try {
     if (existsSync(indexFile(store))) {
       const raw = readJson<VersionIndex>(indexFile(store))
-      if (raw && Array.isArray(raw.versions)) return { formatVersion: 1, versions: raw.versions }
+      if (raw && Array.isArray(raw.versions)) {
+        // Older apps could list a project's first version twice, once as "Recovered <id>": keep the named one.
+        const byId = new Map<string, VersionInfo>()
+        for (const v of raw.versions) {
+          const had = byId.get(v.id)
+          if (!had || (had.name.startsWith('Recovered ') && !v.name.startsWith('Recovered '))) byId.set(v.id, v)
+        }
+        return { formatVersion: 1, versions: [...byId.values()] }
+      }
     }
   } catch {
     store.log.write('error', 'versions/index.json could not be read; rebuilding the list from the folders')
@@ -80,6 +88,8 @@ export function saveVersion(
   const info: VersionInfo = { id, name: name.trim() || 'Untitled version', createdAt: new Date().toISOString(), auto: !!opts.auto }
   if (opts.reason) info.reason = opts.reason
   const index = readIndex(store)
+  // With no index yet, readIndex rebuilds the list from the folders, which already holds the one just written.
+  index.versions = index.versions.filter((v) => v.id !== id)
   index.versions.push(info)
   // Trim automatic versions to the newest 20; named versions stay until deleted.
   const autos = index.versions.filter((v) => v.auto).sort((a, b) => a.createdAt.localeCompare(b.createdAt))

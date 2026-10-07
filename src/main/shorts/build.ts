@@ -51,6 +51,6 @@ export function shortDoc(doc: ProjectDoc, short: Short, out: { width: number; he
   aroll.hidden = false
   for (const t of project.tracks) if (t.kind === 'captions') t.hidden = false
   // Bigger, bolder captions in the middle, a few words at a time; the brand's font and colours still apply.
-  project.captions = { ...project.captions, enabled: short.captions, style: { ...(project.captions.style ?? {}), ...SHORT_CAPTION_STYLE } as unknown as CaptionStyle }
+  project.captions = { ...project.captions, enabled: short.captions, mode: 'all', style: { ...(project.captions.style ?? {}), ...SHORT_CAPTION_STYLE } as unknown as CaptionStyle }
   return { project, transcript: doc.transcript }
 }

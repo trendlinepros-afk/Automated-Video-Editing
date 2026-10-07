@@ -7,7 +7,7 @@ import { ENGINE_VERSION } from '@shared/appInfo'
 import { PLAN_VERSION, type AudioClip, type Layer, type PlanKeyframe, type PlanTransform, type RenderPlan } from '@shared/plan'
 import type { ProjectDoc, Track, Transform } from '@shared/project'
 import { CaptionStyleSchema } from '@shared/project'
-import { TimelineResolver, buildCaptions } from '@shared/timeline'
+import { TimelineResolver, buildCaptions, captionFilter } from '@shared/timeline'
 
 export interface PlanOptions {
   projectDir: string
@@ -217,7 +217,7 @@ export function buildPlan(doc: ProjectDoc, opts: PlanOptions): RenderPlan {
   const brand = project.settings.brandKit
   const style = CaptionStyleSchema.parse({ ...brand.captionStyle, ...(project.captions.style ?? {}) })
   const captionTrack = project.tracks.find((t) => t.kind === 'captions')
-  const lines = project.captions.enabled && !captionTrack?.hidden ? buildCaptions(resolver, style) : []
+  const lines = project.captions.enabled && !captionTrack?.hidden ? buildCaptions(resolver, style, captionFilter(project, doc.transcript)) : []
 
   return {
     planVersion: PLAN_VERSION,

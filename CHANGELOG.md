@@ -3,6 +3,20 @@
 Each release's section becomes its GitHub release text and the notes shown in the app's update dialog.
 A release is blocked until the section for its version has notes.
 
+## 1.8.0
+
+- **The preview is ready much sooner.** It used to start over every time Claude changed something, so nothing finished while Claude worked and the whole video rendered at the end. Now a render runs to the end, and only what changed renders after it.
+- The first time a preview renders, the start of the video plays as soon as about 8 seconds are ready, with sound, while the rest finishes behind it.
+- **Captions at key moments.** New projects no longer caption every word. Claude captions the hook (about the first 3-6 seconds), then only where captions pull attention back: a key number or price, a punchline, the payoff, hard-to-hear speech. That is usually 10-25 % of the video.
+- The CC button on the Captions track now chooses: At key moments, On every word, or Off. Projects made before this update keep captions on every word until you switch.
+- Shorts are still captioned all the way through.
+- **"Like the intro?"** When the intro plays to its end, the viewer asks: **Yes, edit the rest of the video**, **Change the intro…** or **Stop after the intro**. The button in the corner still works too.
+- **Intro buttons in the top bar.** During the intro stage the top bar has **Continue editing** and **Redo intro…**.
+- **Compare intros (A/B).** Every redo keeps the intro you had as "Intro 1", "Intro 2" and so on, and the **Intro** picker in the top bar switches between them. Only the edit changes; your chat and settings stay. Undo switches back.
+- Fixed: the first version saved in a project showed twice in Versions (once as "Recovered …").
+- **Drag the playhead.** Grab the white line on the timeline and drag it to move through the video.
+- **Clear a selection with the ×** at its top-right on the time ruler, as well as the button on the left.
+
 ## 1.7.0
 
 - **Shorts.** A new Shorts tab in the editor. Press Make Shorts and choose how many: 1, 3, 6, 10 or 15. Claude finds the hook, the high-action moments and anything that stops a scroll, and cuts each into a vertical 9:16 Short from your footage. Each one opens on its hook, cuts the dead air and ends on a payoff.

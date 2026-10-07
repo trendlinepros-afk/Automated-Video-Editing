@@ -188,3 +188,40 @@ export function seamMenu(e: ReactMouseEvent, seam: SeamSel, time: number): void 
     { label: 'Leave a note for Claude…', run: () => openDialog({ kind: 'note', range: { start: Math.max(0, time - 1), end: time + 1 }, time }) }
   ])
 }
+
+/** The CC button: captions at key moments (Claude picks them), on every word, or off. One undo step each. */
+export function captionsMenu(e: ReactMouseEvent): void {
+  const p = editor.get().snapshot?.doc.project
+  if (!p) return
+  const mode = !p.captions.enabled ? 'off' : p.captions.mode === 'moments' ? 'moments' : 'all'
+  const mark = (m: string) => (m === mode ? '✓ ' : '')
+  const set = (patch: Record<string, unknown>) => applyOp({ op: 'patchProject', path: 'captions', patch })
+  openMenu(e, [
+    {
+      label: `${mark('moments')}At key moments (the hook, then where they pull attention back)`,
+      run: async () => {
+        await set({ enabled: true, mode: 'moments' })
+        if (!(p.captions.spans ?? []).length) {
+          toast('No caption moments are chosen yet for this video.', {
+            actions: [
+              {
+                label: 'Ask Claude to choose them',
+                primary: true,
+                run: () =>
+                  void window.api.project
+                    .sendChat({
+                      text: 'Choose where captions should appear (set_caption_spans): the hook in the first few seconds, then only the key moments that pull attention back. Not the whole video.',
+                      playhead: editor.get().playhead,
+                      selectedItemIds: []
+                    })
+                    .then(() => setTab('chat'))
+              }
+            ]
+          })
+        }
+      }
+    },
+    { label: `${mark('all')}On every word`, run: () => void set({ enabled: true, mode: 'all' }) },
+    { label: `${mark('off')}Off`, run: () => void set({ enabled: false }) }
+  ])
+}

@@ -526,6 +526,8 @@ export function installMockApi(): void {
         if (r) r.review = decision === 'keep' ? 'kept' : 'reverted'
       }, 'user', 'Review'),
       introDecision: async () => undefined,
+      introVersions: async () => ({ versions: [{ id: 'v_i1', name: 'Intro 1', createdAt: now() }], currentId: null }),
+      useIntro: async () => undefined,
       setVideoTheme: async (id) => void commit((d) => void (d.project.videoTheme = id ? { id, name: themes.find((t) => t.id === id)?.name ?? '' } : null), 'user', 'Video theme'),
       requestStabilize: async () => undefined,
       requestInsertClip: async () => undefined,

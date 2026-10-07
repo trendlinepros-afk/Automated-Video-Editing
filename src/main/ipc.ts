@@ -16,6 +16,7 @@ import { paths } from './paths'
 import { frameAt, seamAudio, waveform } from './engine/media'
 import { snapshotOf } from './project/manager'
 import { newId, type ProjectStore } from './project/store'
+import { introVersions, saveIntroVersion, useIntro } from './project/intros'
 import { applyUserOp, probeSource } from './project/userOps'
 import { exportLog, exportPack } from './services/publish'
 import { themeSheets } from './services/videoThemes'
@@ -325,6 +326,8 @@ export function registerIpc(ctx: AppContext, getWindow: () => BrowserWindow | nu
       s.log.write('app', `Note saved as a rule for "${profile.name}"`, { text: note.text })
     },
     'project.reviewRequest': (requestId: string, decision: 'keep' | 'revert') => ctx.requests.review(requestId, decision),
+    'project.introVersions': () => introVersions(ctx, store()),
+    'project.useIntro': (versionId: string) => useIntro(ctx, store(), versionId),
     'project.introDecision': (decision: 'continue' | 'redo' | 'stop', direction?: string) => {
       const s = store()
       const doc = s.snapshotDoc()
@@ -344,6 +347,8 @@ export function registerIpc(ctx: AppContext, getWindow: () => BrowserWindow | nu
           d.project.scope.introApproved = false
           d.project.status = 'editing'
         }, BOOKKEEPING)
+        // Keep this intro so it can be compared with the new one (A/B) and brought back.
+        saveIntroVersion(ctx, s)
         ctx.requests.enqueue({ kind: 'redo_intro', text: direction ?? '', range: { start: 0, end: introEnd }, context: { introEnd } })
       } else {
         s.mutate('Stop after the intro', 'user', (d) => {

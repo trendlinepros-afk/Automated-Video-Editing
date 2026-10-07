@@ -5,7 +5,7 @@ import { z } from 'zod'
 import type { RenderJobState } from '@shared/ipc'
 import { PIKZELS_MODELS } from '@shared/pikzelsPricing'
 import type { Thumbnail } from '@shared/project'
-import { round3 } from '@shared/timeline'
+import { TimelineResolver, buildCaptions, captionFilter, round3 } from '@shared/timeline'
 import type { AppContext } from '../../context'
 import { newId } from '../../project/store'
 import { ToolError, anchorInput, defineTool, errMessage, json, toAnchor } from './common'
@@ -253,6 +253,48 @@ export const outputTools = [
         tags: pub.tags,
         descriptionChars: pub.description.length,
         chapters: pub.chapters.map((c) => ({ title: c.title, time: round3(r.anchorTime(c.anchor).time) }))
+      })
+    }
+  }),
+
+  defineTool({
+    name: 'set_caption_spans',
+    description:
+      'Choose where burned-in captions appear (captions at key moments). Long-form videos are not captioned all the way through: caption the ' +
+      'hook (roughly the first 3-6 seconds, so viewers read along and stay), then only short bursts where captions pull attention back: a ' +
+      'key number, price or spec, a punchline or strong claim, the verdict or payoff, a moment that is hard to hear (wind, engine noise, ' +
+      'off-camera speech), or a turn in the story that re-hooks. Usually 10-25 % of the video; outside the hook, keep each span to one ' +
+      'sentence or so. Each span runs from one transcript word to another in the same clip, inclusive. This REPLACES all spans. ' +
+      'mode "all" captions every word instead (only when the owner or the channel rules ask for it).',
+    input: {
+      spans: z.array(z.object({ from_word_id: z.string(), to_word_id: z.string() })).default([]),
+      mode: z.enum(['moments', 'all']).default('moments')
+    },
+    run: (args, env) => {
+      const doc = env.store.snapshotDoc()
+      const where = new Map<string, string>()
+      for (const [clip, c] of Object.entries(doc.transcript.clips)) for (const w of c.words) where.set(w.id, clip)
+      const spans = args.spans.map((s, i) => {
+        const a = where.get(s.from_word_id)
+        const b = where.get(s.to_word_id)
+        if (!a || !b) throw new ToolError(`Span ${i + 1}: unknown word id ${!a ? s.from_word_id : s.to_word_id}. Use get_transcript.`)
+        if (a !== b) throw new ToolError(`Span ${i + 1}: both words must be in the same clip.`)
+        return { from: s.from_word_id, to: s.to_word_id }
+      })
+      env.mutate(args.mode === 'all' ? 'Captions on every word' : `Captions at ${spans.length} key moment${spans.length === 1 ? '' : 's'}`, (d) => {
+        d.project.captions.mode = args.mode
+        d.project.captions.spans = spans
+      }, { bypassLock: true })
+      const after = env.store.snapshotDoc()
+      const lines = buildCaptions(new TimelineResolver(after.project, after.transcript), { maxWords: 4 }, captionFilter(after.project, after.transcript))
+      const duration = new TimelineResolver(after.project, after.transcript).duration
+      const covered = lines.reduce((t, l) => t + (l.end - l.start), 0)
+      return json({
+        mode: args.mode,
+        spans: spans.length,
+        captionedSeconds: Math.round(covered * 10) / 10,
+        shareOfVideo: duration ? Math.round((covered / duration) * 1000) / 10 : 0,
+        onTimeline: lines.map((l) => ({ start: Math.round(l.start * 100) / 100, text: l.words.map((w) => w.word.text.trim()).join(' ') })).slice(0, 80)
       })
     }
   }),

@@ -8,7 +8,7 @@ import { TRACK_KINDS, TRACK_LABELS, type Range, type TrackKind } from '@shared/p
 import type { PlacedSegment, ResolvedItem } from '@shared/timeline'
 import { openMenu, toast } from '../state/app'
 import { applyOp, editor, openDialog, select, selectSeam, setRange, setTab, type SeamSel } from '../state/editor'
-import { useDerived } from '../state/derived'
+import { currentDerived, useDerived } from '../state/derived'
 import { pause, seek } from '../state/player'
 import { useStore } from '../state/store'
 import { Icon } from '../components/Icon'
@@ -302,6 +302,20 @@ function Ruler({ zoom, t0, t1, width }: { zoom: number; t0: number; t1: number; 
         title="Click to move the playhead. Drag to select a section. Right-click to send the time to the chat or add a clip here."
       >
         {range && <div className="tl-ruler-range" style={{ left: range.start * zoom, width: (range.end - range.start) * zoom }} />}
+        {range && (
+          <button
+            className="tl-range-x"
+            style={{ left: range.end * zoom + 3 }}
+            title="Clear the selection"
+            onPointerDown={(e) => e.stopPropagation()}
+            onClick={(e) => {
+              e.stopPropagation()
+              setRange(null)
+            }}
+          >
+            ×
+          </button>
+        )}
         {ticks.map(({ t, major }) => (
           <div key={t.toFixed(3)} className={`tl-tick${major ? '' : ' minor'}`} style={{ left: t * zoom }}>
             {major ? (step < 1 ? `${fmt(t)}.${Math.round((t % 1) * 10)}` : fmt(t)) : ''}
@@ -376,7 +390,34 @@ function Playhead({ zoom, scroller, viewW }: { zoom: number; scroller: { current
     if (!el || !playing) return
     if (x > el.scrollLeft + viewW - 40 || x < el.scrollLeft + HEADER_W) el.scrollLeft = Math.max(0, x - HEADER_W - 40)
   }, [x, playing, scroller, viewW])
-  return <div className="tl-overlay tl-playhead" style={{ left: x }} />
+  // Grab the line anywhere along its height and drag to scrub.
+  const onDown = (e: ReactPointerEvent<HTMLDivElement>) => {
+    if (e.button !== 0) return
+    e.preventDefault()
+    e.stopPropagation()
+    const el = scroller.current
+    if (!el) return
+    pause()
+    const end = currentDerived()?.duration ?? Infinity
+    const at = (clientX: number) => {
+      const rect = el.getBoundingClientRect()
+      return Math.max(0, Math.min(end, (clientX - rect.left + el.scrollLeft - HEADER_W) / zoom))
+    }
+    const move = (ev: PointerEvent) => seek(at(ev.clientX))
+    const up = () => {
+      window.removeEventListener('pointermove', move)
+      window.removeEventListener('pointerup', up)
+      document.body.classList.remove('scrubbing')
+    }
+    document.body.classList.add('scrubbing')
+    window.addEventListener('pointermove', move)
+    window.addEventListener('pointerup', up)
+  }
+  return (
+    <div className="tl-overlay tl-playhead" style={{ left: x }}>
+      <div className="tl-playhead-grab" onPointerDown={onDown} title="Drag to move through the video" />
+    </div>
+  )
 }
 
 function Toolbar({ zoom, minZoom, setZoom, fit }: { zoom: number; minZoom: number; setZoom: (z: number) => void; fit: () => void }) {

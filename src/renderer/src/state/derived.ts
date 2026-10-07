@@ -7,6 +7,7 @@ import { CaptionStyleSchema } from '@shared/project'
 import {
   TimelineResolver,
   buildCaptions,
+  captionFilter,
   type CaptionLine,
   type PlacedSegment,
   type PlacedWord,
@@ -68,7 +69,7 @@ export function derive(doc: ProjectDoc): Derived {
           ...project.settings.brandKit.captionStyle,
           ...(project.captions.style ?? {})
         })
-        captions = buildCaptions(resolver, style)
+        captions = buildCaptions(resolver, style, captionFilter(project, doc.transcript))
       }
       return captions
     }

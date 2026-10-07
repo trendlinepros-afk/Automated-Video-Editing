@@ -425,7 +425,14 @@ export const ProjectSchema = z.looseObject({
   notes: z.array(NoteSchema).default([]),
   captions: z.looseObject({
     enabled: z.boolean().default(true),
-    style: CaptionStyleSchema.optional() // overrides brand kit caption style for this project
+    style: CaptionStyleSchema.optional(), // overrides brand kit caption style for this project
+    /**
+     * 'moments': burned in only over the spans Claude chose (the hook, then where they pull attention back).
+     * 'all' (or absent, as in older projects): over every word.
+     */
+    mode: z.enum(['moments', 'all']).optional(),
+    /** Caption spans for 'moments', from one transcript word to another in the same clip (inclusive). */
+    spans: z.array(z.looseObject({ from: z.string(), to: z.string() })).optional()
   }),
   thumbnails: z.looseObject({
     personaId: z.string().default(''),

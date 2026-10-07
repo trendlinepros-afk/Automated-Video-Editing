@@ -269,3 +269,18 @@ describe('video theme tools', () => {
     expect(textOf(again)).toMatch(/Jump cuts every 1-2 s/)
   })
 })
+
+describe('caption moments tool', () => {
+  it('sets the caption spans, says how much of the video they cover, and refuses unknown words', async () => {
+    const client = await connect()
+    expect(store.project.captions.mode).toBe('moments') // new projects caption key moments only
+    const r = await client.callTool({ name: 'set_caption_spans', arguments: { spans: [{ from_word_id: 'src1_w0', to_word_id: 'src1_w1' }] } })
+    expect(r.isError).toBeFalsy()
+    const out = JSON.parse(textOf(r))
+    expect(out.spans).toBe(1)
+    expect(out.onTimeline.length).toBeGreaterThan(0)
+    expect(store.project.captions.spans).toEqual([{ from: 'src1_w0', to: 'src1_w1' }])
+    const bad = await client.callTool({ name: 'set_caption_spans', arguments: { spans: [{ from_word_id: 'nope', to_word_id: 'src1_w1' }] } })
+    expect(bad.isError).toBe(true)
+  })
+})

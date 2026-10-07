@@ -125,6 +125,8 @@ export interface PreviewState {
   message?: string
   /** Before/After for a request under review. */
   beforeFile?: string
+  /** While the first preview renders, `file` plays the start of it: this many seconds are ready. */
+  partialUntil?: number
 }
 
 /** Shorts being tracked, rendered or exported: a short line of progress (or a failure) per Short id. */
@@ -355,6 +357,10 @@ export interface Api {
     noteToRule(noteId: string): Promise<void>
     reviewRequest(requestId: string, decision: 'keep' | 'revert'): Promise<void>
     introDecision(decision: 'continue' | 'redo' | 'stop', direction?: string): Promise<void>
+    /** Intros saved for comparing (one each time the intro is redone), and which one is on screen. */
+    introVersions(): Promise<{ versions: { id: string; name: string; createdAt: string }[]; currentId: string | null }>
+    /** Put a saved intro back on the timeline (one undo step); the one on screen is saved first. */
+    useIntro(versionId: string): Promise<void>
     regeneratePublish(part: 'titles' | 'description' | 'chapters' | 'tags', direction: string): Promise<void>
     seamAudio(segmentId: string): Promise<string> // wav path of the audio around the seam before this segment
     waveform(key: { sourceId?: string; file?: string }): Promise<{ peaksPerSecond: number; peaks: number[] } | null>

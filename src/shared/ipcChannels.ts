@@ -13,7 +13,7 @@ export const API_METHODS = [
   'projects.recent', 'projects.create', 'projects.open', 'projects.locate', 'projects.removeRecent', 'projects.close',
   'project.get', 'project.apply', 'project.undo', 'project.redo', 'project.relinkSource', 'project.startEdit',
   'project.sendChat', 'project.requestReedit', 'project.requestFixAudio', 'project.requestStabilize', 'project.requestInsertClip', 'project.requestShorts', 'project.exportCheck', 'project.addNote', 'project.noteToRule',
-  'project.reviewRequest', 'project.introDecision', 'project.setVideoTheme', 'project.regeneratePublish', 'project.seamAudio', 'project.waveform',
+  'project.reviewRequest', 'project.introDecision', 'project.introVersions', 'project.useIntro', 'project.setVideoTheme', 'project.regeneratePublish', 'project.seamAudio', 'project.waveform',
   'project.frameAt',
   'project.versions.list', 'project.versions.save', 'project.versions.restore', 'project.versions.remove',
   'project.versions.compareFrames',

@@ -5,6 +5,7 @@
 import { memo, type ReactElement, type PointerEvent as ReactPointerEvent, type MouseEvent as ReactMouseEvent } from 'react'
 import type { Range, Source, Track } from '@shared/project'
 import type { CaptionLine, PlacedSegment, ResolvedItem } from '@shared/timeline'
+import { captionsMenu } from '../editor/actions'
 import { applyOp } from '../state/editor'
 import { seek } from '../state/player'
 import { useStore } from '../state/store'
@@ -125,8 +126,8 @@ function TrackHeader({ track, color, width, readOnly, captionsEnabled }: { track
           className={`ms${captionsEnabled ? ' on-s' : ''}`}
           style={{ width: 30 }}
           disabled={readOnly}
-          title={captionsEnabled ? 'Captions on. Click to turn them off for this project.' : 'Captions off. Click to turn them on.'}
-          onClick={() => void applyOp({ op: 'patchProject', path: 'captions', patch: { enabled: !captionsEnabled } })}
+          title="Captions: at key moments (Claude chooses), on every word, or off. Click to choose."
+          onClick={(e) => captionsMenu(e)}
         >
           CC
         </button>

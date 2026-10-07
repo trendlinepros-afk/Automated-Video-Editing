@@ -1,16 +1,16 @@
 /**
  * Which Claude model runs each part of an edit, and what runs cost.
  *
- * The app runs an edit as stages, each its own Claude Code run with its own model; stages pick up
- * from the progress checklist and handoff notes. Defaults keep Opus where judgment decides quality
- * (cuts, B-roll, self-check, open-ended requests) and use cheaper models where the work is well specified.
+ * The app runs an edit as stages; consecutive stages on the same model run as one Claude Code session, and a
+ * change of model starts a new session that picks up from the progress checklist and handoff notes. Defaults use
+ * Opus everywhere quality can show, and a cheaper model only for transcribing, where the model makes no difference.
  */
 import type { RequestKind, StageId } from './project'
 
 export const CLAUDE_MODELS = [
   { id: 'claude-opus-5-5', label: 'Opus 5.5', note: 'Best judgment. Cuts, timing, open-ended requests.' },
-  { id: 'claude-sonnet-5-5', label: 'Sonnet 5.5', note: 'Strong and half the price. Well-specified work.' },
-  { id: 'claude-haiku-4-5', label: 'Haiku 4.5', note: 'Fastest and cheapest. Simple bookkeeping.' },
+  { id: 'claude-sonnet-5-5', label: 'Sonnet 5.5', note: 'Half the price of Opus; less taste in creative work.' },
+  { id: 'claude-haiku-4-5', label: 'Haiku 4.5', note: 'Fastest and cheapest. Only for running a program, like transcribing.' },
   { id: '', label: 'Claude Code default', note: 'Whatever model Claude Code is set to use.' }
 ] as const
 
@@ -37,28 +37,32 @@ export const MODEL_SECTIONS = [
   { id: 'thumbnails', label: 'Thumbnails', detail: 'Writes thumbnail prompts for Pikzels.', stage: true },
   { id: 'publish', label: 'Publishing pack', detail: 'Titles, description, chapters and tags.', stage: true },
   { id: 'chat', label: 'Chat and notes', detail: 'Changes you ask for in the chat or in notes for Claude.', stage: false },
-  { id: 'reedit', label: 'Section re-edits', detail: 'Re-edit section and intro redo.', stage: false },
+  { id: 'reedit', label: 'Section re-edits', detail: 'Re-edit section, intro redo, and Add clip here.', stage: false },
   { id: 'fix_audio', label: 'Fix clipped audio', detail: 'Restores one clipped word at a cut.', stage: false },
   { id: 'stabilize', label: 'Stabilize', detail: 'Stabilizes one clip you right-click. ffmpeg does the work; the model runs it and checks the framing.', stage: false }
 ] as const
 
 export type ModelSection = (typeof MODEL_SECTIONS)[number]['id']
 
-/** Recommended: no noticeable quality drop, about a quarter cheaper than Opus everywhere. */
+/**
+ * Recommended: Opus 5.5 for every part where judgment or taste shows in the video, including graphics, music,
+ * captions, thumbnails and titles. The only exception is transcribing: there Claude just runs faster-whisper on
+ * the GPU and hands the app the file it wrote, so the transcript is the same whichever model starts it.
+ */
 export const RECOMMENDED_MODELS: Record<ModelSection, ClaudeModelId> = {
   transcript: 'claude-haiku-4-5',
   cuts: 'claude-opus-5-5',
   broll: 'claude-opus-5-5',
-  graphics: 'claude-sonnet-5-5',
-  audio: 'claude-sonnet-5-5',
-  captions: 'claude-sonnet-5-5',
+  graphics: 'claude-opus-5-5',
+  audio: 'claude-opus-5-5',
+  captions: 'claude-opus-5-5',
   self_check: 'claude-opus-5-5',
-  thumbnails: 'claude-sonnet-5-5',
-  publish: 'claude-sonnet-5-5',
+  thumbnails: 'claude-opus-5-5',
+  publish: 'claude-opus-5-5',
   chat: 'claude-opus-5-5',
   reedit: 'claude-opus-5-5',
   fix_audio: 'claude-opus-5-5',
-  stabilize: 'claude-sonnet-5-5'
+  stabilize: 'claude-opus-5-5'
 }
 
 export function modelLabel(id: string | undefined | null): string {
@@ -74,6 +78,7 @@ export function sectionForRequest(kind: RequestKind): ModelSection | null {
       return 'chat'
     case 'reedit':
     case 'redo_intro':
+    case 'insert_clip':
       return 'reedit'
     case 'fix_audio':
       return 'fix_audio'
@@ -111,10 +116,10 @@ export interface ClaudeRunCost {
 /** Rough first guesses (USD) before this PC has measured anything. Replaced by your own averages. */
 export const DEFAULT_ESTIMATES = {
   /** A whole staged edit, per minute of footage, with the recommended models. */
-  editPerFootageMinute: 0.45,
+  editPerFootageMinute: 0.55,
   chat: 0.35,
   reedit: 0.6,
   fix_audio: 0.15,
-  stabilize: 0.12,
-  publish: 0.12
+  stabilize: 0.2,
+  publish: 0.2
 }

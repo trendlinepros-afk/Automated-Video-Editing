@@ -5,7 +5,9 @@ import { z } from 'zod'
 import { ENGINE_VERSION, PROJECT_FORMAT_VERSION } from '@shared/appInfo'
 import { DEFAULT_EDITING_RULES } from '@shared/rules'
 import { round3 } from '@shared/timeline'
-import { AUDIO_EXT, IMAGE_EXT, defineTool, describeItem, ensureSource, json, sourceById } from './common'
+import { themeOneLine } from '@shared/videoTheme'
+import { themeSheets } from '../../services/videoThemes'
+import { AUDIO_EXT, IMAGE_EXT, defineTool, describeItem, ensureSource, images, json, sourceById } from './common'
 
 const VIDEO_EXT = /\.(mp4|mov|mkv|avi|m4v|webm|mts|m2ts|mxf)$/i
 
@@ -67,8 +69,66 @@ export const readTools = [
       return json({
         inspiration: p.inspiration,
         scope: { ...p.scope, introEnd },
-        thumbnailDirection: p.thumbnails.useMyDirection ? p.thumbnails.direction : ''
+        thumbnailDirection: p.thumbnails.useMyDirection ? p.thumbnails.direction : '',
+        videoTheme: p.videoTheme ? `${p.videoTheme.name} (call get_video_theme)` : null
       })
+    }
+  }),
+
+  defineTool({
+    name: 'get_video_theme',
+    description:
+      'The video theme the owner chose for this edit: the measured editing style of reference videos (cuts per minute overall, in the ' +
+      'first 30 s and minute by minute, shot lengths, speech pace, loudness), the owner\'s notes on what to copy or skip, your earlier ' +
+      'written summary of the style if there is one, and contact sheets of the reference shots (one frame per shot in the first minute, then ' +
+      'frames spread over the rest). Edit to a similar pace and look; the channel rules, brand kit and the owner\'s inspiration come first. ' +
+      'frames: true includes the contact sheets (default when there is no summary yet).',
+    input: { frames: z.boolean().optional() },
+    run: (args, env) => {
+      const ref = env.store.project.videoTheme
+      if (!ref) return json({ videoTheme: null, note: 'No video theme is chosen for this project.' })
+      const t = env.ctx.themes.get(ref.id)
+      if (!t) return json({ videoTheme: null, note: `The video theme "${ref.name}" was deleted in Settings. Edit without it.` })
+      const info = {
+        name: t.name,
+        source: t.source,
+        averages: t.averages,
+        inWords: themeOneLine(t),
+        ownerNotes: t.notes || null,
+        yourSummary: t.summary ?? null,
+        videos: t.videos.map((v) => ({
+          title: v.title,
+          url: v.url,
+          analyzedSeconds: v.stats.analyzedSeconds,
+          cutsPerMinute: v.stats.cutsPerMinute,
+          cutsPerMinuteFirst30s: v.stats.cutsPerMinuteFirst30s,
+          shotSeconds: v.stats.shotSeconds,
+          paceByMinute: v.stats.pace.map((p) => p.cutsPerMinute),
+          firstCutTimes: v.stats.cutTimes.slice(0, 40),
+          speech: v.stats.speech ?? null,
+          loudnessLufs: v.stats.loudnessLufs ?? null
+        })),
+        next: t.summary
+          ? 'Follow your summary and the numbers. Ask for frames: true only if you need to look again.'
+          : 'Study the contact sheets (captions, text and graphics, zoom punch-ins, B-roll share, framing, color, transitions), then call save_video_theme_summary once with a short description of the style so later stages can read it without the images.'
+      }
+      const withFrames = args.frames ?? !t.summary
+      return withFrames ? images(themeSheets(env.ctx.themes.dir(t.id), t), info) : json(info)
+    }
+  }),
+
+  defineTool({
+    name: 'save_video_theme_summary',
+    description:
+      'Save your description of the chosen video theme\'s style (pace, cut style, hook, captions, graphics and text, zooms, B-roll, music ' +
+      'and sound effects, color and look) in a few sentences. It is kept with the theme and shown to the owner in Settings, and later ' +
+      'stages and videos read it instead of the contact sheets.',
+    input: { summary: z.string().min(20).max(2000) },
+    run: (args, env) => {
+      const ref = env.store.project.videoTheme
+      if (!ref || !env.ctx.themes.get(ref.id)) return json({ saved: false, note: 'No video theme is chosen for this project.' })
+      env.ctx.themes.update(ref.id, { summary: args.summary })
+      return json({ saved: true })
     }
   }),
 
@@ -201,8 +261,10 @@ export const readTools = [
     name: 'search_library',
     description:
       'Search the asset library (graphics, sounds, effects, music, clips saved from earlier videos) for this channel and the shared section. ' +
-      'ALWAYS search before making a graphic or sound. Results come preferred-first with name, description, when to use, tags, inputs ' +
-      '(parameters such as text, colors, length), use count, and the path of a preview image you can Read. Place one with place_library_asset. ' +
+      'Search before making a graphic, animation, song or sound effect, and reuse one ONLY if it fits this moment perfectly: the same purpose, ' +
+      'emotion and energy, right for the story and the brand, as good as anything you would make fresh. Never reuse something just to save ' +
+      'time or usage; if a new one would tell the story better, make the new one. Results come preferred-first with name, description, when ' +
+      'to use, tags, inputs (parameters such as text, colors, length), use count, and the path of a preview image you can Read. Place one with place_library_asset. ' +
       'An empty query lists everything.',
     input: {
       query: z.string().default(''),

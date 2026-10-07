@@ -3,6 +3,18 @@
 Each release's section becomes its GitHub release text and the notes shown in the app's update dialog.
 A release is blocked until the section for its version has notes.
 
+## 1.5.0
+
+- **Video themes.** Settings > Video themes: paste a YouTube video or channel link (or choose a video file) and the app measures its editing style: cuts per minute, how fast the opening is, shot lengths, speech pace, loudness, and a contact sheet of its shots. For a channel it reads the newest 3 long-form videos (Shorts and live streams skipped). Only the first 12 minutes are read, at low resolution, and the downloads are deleted afterwards. Making a theme uses no Claude usage.
+- Choose a theme on the Start edit panel, or later in Inspiration, and Claude edits to a similar pace and style, within your channel's rules and brand kit. The first time it uses a theme, Claude writes a short description of the style, shown in Settings; later edits read that instead of the pictures, which keeps usage down.
+- Add your own notes to a theme ("copy the pace and the zooms, skip the meme sounds") and Claude follows them.
+- **Everything Claude makes is saved to your asset library**: graphics and animations, custom effects, composed music and sound effects, each with a description of what it is, its mood and when it fits. Anything Claude forgets to save is saved automatically after its run. The library now has a folder from the start (Documents\AI Video Editor Asset Library); change it in Settings.
+- **Reuse only when it is just as good.** Claude checks the library before making something, and reuses an asset only when it fits the moment perfectly. It never reuses to save usage: when something new would carry the story or emotion better, it makes the new one.
+- **Add clip here.** Right-click a cut between clips (or anywhere on the timeline) and choose Add clip here… to pick a photo or video. Then choose whether to cut it in (the video gets longer) or show it over the video, and how much around it Claude may re-edit so it flows: 5, 10 or 25 seconds each side, or type your own. You get Before and After with Keep and Revert.
+- **Send time to chat.** Right-click the timeline (ruler, an empty spot, a clip or a cut) and choose Send 2:35.1 to chat: the time goes into the chat box ("At 2:35.1: "), the playhead jumps there, and you finish typing what you want. With a section selected, the whole section is sent.
+- **Choose where the asset library lives.** The app asks once where to keep it (keep the suggested folder or choose another). Changing it later in Settings > General asks whether to move the saved assets to the new folder or leave them where they are.
+- **Opus 5.5 by default everywhere quality can show.** The recommended models (Settings > Claude models) are now Opus 5.5 for every part, including graphics, music and sound, captions, thumbnails and titles. Only transcribing stays on Haiku 4.5: Claude only starts faster-whisper on your GPU there, so the transcript is word for word the same. If you never changed the models, this applies by itself; if you did, press Reset to recommended.
+
 ## 1.4.0
 
 - **Undo button with words.** The top bar has an Undo button. Clicking it says in plain words what it will take back, who made the change and when ("Move B-roll clip "Charger screen". Made by Claude 3 minutes ago"), and Undo it confirms. Ctrl+Z still undoes at once; either way a message says what was undone, with Redo.

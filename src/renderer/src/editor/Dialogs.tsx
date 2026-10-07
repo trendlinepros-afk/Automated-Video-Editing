@@ -1,4 +1,5 @@
 /** The editor's dialogs: Export, Export log, Re-edit section, Inspiration, Save to library, Leave a note, Compare versions. */
+import type { VideoTheme } from '@shared/videoTheme'
 import { useEffect, useRef, useState } from 'react'
 import type { ExportPreset, Range } from '@shared/project'
 import { call, toast } from '../state/app'
@@ -31,6 +32,8 @@ export function EditorDialogs() {
       return <NoteDialog d={dialog} onClose={close} />
     case 'compare':
       return <CompareDialog a={dialog.a} b={dialog.b} onClose={close} />
+    case 'insertClip':
+      return <InsertClipDialog time={dialog.time} file={dialog.file} onClose={close} />
   }
 }
 
@@ -195,11 +198,120 @@ function ReeditDialog({ onClose }: { onClose: () => void }) {
   )
 }
 
+const INSERT_PRESETS = [5, 10, 25]
+
+/** "Add clip here": how the new photo or video goes in, and how much around it Claude may re-edit so it flows. */
+function InsertClipDialog({ time, file, onClose }: { time: number; file: string; onClose: () => void }) {
+  const connected = useStore(editor, (s) => s.runner.connected || s.runner.status === 'running')
+  const [seconds, setSeconds] = useState<number>(10)
+  const [custom, setCustom] = useState('')
+  const [mode, setMode] = useState<'insert' | 'overlay'>('insert')
+  const [note, setNote] = useState('')
+  const [busy, setBusy] = useState(false)
+  const est = useEstimate('insert_clip')
+  const customSeconds = parseFloat(custom)
+  const each = custom.trim() ? customSeconds : seconds
+  const valid = Number.isFinite(each) && each >= 1 && each <= 600
+  const name = file.split(/[\\/]/).pop()
+  const isImage = /\.(png|jpe?g|webp|bmp|gif)$/i.test(file)
+  const send = async () => {
+    if (!valid) return
+    setBusy(true)
+    try {
+      await window.api.project.requestInsertClip({ file, time, seconds: each, mode, note: note.trim() || undefined })
+    } catch (e) {
+      toast(`Could not add the clip: ${errorMessage(e)}`, { kind: 'error' })
+      setBusy(false)
+      return
+    }
+    onClose()
+    const span = fmtRange({ start: Math.max(0, time - each), end: time + each })
+    toast(connected ? `Claude is adding ${name} at ${fmt(time)} and re-editing ${span} around it.` : `Adding ${name} at ${fmt(time)} is queued until Claude connects.`)
+  }
+  return (
+    <Modal
+      title={`Add ${isImage ? 'a photo' : 'a clip'} at ${fmt(time)}`}
+      onClose={onClose}
+      footer={
+        <>
+          <EstimateNote estimate={est} />
+          <span className="spacer" />
+          <button className="btn" onClick={onClose}>
+            Cancel
+          </button>
+          <button className="btn primary" disabled={!valid || busy} onClick={() => void send()}>
+            Add it
+          </button>
+        </>
+      }
+    >
+      <div className="small">
+        <b>{name}</b> <span className="muted selectable">{file}</span>
+      </div>
+      <label className="small">How it goes in</label>
+      <div className="seg" style={{ width: 'fit-content' }}>
+        <button className={mode === 'insert' ? 'on' : ''} onClick={() => setMode('insert')} title="Cut it into the video here; the video gets longer">
+          Cut it in here
+        </button>
+        <button className={mode === 'overlay' ? 'on' : ''} onClick={() => setMode('overlay')} title="Show it over the video here; the talking carries on underneath">
+          Show it over the video
+        </button>
+      </div>
+      <label className="small">How much around it should Claude look at and re-edit so it flows?</label>
+      <div className="row wrap" style={{ gap: 6 }}>
+        {INSERT_PRESETS.map((n) => (
+          <button
+            key={n}
+            className={`btn small${!custom.trim() && seconds === n ? ' primary' : ''}`}
+            onClick={() => {
+              setSeconds(n)
+              setCustom('')
+            }}
+          >
+            {n} s each side
+          </button>
+        ))}
+        <input
+          type="number"
+          min={1}
+          max={600}
+          step={1}
+          style={{ width: 90 }}
+          placeholder="Other"
+          value={custom}
+          onChange={(e) => setCustom(e.target.value)}
+        />
+        <span className="small muted">seconds each side</span>
+      </div>
+      <span className="hint">
+        {valid
+          ? `Claude may change ${fmtRange({ start: Math.max(0, time - each), end: time + each })}; nothing outside it changes. More room lets it re-pace the lead-in and the follow-up; less keeps the rest exactly as it is.`
+          : 'Type a number of seconds from 1 to 600.'}
+      </span>
+      <textarea rows={2} value={note} onChange={(e) => setNote(e.target.value)} placeholder="Anything Claude should know (optional), e.g. use the part where the car jumps. Win+H to speak." />
+      <span className="hint">You get Before and After with Keep and Revert.</span>
+    </Modal>
+  )
+}
+
 function InspirationDialog({ onClose }: { onClose: () => void }) {
   const project = useStore(editor, (s) => s.snapshot!.doc.project)
   const readOnly = useStore(editor, (s) => s.snapshot!.readOnly)
   const [text, setText] = useState(project.inspiration)
+  const [themes, setThemes] = useState<VideoTheme[]>([])
+  const [themeId, setThemeId] = useState(project.videoTheme?.id ?? '')
+  useEffect(() => {
+    void window.api.themes.list().then(setThemes, () => undefined)
+  }, [])
   const save = async () => {
+    if ((project.videoTheme?.id ?? '') !== themeId) {
+      try {
+        await window.api.project.setVideoTheme(themeId || null)
+      } catch (e) {
+        toast(`Could not change the video theme: ${errorMessage(e)}`, { kind: 'error' })
+        return false
+      }
+    }
     if (text !== project.inspiration) return applyOp({ op: 'setInspiration', text })
     return true
   }
@@ -208,7 +320,9 @@ function InspirationDialog({ onClose }: { onClose: () => void }) {
     const d = currentDerived()
     const range: Range = { start: 0, end: d?.duration ?? 0 }
     try {
-      await window.api.project.requestReedit({ range, direction: `Re-edit the video following the updated inspiration:\n${text.trim()}` })
+      const themeName = themes.find((t) => t.id === themeId)?.name
+      const direction = [text.trim() && `Re-edit the video following the updated inspiration:\n${text.trim()}`, themeName && `Match the pace and style of the video theme "${themeName}" (get_video_theme).`].filter(Boolean).join('\n')
+      await window.api.project.requestReedit({ range, direction })
     } catch (e) {
       toast(`Could not send the re-edit: ${errorMessage(e)}`, { kind: 'error' })
       return
@@ -225,14 +339,24 @@ function InspirationDialog({ onClose }: { onClose: () => void }) {
           <button className="btn" onClick={async () => (await save()) && onClose()} disabled={readOnly}>
             Save
           </button>
-          <button className="btn primary" onClick={reedit} disabled={readOnly || project.status === 'new' || !text.trim()}>
-            Re-edit following the new inspiration
+          <button className="btn primary" onClick={reedit} disabled={readOnly || project.status === 'new' || (!text.trim() && !themeId)}>
+            Re-edit following this
           </button>
         </>
       }
     >
       <div className="muted small">Your vision for this video: tone, pacing, jokes, moments to feature, videos to take after. It is saved in the project.</div>
       <textarea rows={8} value={text} disabled={readOnly} onChange={(e) => setText(e.target.value)} placeholder="Leave empty and Claude does its best from the footage, the channel's rules and the brand kit. (Win+H to speak)" />
+      <label className="small">Video theme</label>
+      <select value={themeId} disabled={readOnly} onChange={(e) => setThemeId(e.target.value)}>
+        <option value="">None: the channel's usual style</option>
+        {themes.map((t) => (
+          <option key={t.id} value={t.id}>
+            {t.name}
+          </option>
+        ))}
+      </select>
+      <div className="muted small">Make themes from YouTube videos or channels in Settings &gt; Video themes. Claude follows the theme from the next request.</div>
     </Modal>
   )
 }

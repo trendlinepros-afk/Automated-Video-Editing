@@ -23,7 +23,8 @@ import { createRequestService } from './project/requests'
 import { createVersionService } from './project/versions'
 import { readJson } from './project/store'
 import { createCorrectionsService } from './services/corrections'
-import { createLibraryService } from './services/library'
+import { DEFAULT_LIBRARY_FOLDER_NAME, createLibraryService } from './services/library'
+import { createVideoThemesService } from './services/videoThemes'
 import { createMusicService } from './services/music'
 import { createPikzelsService } from './services/pikzels'
 import {
@@ -126,6 +127,7 @@ function buildContext(log: ActivityLog): AppContext {
   c.mcp = createMcpService(c)
   c.runner = createRunnerService(c)
   c.library = createLibraryService(c)
+  c.themes = createVideoThemesService(c)
   c.pikzels = createPikzelsService(c)
   c.updater = createUpdaterService(c)
   return c
@@ -137,6 +139,15 @@ function forwardEvents(c: AppContext): void {
   c.runner.onOutput((line) => c.send(API_EVENTS['claude.onOutput'], line))
   // A newly chosen asset library folder is created and given the starter assets at once,
   // so first-launch setup shows it as ready.
+  // Everything Claude makes is saved to the library, so it needs a folder from the start: Documents by default.
+  if (!c.settings.get().libraryFolder) {
+    try {
+      c.settings.update({ libraryFolder: join(app.getPath('documents'), DEFAULT_LIBRARY_FOLDER_NAME) })
+      c.library.root()
+    } catch (err) {
+      c.appLog.write('error', 'Could not set up the default asset library folder', { error: String(err) })
+    }
+  }
   let libraryFolder = c.settings.get().libraryFolder
   c.settings.onChange((s) => {
     if (s.libraryFolder && s.libraryFolder !== libraryFolder) c.library.root()

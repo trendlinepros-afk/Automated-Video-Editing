@@ -25,7 +25,11 @@ export const WORKFLOW = `How to work with the app (tools from the "ave" MCP serv
   time and call save_transcript for each as soon as it is done; when resuming, skip sources list_footage shows as transcribed.
   Keep your scratch files in the project's scratch folder (get_engine_info) so a new session can find and reuse them.
 - Anchor B-roll, graphics, effects, sound effects and chapters to transcript words, not fixed times.
-- Search the asset library (search_library) before making a graphic or sound; offer to save reusable new ones (save_to_library).
+- Before making a graphic, animation, song or sound effect, search the asset library (search_library). Reuse one only when it fits
+  this moment perfectly (same purpose, emotion and energy, right for the story and the brand) and is as good as what you would
+  make fresh. Quality first: never reuse to save time or usage; when a new one would carry the story or emotion better, make it.
+- Save every new graphic, animation, custom effect, music track and sound effect you make to the library (save_to_library) right
+  after placing it, with a description of what it is, its mood and when it fits.
 - Anything the tools cannot express, build with your own scripts (get_engine_info gives the Python and ffmpeg to use) and
   bring the finished file in with import_file.
 - Claude cannot hear the result: check audio by measurement (get_audio_energy, measure_loudness, transcribing snippets).`
@@ -118,6 +122,27 @@ export function requestSection(r: EditRequest, project: Project): string {
       )
       if (r.text.trim()) lines.push(`Note from the owner: "${r.text.trim()}"`)
       break
+    case 'insert_clip': {
+      const c = (r.context ?? {}) as { insertAt?: number; mode?: string; secondsEachSide?: number; kind?: string; sourceId?: string }
+      const at = typeof c.insertAt === 'number' ? `${formatTime(c.insertAt, true)} (${c.insertAt.toFixed(2)}s)` : 'the marked spot'
+      lines.push(
+        `The owner added a ${c.kind === 'image' ? 'photo' : 'video clip'} (source ${c.sourceId ?? 'in the attached context'}) at ${at} and wants it to ` +
+          `flow with the edit around it. You may re-edit ${rangeText(r.range)} (${c.secondsEachSide ?? '?'} s on each side); nothing outside it can change.`,
+        c.mode === 'overlay'
+          ? 'Show it OVER the video there as B-roll (add_item on the B-roll track, anchored to the words at that spot): the A-roll and its sound carry on underneath.'
+          : 'Cut it INTO the video there (set_aroll_cuts, inserting it between the pieces at that spot; the video gets longer and everything after shifts on its own). ' +
+              'Pick the exact cut points at word boundaries near the spot, so no word is clipped.',
+        'Look at the new clip first (frames of the source) and at the footage around the spot (get_range_frames). Decide how long it should be ' +
+          'and which part of it to use, then re-tune the range so it reads as one piece: trims, the cuts before and after, a transition only if it ' +
+          'helps, graphics, sound effects, music under it and captions. ' +
+          (c.kind === 'image'
+            ? 'For a photo, choose a length that suits the moment (usually 2-4 s) and give it gentle motion if that fits the style (keyframes, or render a short video from it with ffmpeg and import_file). '
+            : 'Keep its own sound only if it adds something; otherwise lower or mute it under the voice. ') +
+          'Follow the channel rules and the video theme if there is one. Reply with what you did.'
+      )
+      if (r.text.trim()) lines.push(`Note from the owner: "${r.text.trim()}"`)
+      break
+    }
     case 'stabilize':
       lines.push(
         `Stabilize the clip ${r.context?.itemId ?? ''} at ${rangeText(r.range)}. The attached context has its source file, the source range it ` +
@@ -159,5 +184,9 @@ export function buildRunPrompt(requests: EditRequest[], project: Project, opts: 
   const inFlight = project.checklist.find((c) => c.status === 'in_progress')
   const resumeNote = inFlight ? `\nThe checklist shows "${inFlight.label}" in progress: continue from there and do not redo finished stages.` : ''
   const body = requests.map((r) => requestSection(r, project)).join('\n\n')
-  return `${intro}${resumeNote}\n\nOpen requests (handle them in this order; begin_request and finish_request each one):\n\n${body}`
+  const theme = project.videoTheme
+    ? `\nVideo theme: "${project.videoTheme.name}". Edit to a similar pace and style as its reference videos. Call get_video_theme before ` +
+      'deciding cuts, B-roll, graphics, captions or sound (the channel rules, brand kit and the inspiration still come first).'
+    : ''
+  return `${intro}${resumeNote}${theme}\n\nOpen requests (handle them in this order; begin_request and finish_request each one):\n\n${body}`
 }

@@ -75,7 +75,7 @@ jobs:
           set -euo pipefail
           node -e '
             const m = require("./engine/runtime.json");
-            for (const k of ["uv", "ffmpeg"]) for (const u of [m[k].url, ...(m[k].mirrors || [])]) console.log(u);
+            for (const k of ["uv", "ffmpeg", "ytdlp"]) if (m[k]) for (const u of [m[k].url, ...(m[k].mirrors || [])]) console.log(u);
           ' > urls.txt
           ok=0
           while read -r u; do
@@ -85,7 +85,7 @@ jobs:
           node -e '
             const m = require("./engine/runtime.json");
             const { execSync } = require("child_process");
-            for (const k of ["uv", "ffmpeg"]) {
+            for (const k of ["uv", "ffmpeg", "ytdlp"].filter((k) => m[k])) {
               const live = [m[k].url, ...(m[k].mirrors || [])].some((u) => { try { execSync(`curl -fsIL -o /dev/null "${u}"`); return true } catch { return false } });
               if (!live) { console.error(`No live download for ${k}`); process.exit(1) }
             }'

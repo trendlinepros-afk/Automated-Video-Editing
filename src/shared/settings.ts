@@ -39,6 +39,8 @@ export const SettingsSchema = z.looseObject({
   defaultProjectsFolder: z.string().default(''),
   defaultExportsFolder: z.string().default(''), // '' = the project's exports/ folder
   libraryFolder: z.string().default(''),
+  /** The owner chose (or kept) the library folder; until then the app asks once at start. */
+  libraryFolderConfirmed: z.boolean().default(false),
   musicFolders: z.array(MusicFolderSchema).default([]),
   runner: z.looseObject({
     /** The command that starts the AI. Claude Code by default; any CLI with MCP support can replace it. */

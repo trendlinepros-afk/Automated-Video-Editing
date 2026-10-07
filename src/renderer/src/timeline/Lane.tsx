@@ -19,6 +19,7 @@ export interface LaneHandlers {
   seamDown(e: ReactPointerEvent, seg: PlacedSegment, prev: PlacedSegment, edge: 'in' | 'out'): void
   seamMenu(e: ReactMouseEvent, seg: PlacedSegment, prev: PlacedSegment): void
   laneDown(e: ReactPointerEvent): void
+  laneMenu(e: ReactMouseEvent): void
 }
 
 interface LaneProps {
@@ -51,7 +52,7 @@ export const Lane = memo(function Lane(p: LaneProps) {
   return (
     <div className="tl-lane" style={{ height, width: p.width }}>
       <TrackHeader track={p.track} color={color} width={p.headerW} readOnly={p.readOnly} captionsEnabled={p.captionsEnabled} />
-      <div className="tl-body" onPointerDown={p.h.laneDown}>
+      <div className="tl-body" onPointerDown={p.h.laneDown} onContextMenu={p.h.laneMenu}>
         {p.captions &&
           p.captions
             .filter((c) => c.end >= p.t0 && c.start <= p.t1)

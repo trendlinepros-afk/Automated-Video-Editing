@@ -257,3 +257,20 @@ describe('runner', () => {
     expect(prompt).toContain('set_intro_end')
   })
 })
+
+describe('Add clip here', () => {
+  it('tells Claude where the new clip goes, how, and how far around it may change', () => {
+    const req = {
+      id: 'req_ins', kind: 'insert_clip', status: 'queued', createdAt: new Date().toISOString(), text: 'use the jump',
+      range: { start: 52, end: 72 }, context: { insertAt: 62, mode: 'insert', secondsEachSide: 10, sourceId: 'src_new', kind: 'video' }
+    } as EditRequest
+    const prompt = buildRunPrompt([req], store.project, { resumed: false })
+    expect(prompt).toMatch(/added a video clip \(source src_new\) at 1:02/)
+    expect(prompt).toMatch(/10 s on each side/)
+    expect(prompt).toMatch(/Cut it INTO the video/)
+    expect(prompt).toMatch(/use the jump/)
+    const over = buildRunPrompt([{ ...req, context: { ...req.context, mode: 'overlay', kind: 'image' } }], store.project, { resumed: false })
+    expect(over).toMatch(/added a photo/)
+    expect(over).toMatch(/OVER the video/)
+  })
+})

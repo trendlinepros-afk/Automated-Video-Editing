@@ -12,7 +12,7 @@ import { useDerived } from '../state/derived'
 import { pause, seek } from '../state/player'
 import { useStore } from '../state/store'
 import { Icon } from '../components/Icon'
-import { canEdit, fixAudio, itemMenu, nudgeSeam, seamMenu } from '../editor/actions'
+import { canEdit, fixAudio, itemMenu, nudgeSeam, seamMenu, timeMenu } from '../editor/actions'
 import { clamp, fmt, fmtRange, mediaUrl } from '../util'
 import { HEADER_W, MAX_ZOOM, RULER_H, drag } from './drag'
 import { Lane, type LaneHandlers } from './Lane'
@@ -238,6 +238,10 @@ function useHandlers(zoomRef: { current: number }): LaneHandlers {
         if (e.button !== 0) return
         select([])
         seek(timeAt(e, e.currentTarget, zoomRef.current))
+      },
+      laneMenu(e) {
+        if (e.target !== e.currentTarget) return // items and cuts have their own menus
+        timeMenu(e, timeAt(e, e.currentTarget, zoomRef.current))
       }
     }
   }, [zoomRef])
@@ -291,7 +295,12 @@ function Ruler({ zoom, t0, t1, width }: { zoom: number; t0: number; t1: number; 
       <div className="tl-corner" style={{ width: HEADER_W }}>
         <PlayheadTime />
       </div>
-      <div className="tl-ruler-body" onPointerDown={onDown} title="Click to move the playhead. Drag to select a section.">
+      <div
+        className="tl-ruler-body"
+        onPointerDown={onDown}
+        onContextMenu={(e) => timeMenu(e, timeAt(e, e.currentTarget, zoom))}
+        title="Click to move the playhead. Drag to select a section. Right-click to send the time to the chat or add a clip here."
+      >
         {range && <div className="tl-ruler-range" style={{ left: range.start * zoom, width: (range.end - range.start) * zoom }} />}
         {ticks.map(({ t, major }) => (
           <div key={t.toFixed(3)} className={`tl-tick${major ? '' : ' minor'}`} style={{ left: t * zoom }}>

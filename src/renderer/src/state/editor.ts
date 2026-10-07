@@ -31,6 +31,7 @@ export type Dialog =
   | { kind: 'saveToLibrary'; itemId: string }
   | { kind: 'note'; itemId?: string; range?: Range; time?: number }
   | { kind: 'compare'; a: string; b: string }
+  | { kind: 'insertClip'; time: number; file: string }
 
 export interface EditorState {
   snapshot: ProjectSnapshot | null
@@ -47,6 +48,8 @@ export interface EditorState {
   range: Range | null
   /** A time range recognised in the chat box as you type. */
   chatRange: Range | null
+  /** Text to put in the chat box ("Send time to chat"); n changes each time. */
+  chatDraft: { text: string; n: number } | null
   tab: SideTab
   /** Item ids Claude just added or changed (they pulse briefly). */
   pulses: ReadonlySet<string>
@@ -73,6 +76,7 @@ export const editor = createStore<EditorState>({
   seam: null,
   range: null,
   chatRange: null,
+  chatDraft: null,
   tab: 'chat',
   pulses: new Set(),
   beforeRequestId: null,

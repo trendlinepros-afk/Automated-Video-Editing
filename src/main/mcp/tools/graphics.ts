@@ -125,9 +125,10 @@ export const graphicsTools = [
   defineTool({
     name: 'save_to_library',
     description:
-      'Save something reusable you built (a like-and-subscribe animation, a lower third, a transition, a sound) to the asset library, so later ' +
-      'videos reuse it instead of generating it again. Give item_id (an item on the timeline) or file (a project path). Describe what it is, ' +
-      'when to use it, tags, and its inputs (parameters such as text, colors, length) so it works for any text without being rebuilt. ' +
+      'Save what you made to the asset library: EVERY new graphic or animation, custom effect, composed music track and sound effect, right ' +
+      'after you place it, so later videos can find it. Give item_id (an item on the timeline) or file (a project path). Describe what it is ' +
+      'and looks or sounds like, the mood and energy, when it fits, tags, and its inputs (parameters such as text, colors, length) so it ' +
+      'works for any text without being rebuilt. Anything you do not save is saved automatically after your run with a plain description. ' +
       'scope "shared" = every channel, "channel" = this channel only.',
     input: {
       item_id: z.string().optional(),
@@ -171,6 +172,14 @@ export const graphicsTools = [
         scope: args.scope === 'shared' ? 'shared' : env.store.project.profileId,
         inputs: args.inputs
       })
+      // The items that use this file are now in the library, so the automatic save after the run skips them.
+      const savedFile = args.item_id ? (itemById(doc, args.item_id) as { file?: string }).file : projectRelative(env.dir, args.file ?? '') ?? undefined
+      const ids = doc.project.items.filter((i) => i.id === args.item_id || (savedFile && (i as { file?: string }).file === savedFile)).map((i) => i.id)
+      if (ids.length) {
+        env.store.mutate('Saved to the library', 'app', (d) => {
+          for (const it of d.project.items) if (ids.includes(it.id) && !it.libraryAssetId) it.libraryAssetId = asset.id
+        }, { bypassLock: true, noHistory: true })
+      }
       return json({ saved: { id: asset.id, name: asset.name, type: asset.type, scope: asset.scope, preview: asset.preview && asset.dir ? join(asset.dir, asset.preview) : null } })
     }
   }),

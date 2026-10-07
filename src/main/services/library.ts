@@ -8,7 +8,7 @@
  * asset.json carries a format version and is upgraded like a project, with a backup copy first.
  */
 import { closeSync, copyFileSync, cpSync, existsSync, fsyncSync, mkdirSync, openSync, readdirSync, readFileSync, renameSync, rmSync, statSync, writeFileSync, writeSync } from 'node:fs'
-import { basename, extname, join } from 'node:path'
+import { basename, dirname, extname, join, resolve, sep } from 'node:path'
 import { randomBytes } from 'node:crypto'
 import { LIBRARY_FORMAT_VERSION } from '@shared/appInfo'
 import type { LibraryAsset } from '@shared/ipc'
@@ -99,6 +99,9 @@ function toDisk(asset: LibraryAsset): Record<string, unknown> {
   const { dir: _dir, ...rest } = asset
   return rest
 }
+
+/** The library's folder in Documents until the owner picks another in Settings. */
+export const DEFAULT_LIBRARY_FOLDER_NAME = 'AI Video Editor Asset Library'
 
 export interface LibraryOptions {
   /** Folder of starter assets (default: <resources>/engine/starter_assets). */
@@ -439,4 +442,61 @@ export function createLibraryService(ctx: AppContext, opts: LibraryOptions = {})
     }
   }
   return service
+}
+
+/**
+ * Moves a library to a new folder: every asset folder (shared and per channel) and the starter-assets marker.
+ * Each asset is copied first and removed from the old folder only once its copy is complete; an asset that already
+ * exists in the new folder is kept as it is there. Other files in the old folder are left alone.
+ */
+export function moveLibrary(from: string, to: string): { moved: number; skipped: number } {
+  const a = resolve(from)
+  const b = resolve(to)
+  if (a === b) return { moved: 0, skipped: 0 }
+  if (b.startsWith(a + sep) || a.startsWith(b + sep)) throw new Error('Choose a folder that is not inside the current library folder (or the other way round).')
+  let moved = 0
+  let skipped = 0
+  const assetDirs: string[] = []
+  if (isDir(join(a, 'shared'))) for (const n of readdirSync(join(a, 'shared'))) assetDirs.push(join('shared', n))
+  if (isDir(join(a, 'profiles'))) {
+    for (const p of readdirSync(join(a, 'profiles'))) {
+      if (!isDir(join(a, 'profiles', p))) continue
+      for (const n of readdirSync(join(a, 'profiles', p))) assetDirs.push(join('profiles', p, n))
+    }
+  }
+  for (const rel of assetDirs) {
+    const src = join(a, rel)
+    if (!isDir(src)) continue
+    const dest = join(b, rel)
+    if (existsSync(dest)) {
+      skipped++
+      continue
+    }
+    mkdirSync(dirname(dest), { recursive: true })
+    const tmp = `${dest}.moving`
+    rmSync(tmp, { recursive: true, force: true })
+    cpSync(src, tmp, { recursive: true })
+    renameSync(tmp, dest)
+    rmSync(src, { recursive: true, force: true })
+    moved++
+  }
+  const marker = join(a, SEED_MARKER)
+  if (existsSync(marker) && !existsSync(join(b, SEED_MARKER))) {
+    mkdirSync(b, { recursive: true })
+    copyFileSync(marker, join(b, SEED_MARKER))
+    rmSync(marker, { force: true })
+  }
+  // Tidy up folders the move emptied.
+  const removeIfEmpty = (d: string) => {
+    try {
+      if (isDir(d) && !readdirSync(d).length) rmSync(d, { recursive: true })
+    } catch {
+      /* leave it */
+    }
+  }
+  if (isDir(join(a, 'profiles'))) for (const p of readdirSync(join(a, 'profiles'))) removeIfEmpty(join(a, 'profiles', p))
+  removeIfEmpty(join(a, 'profiles'))
+  removeIfEmpty(join(a, 'shared'))
+  removeIfEmpty(a)
+  return { moved, skipped }
 }

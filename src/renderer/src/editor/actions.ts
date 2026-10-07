@@ -1,10 +1,11 @@
 /** Editor actions shared by the timeline, inspector, keyboard and menus. */
 import type { Item } from '@shared/project'
 import type { MouseEvent as ReactMouseEvent } from 'react'
-import { openMenu, toast, type MenuEntry } from '../state/app'
-import { applyOp, editor, isLockedOut, openDialog, select, undo, type SeamSel } from '../state/editor'
+import { call, openMenu, toast, type MenuEntry } from '../state/app'
+import { applyOp, editor, isLockedOut, openDialog, select, setTab, undo, type SeamSel } from '../state/editor'
+import { seek } from '../state/player'
 import { currentDerived } from '../state/derived'
-import { errorMessage, fmt, fmtRange } from '../util'
+import { IMAGE_EXTS, VIDEO_EXTS, errorMessage, fmt, fmtRange, fmtShort } from '../util'
 
 export function canHaveAudio(item: Item): boolean {
   return item.type === 'segment' || item.type === 'audio'
@@ -119,8 +120,50 @@ export async function resetClip(item: Item): Promise<void> {
   toast(`${label ?? 'Reset'}. Undo puts it back.`, { actions: [{ label: 'Undo', run: () => void undo() }] })
 }
 
+/**
+ * "Send time to chat": puts "At 1:23.4: " (or the selected section, when the click is inside it) in the chat box,
+ * moves the playhead there and opens the chat, so the request can be finished in words.
+ */
+export function sendTimeToChat(time: number): void {
+  const range = editor.get().range
+  const inRange = range && time >= range.start && time <= range.end
+  const text = inRange ? `From ${fmtShort(range.start)} to ${fmtShort(range.end)}: ` : `At ${fmtShort(time)}: `
+  seek(time)
+  setTab('chat')
+  editor.set({ chatDraft: { text, n: Date.now() } })
+}
+
+/** "Add clip here…": pick a photo or video, then choose how much around it Claude may re-edit. */
+export async function addClipHere(time: number): Promise<void> {
+  const snap = editor.get().snapshot
+  if (!snap || snap.readOnly) {
+    toast(snap?.readOnlyReason ?? 'This project is open read-only.')
+    return
+  }
+  const files = await call(() =>
+    window.api.app.pickFiles({ title: 'Choose a photo or video to add here', filters: [{ name: 'Photos and videos', extensions: [...VIDEO_EXTS, ...IMAGE_EXTS] }] })
+  )
+  if (files?.[0]) openDialog({ kind: 'insertClip', time, file: files[0] })
+}
+
+/** The entries every timeline right-click offers for the spot clicked. */
+function timeEntries(time: number): MenuEntry[] {
+  const range = editor.get().range
+  const inRange = range && time >= range.start && time <= range.end
+  return [
+    { label: inRange ? `Send ${fmtShort(range.start)}–${fmtShort(range.end)} to chat` : `Send ${fmtShort(time)} to chat`, run: () => sendTimeToChat(time) },
+    { label: 'Add clip here…', run: () => void addClipHere(time) }
+  ]
+}
+
+/** Right-click on the ruler or an empty part of a track. */
+export function timeMenu(e: ReactMouseEvent, time: number): void {
+  e.preventDefault()
+  openMenu(e, timeEntries(Math.max(0, time)))
+}
+
 export function itemMenu(e: ReactMouseEvent, item: Item, time: number): void {
-  const entries: MenuEntry[] = []
+  const entries: MenuEntry[] = [...timeEntries(time), { label: '', run: () => undefined, separator: true }]
   if (canStabilize(item)) {
     const pic = (item as { picture?: { kind?: string } }).picture
     entries.push({ label: pic?.kind === 'stabilized' ? 'Stabilize again' : 'Stabilize', run: () => void stabilize(item) })
@@ -139,6 +182,8 @@ export function itemMenu(e: ReactMouseEvent, item: Item, time: number): void {
 
 export function seamMenu(e: ReactMouseEvent, seam: SeamSel, time: number): void {
   openMenu(e, [
+    ...timeEntries(time),
+    { label: '', run: () => undefined, separator: true },
     { label: 'Fix clipped audio', run: () => void fixAudio({ segmentId: seam.segmentId, time }) },
     { label: 'Leave a note for Claude…', run: () => openDialog({ kind: 'note', range: { start: Math.max(0, time - 1), end: time + 1 }, time }) }
   ])

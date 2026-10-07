@@ -12,8 +12,8 @@ export const API_METHODS = [
   'music.list', 'music.rescan', 'music.addFolder', 'music.removeFolder',
   'projects.recent', 'projects.create', 'projects.open', 'projects.locate', 'projects.removeRecent', 'projects.close',
   'project.get', 'project.apply', 'project.undo', 'project.redo', 'project.relinkSource', 'project.startEdit',
-  'project.sendChat', 'project.requestReedit', 'project.requestFixAudio', 'project.requestStabilize', 'project.addNote', 'project.noteToRule',
-  'project.reviewRequest', 'project.introDecision', 'project.regeneratePublish', 'project.seamAudio', 'project.waveform',
+  'project.sendChat', 'project.requestReedit', 'project.requestFixAudio', 'project.requestStabilize', 'project.requestInsertClip', 'project.addNote', 'project.noteToRule',
+  'project.reviewRequest', 'project.introDecision', 'project.setVideoTheme', 'project.regeneratePublish', 'project.seamAudio', 'project.waveform',
   'project.frameAt',
   'project.versions.list', 'project.versions.save', 'project.versions.restore', 'project.versions.remove',
   'project.versions.compareFrames',
@@ -22,9 +22,10 @@ export const API_METHODS = [
   'thumbnails.recreate', 'thumbnails.edit', 'thumbnails.faceSwap', 'thumbnails.score', 'thumbnails.titles',
   'preview.state', 'preview.showBefore',
   'claude.state', 'claude.stop', 'claude.resume', 'claude.estimate',
-  'library.list', 'library.update', 'library.duplicate', 'library.remove', 'library.placeInProject',
+  'library.list', 'library.changeFolder', 'library.update', 'library.duplicate', 'library.remove', 'library.placeInProject',
   'pikzels.list', 'pikzels.create', 'pikzels.refresh', 'pikzels.updateInstructions', 'pikzels.remove',
-  'pikzels.rename', 'pikzels.pricing', 'pikzels.setPrices', 'pikzels.thumbnailsFromLink'
+  'pikzels.rename', 'pikzels.pricing', 'pikzels.setPrices', 'pikzels.thumbnailsFromLink',
+  'themes.list', 'themes.analyze', 'themes.cancel', 'themes.update', 'themes.remove', 'themes.sheets'
 ] as const
 
 export type ApiMethod = (typeof API_METHODS)[number]
@@ -39,5 +40,6 @@ export const API_EVENTS = {
   'project.onRenderJob': 'render:job',
   'preview.onState': 'preview:state',
   'claude.onState': 'claude:state',
-  'claude.onOutput': 'claude:output'
+  'claude.onOutput': 'claude:output',
+  'themes.onProgress': 'themes:progress'
 } as const

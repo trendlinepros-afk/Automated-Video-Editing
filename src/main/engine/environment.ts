@@ -44,6 +44,8 @@ export interface RuntimeManifest {
   requirements: string
   uv: PinnedDownload
   ffmpeg: PinnedDownload
+  /** yt-dlp, downloaded the first time a video theme is made from a YouTube link. */
+  ytdlp?: PinnedDownload & { version: string }
   [k: string]: unknown
 }
 
@@ -646,6 +648,34 @@ export function createEnvironmentService(ctx: AppContext): EnvironmentService {
     }
   }
 
+  /**
+   * yt-dlp for reading reference videos (video themes). Downloaded on first use, pinned and checked like ffmpeg;
+   * it can update itself later (yt-dlp -U) when YouTube changes. Elsewhere than Windows it is taken from PATH.
+   */
+  const ytdlp = async (onPercent?: (pct: number) => void): Promise<string> => {
+    if (process.env.AVE_YTDLP) return process.env.AVE_YTDLP
+    if (!IS_WIN) return 'yt-dlp'
+    const m = manifest()
+    if (!m.ytdlp?.url) throw new SetupError('The app has no yt-dlp download listed. Reinstall the app.')
+    const dir = join(paths.toolsDir, 'yt-dlp')
+    const exe = join(dir, 'yt-dlp.exe')
+    const marker = join(dir, 'pinned.txt')
+    if (existsSync(exe)) return exe
+    const tmp = `${exe}.download-${randomBytes(3).toString('hex')}`
+    try {
+      await downloadPinned(m.ytdlp, tmp, (pct) => onPercent?.(pct))
+      mkdirSync(dir, { recursive: true })
+      renameSync(tmp, exe)
+      writeFileSync(marker, m.ytdlp.version)
+    } finally {
+      rmSync(tmp, { force: true })
+    }
+    return exe
+  }
+
+  /** The style analysis script (not part of the versioned render engine: it changes nothing in projects). */
+  const analysisScript = (): string => join(bundledEngine(), 'analysis', 'style.py')
+
   return {
     status,
     install,
@@ -653,6 +683,8 @@ export function createEnvironmentService(ctx: AppContext): EnvironmentService {
     ffmpeg,
     ffprobe,
     engineDir,
+    ytdlp,
+    analysisScript,
     hasGpu: async () => (await gpu()).ok
   }
 }

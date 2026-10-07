@@ -10,6 +10,8 @@ import { Icon } from '../components/Icon'
 import { UpdateButton } from '../components/Updates'
 import { ProfilesSection } from '../settings/ProfilesSection'
 import { ModelsSection } from '../settings/ModelsSection'
+import { changeLibraryFolder } from '../components/LibraryFolder'
+import { VideoThemesSection } from '../settings/VideoThemesSection'
 import { fmt } from '../util'
 import { PriceEditor } from '../panels/ThumbnailsPanelCosts'
 
@@ -18,6 +20,7 @@ const SECTIONS: [SettingsSection, string][] = [
   ['music', 'Music folders'],
   ['claude', 'Claude connection'],
   ['models', 'Claude models'],
+  ['themes', 'Video themes'],
   ['profiles', 'Profiles'],
   ['suggestions', 'Suggested rules'],
   ['about', 'About']
@@ -54,6 +57,8 @@ export function SettingsScreen() {
                 <Claude />
               ) : section === 'models' ? (
                 <ModelsSection />
+              ) : section === 'themes' ? (
+                <VideoThemesSection />
               ) : section === 'profiles' ? (
                 <ProfilesSection />
               ) : section === 'suggestions' ? (
@@ -153,9 +158,9 @@ function General() {
       <PriceEditor />
       <FolderRow
         label="Asset library folder"
-        hint="Saved graphics, animations and sounds. Any drive works, including a synced one."
+        hint="Every graphic, animation, song and sound effect Claude makes is saved here. Any drive works, including a synced one. Changing it asks whether to move the saved assets too."
         value={settings.libraryFolder}
-        onPick={() => void pick('libraryFolder', 'Choose the asset library folder')}
+        onPick={() => void changeLibraryFolder()}
       />
       <FolderRow
         label="Default folder for new projects"

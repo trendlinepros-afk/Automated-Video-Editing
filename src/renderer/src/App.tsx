@@ -3,6 +3,7 @@ import { app, startApp } from './state/app'
 import { editor } from './state/editor'
 import { useStore } from './state/store'
 import { ContextMenu, Toasts } from './components/Overlays'
+import { LibraryFolderPrompt, MoveAssetsPrompt } from './components/LibraryFolder'
 import { UpdateDialog } from './components/Updates'
 import { SetupScreen } from './screens/SetupScreen'
 import { HomeScreen } from './screens/HomeScreen'
@@ -61,6 +62,8 @@ export function App() {
     <div className="app">
       {body}
       <UpdateDialog />
+      <LibraryFolderPrompt />
+      <MoveAssetsPrompt />
       <ContextMenu />
       <Toasts />
     </div>

@@ -5,6 +5,7 @@
  *
  * URL hash options: #editor opens the sample project straight away, #setup shows first-launch setup.
  */
+import type { VideoTheme, VideoThemeProgress } from '@shared/videoTheme'
 import type {
   Api,
   LibraryAsset,
@@ -254,10 +255,28 @@ export function installMockApi(): void {
     preview: emitter<PreviewState>(),
     job: emitter<RenderJobState>(),
     suggestion: emitter<Suggestion>(),
-    setup: emitter<{ step: string; percent?: number; message: string; done?: boolean; error?: string }>()
+    setup: emitter<{ step: string; percent?: number; message: string; done?: boolean; error?: string }>(),
+    themes: emitter<VideoThemeProgress>()
   }
 
   const undoLabels: string[] = []
+  const sampleStats = {
+    duration: 812, analyzedSeconds: 720, cuts: 301, cutsPerMinute: 25.1, cutsPerMinuteFirst30s: 42, cutsPerMinuteFirst60s: 36,
+    shotSeconds: { median: 1.9, mean: 2.4, p10: 0.8, p90: 4.6 }, pace: [], cutTimes: [],
+    speech: { wordsPerMinute: 192, speechShare: 0.86, longPausesPerMinute: 0.4, firstWords: 'This $25 drift car should not be this good…' },
+    loudnessLufs: -14.2, sheets: []
+  }
+  const themes: VideoTheme[] = [
+    {
+      formatVersion: 1, id: 'vt_demo', name: 'Fast RC review style', createdAt: now(),
+      source: { kind: 'channel', input: 'https://www.youtube.com/@SomeRcChannel', title: 'Some RC Channel' },
+      videos: [{ title: 'Racing at the beach', channel: 'Some RC Channel', url: 'https://www.youtube.com/watch?v=abc', stats: sampleStats }],
+      averages: { cutsPerMinute: 25.1, cutsPerMinuteFirst30s: 42, medianShotSeconds: 1.9, wordsPerMinute: 192, loudnessLufs: -14.2 },
+      notes: 'Copy the pace and the punch-in zooms. Skip the meme sound effects.',
+      summary: 'Hook in the first 3 seconds with the price on screen. Jump cuts every 1-2 s, punch-in zooms on every claim, bold yellow captions with one emphasized word, B-roll of the car in action every 6-8 s, upbeat music under speech, a whoosh on most cuts.'
+    }
+  ]
+
   const snapshot = (): ProjectSnapshot => ({
     path: 'C:\\Projects\\LiPo',
     doc,
@@ -500,7 +519,9 @@ export function installMockApi(): void {
         if (r) r.review = decision === 'keep' ? 'kept' : 'reverted'
       }, 'user', 'Review'),
       introDecision: async () => undefined,
+      setVideoTheme: async (id) => void commit((d) => void (d.project.videoTheme = id ? { id, name: themes.find((t) => t.id === id)?.name ?? '' } : null), 'user', 'Video theme'),
       requestStabilize: async () => undefined,
+      requestInsertClip: async () => undefined,
       regeneratePublish: async () => undefined,
       seamAudio: async () => 'seam.wav',
       waveform: async (key) => {
@@ -595,7 +616,34 @@ export function installMockApi(): void {
         return a
       },
       remove: async (id) => void (library = library.filter((a) => a.id !== id)),
-      placeInProject: async () => undefined
+      placeInProject: async () => undefined,
+      changeFolder: async (dest: string) => {
+        settings = { ...settings, libraryFolder: dest, libraryFolderConfirmed: true }
+        return { moved: library.length, skipped: 0 }
+      }
+    },
+    themes: {
+      list: async () => themes,
+      analyze: async (input) => {
+        const steps = ['Finding the newest videos…', 'Downloading video 1 of up to 3… 40%', 'Measuring the style of "Racing at the beach"… Finding the cuts (video 1 of 3)…']
+        for (const [i, message] of steps.entries()) {
+          ev.themes.emit({ step: i === 0 ? 'listing' : i === 1 ? 'download' : 'analyze', message, percent: 10 + i * 30 })
+          await new Promise((r) => setTimeout(r, 400))
+        }
+        const t = { ...themes[0], id: `vt_${Date.now()}`, name: input.name || 'New channel style', createdAt: now(), summary: undefined }
+        themes.unshift(t)
+        ev.themes.emit({ step: 'done', message: 'Done', percent: 100 })
+        return t
+      },
+      cancel: async () => undefined,
+      update: async (id, patch) => {
+        const t = themes.find((x) => x.id === id)!
+        Object.assign(t, patch.name ? { name: patch.name } : {}, patch.notes !== undefined ? { notes: patch.notes } : {})
+        return t
+      },
+      remove: async (id) => void themes.splice(themes.findIndex((x) => x.id === id), 1),
+      sheets: async () => [],
+      onProgress: (cb) => ev.themes.on(cb)
     },
     pikzels: {
       list: async () => pikzels,

@@ -32,6 +32,7 @@ import type { AppContext, PikzelsService } from '../context'
 import { registerSecret, type ActivityLog } from '../log'
 import { paths } from '../paths'
 import { newId, type ProjectStore } from '../project/store'
+import { basePath, cleanFrame } from './thumbnailBase'
 
 // ---------------------------------------------------------------- API shape (correct here if Pikzels changes it)
 
@@ -317,9 +318,10 @@ export function createPikzelsService(ctx: AppContext, deps: PikzelsDeps = {}): P
     throw new Error('Choose an image first.')
   }
 
+  /** A frame of the footage for Pikzels: clean (no captions, graphics or effects) and sized for the thumbnail format. */
   const frameImage = async (store: ProjectStore, time: number, tag: string): Promise<string> => {
-    const out = join(store.paths.cache, `pikzels_${tag}.png`)
-    return ctx.engine.frame(store.snapshotDoc(), store.dir, time, { width: 1280, out })
+    const out = join(store.paths.cache, `pikzels_${tag}.jpg`)
+    return cleanFrame(ctx, store, time, out)
   }
 
   /** Training status that blocks using a persona or style, in plain words. */
@@ -475,6 +477,9 @@ export function createPikzelsService(ctx: AppContext, deps: PikzelsDeps = {}): P
         store.log.write('thumbnail', 'The reference frame could not be made; generating without it', { time: o.referenceTime, error: String(err) })
       }
     }
+    // Otherwise the base picture (Grab screenshot, or the frame Claude picked) goes with every prompt.
+    const base = supportImage ? null : basePath(store)
+    if (base) supportImage = b64(base)
 
     const r = PIKZELS_API.request
     // One image per request, a few at a time.
@@ -490,7 +495,7 @@ export function createPikzelsService(ctx: AppContext, deps: PikzelsDeps = {}): P
           body,
           action: 'thumbnail',
           model,
-          logData: { prompt: it.prompt, persona: persona ?? null, style: style ?? null, model, format: t.format }
+          logData: { prompt: it.prompt, persona: persona ?? null, style: style ?? null, model, format: t.format, ...(base ? { basePicture: store.project.thumbnails.base?.file } : {}) }
         })
       }
     }

@@ -1,4 +1,5 @@
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import { execFileSync } from 'node:child_process'
+import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { request } from 'node:http'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -43,7 +44,15 @@ function makeCtx(): AppContext {
       dir: () => join(dir, 'theme'),
       update: (_id: string, patch: { summary?: string }) => Object.assign(themeState, patch)
     },
-    engine: { probe: async (p: string) => ({ kind: p.endsWith('.png') ? 'image' : 'video', duration: 8, fps: 30, width: 1920, height: 1080, hasAudio: false }) },
+    engine: {
+      probe: async (p: string) => ({ kind: p.endsWith('.png') ? 'image' : 'video', duration: 8, fps: 30, width: 1920, height: 1080, hasAudio: false }),
+      frame: async (_doc: unknown, _dir: string, _time: number, o: { out: string; footageOnly?: boolean }) => {
+        if (!o.footageOnly) throw new Error('the base picture must be the clean footage')
+        execFileSync('ffmpeg', ['-hide_banner', '-loglevel', 'error', '-y', '-f', 'lavfi', '-i', 'testsrc2=size=1920x1080', '-frames:v', '1', o.out])
+        return o.out
+      }
+    },
+    env: { ffmpeg: () => 'ffmpeg' },
     send: () => {}
   } as unknown as AppContext
   c.requests = createRequestService(c)
@@ -282,5 +291,21 @@ describe('caption moments tool', () => {
     expect(store.project.captions.spans).toEqual([{ from: 'src1_w0', to: 'src1_w1' }])
     const bad = await client.callTool({ name: 'set_caption_spans', arguments: { spans: [{ from_word_id: 'nope', to_word_id: 'src1_w1' }] } })
     expect(bad.isError).toBe(true)
+  })
+
+  it('saves a thumbnail description and base picture for the owner, keeping a base the owner grabbed', async () => {
+    const client = await connect()
+    const r = await client.callTool({ name: 'save_thumbnail_draft', arguments: { description: 'Me holding the drift car, big text "$65?" https://x.com/a', base_time: 1.5 } })
+    expect(r.isError).toBeFalsy()
+    expect(store.project.thumbnails.draft?.text).toBe('Me holding the drift car, big text "$65?"')
+    expect(store.project.thumbnails.base).toMatchObject({ by: 'claude', time: 1.5 })
+    expect(existsSync(join(store.dir, store.project.thumbnails.base!.file))).toBe(true)
+
+    store.mutate('grab', 'user', (d) => void (d.project.thumbnails.base = { ...d.project.thumbnails.base!, by: 'user' }))
+    const refused = await client.callTool({ name: 'save_thumbnail_draft', arguments: { description: 'Another', base_time: 2 } })
+    expect(refused.isError).toBe(true)
+    const kept = await client.callTool({ name: 'save_thumbnail_draft', arguments: { description: 'Another' } })
+    expect(kept.isError).toBeFalsy()
+    expect(store.project.thumbnails).toMatchObject({ draft: { text: 'Another' }, base: { by: 'user', time: 1.5 } })
   })
 })

@@ -1,7 +1,7 @@
 {
   "name": "ai-video-editor",
   "productName": "AI Video Editor",
-  "version": "1.8.1",
+  "version": "1.9.0",
   "description": "A Windows desktop app where Claude edits video through MCP and you review, tweak and export.",
   "main": "out/main/index.js",
   "author": "Adam",

@@ -34,6 +34,10 @@ export const WORKFLOW = `How to work with the app (tools from the "ave" MCP serv
   make fresh. Quality first: never reuse to save time or usage; when a new one would carry the story or emotion better, make it.
 - Save every new graphic, animation, custom effect, music track and sound effect you make to the library (save_to_library) right
   after placing it, with a description of what it is, its mood and when it fits.
+- Thumbnails are built around a base picture: a clean frame of the footage (no captions or graphics) where the subject of the
+  video is shown best. Before request_thumbnails, pick that moment (check candidates with get_frame footage_only) and call
+  save_thumbnail_draft with your best description and base_time; leave base_time out when get_project shows the owner grabbed
+  one (thumbnails.base.by "user"). The base picture is sent with every thumbnail prompt.
 - Anything the tools cannot express, build with your own scripts (get_engine_info gives the Python and ffmpeg to use) and
   bring the finished file in with import_file.
 - Claude cannot hear the result: check audio by measurement (get_audio_energy, measure_loudness, transcribing snippets).`
@@ -200,6 +204,32 @@ export function requestSection(r: EditRequest, project: Project): string {
     case 'thumbnail_direction':
       lines.push(`New thumbnail direction from the owner: "${r.text}". Write new prompts that follow it and call request_thumbnails.`)
       break
+    case 'thumbnail_draft': {
+      const c = (r.context ?? {}) as { persona?: string; style?: string; keepBase?: boolean }
+      lines.push(
+        'Write the thumbnail description for the owner. Do NOT make thumbnails or call any Pikzels tool: the owner reads your ' +
+          'description in the Thumbnails tab, changes it if they like, and presses Generate.'
+      )
+      if (c.keepBase) {
+        lines.push('The owner already grabbed the base picture themselves: keep it (do not pass base_time). Look at it with get_frame at that time.')
+      } else {
+        lines.push(
+          'First pick the base picture: the moment where the thing the video is about (the product, vehicle, build or subject) is shown best: ' +
+            'big in frame, sharp, well lit, not blocked by hands, no motion blur. Check 4-8 candidate times with get_frame footage_only=true ' +
+            '(captions and graphics are left out of the base picture anyway) and pick one.'
+        )
+      }
+      lines.push(
+        `Then write ONE description (under 750 characters, no links) of a click-worthy thumbnail built around that picture: ` +
+          'the subject, the owner\'s face and reaction, the big short text (2-4 words), colours and layout. It must match the video\'s ' +
+          'actual story and payoff (read the transcript and the publishing pack if there is one).' +
+          (c.persona ? ` The persona "${c.persona}" (the owner) is added by Pikzels: describe them by role, not looks.` : '') +
+          (c.style ? ` The thumbnail style "${c.style}" is applied by Pikzels: fit the description to it.` : '') +
+          (project.thumbnails.direction.trim() ? ` Owner's thumbnail direction: "${project.thumbnails.direction.trim()}".` : '')
+      )
+      lines.push('Save it with save_thumbnail_draft (description, plus base_time unless told to keep the base), then finish_request. No chat reply is needed.')
+      break
+    }
     case 'resume':
       lines.push('Continue the edit from the next unfinished checklist stage. Read the handoff notes first. Do not redo finished work.')
       if (r.text.trim()) lines.push(`Note: ${r.text.trim()}`)

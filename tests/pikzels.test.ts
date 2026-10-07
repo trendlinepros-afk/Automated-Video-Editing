@@ -1,3 +1,4 @@
+import { execFileSync } from 'node:child_process'
 import { existsSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -10,8 +11,25 @@ import { ProjectStore } from '../src/main/project/store'
 import { FEATURE_CHANGED, PIKZELS_API, createPikzelsService, plainError, stripLinks } from '../src/main/services/pikzels'
 import { createSecretsService, createSettingsService } from '../src/main/services/settings'
 import { initPaths, paths } from '../src/main/paths'
+import { clearBase, grabBase } from '../src/main/services/thumbnailBase'
 
 const KEY = 'pkz_live_secretkey_0123456789'
+
+/** Frames the fake engine was asked for. */
+let frames: { time: number; footageOnly: boolean }[] = []
+
+/** Width and height from a JPEG's frame header. */
+function jpegSize(buf: Buffer): { width: number; height: number } | null {
+  if (buf[0] !== 0xff || buf[1] !== 0xd8) return null
+  for (let i = 2; i < buf.length - 9; ) {
+    if (buf[i] !== 0xff) return null
+    const marker = buf[i + 1]
+    const len = buf.readUInt16BE(i + 2)
+    if (marker >= 0xc0 && marker <= 0xc3) return { height: buf.readUInt16BE(i + 5), width: buf.readUInt16BE(i + 7) }
+    i += 2 + len
+  }
+  return null
+}
 let dir: string
 let store: ProjectStore
 let settings: ReturnType<typeof SettingsSchema.parse>
@@ -29,11 +47,14 @@ function makeCtx(key: string | null = KEY): AppContext {
     appLog: new ActivityLog(join(dir, 'app.log')),
     settings: { get: () => settings, update: (p: object) => (settings = SettingsSchema.parse({ ...settings, ...p })) },
     engine: {
-      frame: async (_doc: unknown, _dir: string, time: number, o: { out: string }) => {
-        writeFileSync(o.out, `FRAME@${time}`)
+      // A real picture, so the app can crop and size it for the thumbnail with ffmpeg.
+      frame: async (_doc: unknown, _dir: string, time: number, o: { out: string; footageOnly?: boolean }) => {
+        frames.push({ time, footageOnly: !!o.footageOnly })
+        execFileSync('ffmpeg', ['-hide_banner', '-loglevel', 'error', '-y', '-f', 'lavfi', '-i', 'testsrc2=size=1920x1080', '-frames:v', '1', o.out])
         return o.out
       }
     },
+    env: { ffmpeg: () => 'ffmpeg' },
     secrets: { get: (n: string) => (n === 'pikzels' ? key : null), set: () => {} },
     projects: { current: () => store }
   } as unknown as AppContext
@@ -105,6 +126,7 @@ function addDoneThumb(id = 'thumb_base'): string {
 }
 
 beforeEach(() => {
+  frames = []
   dir = mkdtempSync(join(tmpdir(), 'ave-pkz-'))
   store = ProjectStore.create(join(dir, 'proj'), {
     name: 'Thumbs',
@@ -281,7 +303,9 @@ describe('Pikzels', () => {
     // Older model: no persona or style, image_weight only on pkz_2.
     await svc.recreate({ from: { time: 12.5 }, model: 'pkz_2', imageWeight: 'high', source: 'claude' })
     const b3 = calls.filter((c) => c.url.endsWith(PIKZELS_API.thumbnailFromImage))[2].body
-    expect(b3.image_base64).toBe(Buffer.from('FRAME@12.5').toString('base64'))
+    // The frame is the clean footage (no captions or graphics), sized for a 16:9 thumbnail.
+    expect(frames.at(-1)).toEqual({ time: 12.5, footageOnly: true })
+    expect(jpegSize(Buffer.from(b3.image_base64, 'base64'))).toEqual({ width: 1280, height: 720 })
     expect(b3).toMatchObject({ model: 'pkz_2', image_weight: 'high' })
     expect(b3.persona).toBeUndefined()
     expect(store.project.thumbnails.spend?.byAction).toEqual({ 'recreate:pkz_4_5': 0.26, 'recreate:pkz_2': 0.2 })
@@ -419,5 +443,38 @@ describe('Pikzels', () => {
     const after = { appLog: new ActivityLog(join(dir, 'app2.log')) } as unknown as AppContext
     expect(createSecretsService(after, safe).get('pikzels')).toBe(KEY)
     expect(createSettingsService(after).get().pikzels.prices).toEqual({ score: 0.05 })
+  })
+})
+
+describe('Thumbnail base picture', () => {
+  it('grabs the clean footage frame at YouTube thumbnail size and sends it with every prompt', async () => {
+    const ctx = makeCtx()
+    const first = await grabBase(ctx, store, 4.2, 'user')
+    expect(frames).toEqual([{ time: 4.2, footageOnly: true }])
+    expect(store.project.thumbnails.base).toMatchObject({ file: first.file, time: 4.2, by: 'user' })
+    const firstPath = join(store.dir, first.file)
+    expect(jpegSize(readFileSync(firstPath))).toEqual({ width: 1280, height: 720 })
+
+    const { fn, calls } = fakeFetch()
+    await createPikzelsService(ctx, { fetch: fn, sleep: async () => {} }).generate({ prompts: ['Me with the drift car', 'Close-up'], source: 'user' })
+    const posts = calls.filter((c) => c.url.endsWith(PIKZELS_API.thumbnailFromText))
+    expect(posts).toHaveLength(2)
+    for (const p of posts) expect(p.body.support_image_base64).toBe(readFileSync(firstPath).toString('base64'))
+
+    // A new grab replaces the old picture; clearing removes it, and prompts go without one.
+    const second = await grabBase(ctx, store, 9, 'user')
+    expect(existsSync(firstPath)).toBe(false)
+    expect(existsSync(join(store.dir, second.file))).toBe(true)
+    clearBase(store)
+    expect(store.project.thumbnails.base).toBeUndefined()
+    expect(existsSync(join(store.dir, second.file))).toBe(false)
+    await createPikzelsService(ctx, { fetch: fn, sleep: async () => {} }).generate({ prompts: ['No base'], source: 'user' })
+    expect(calls.filter((c) => c.url.endsWith(PIKZELS_API.thumbnailFromText)).at(-1)!.body.support_image_base64).toBeUndefined()
+  })
+
+  it('crops to the thumbnail format', async () => {
+    store.mutate('t', 'user', (d) => void (d.project.thumbnails.format = '9:16'))
+    const b = await grabBase(makeCtx(), store, 1, 'claude')
+    expect(jpegSize(readFileSync(join(store.dir, b.file)))).toEqual({ width: 720, height: 1280 })
   })
 })

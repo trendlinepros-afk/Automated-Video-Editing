@@ -100,6 +100,9 @@ function toDisk(asset: LibraryAsset): Record<string, unknown> {
   return rest
 }
 
+/** The library's folder in Documents until the owner picks another in Settings. */
+export const DEFAULT_LIBRARY_FOLDER_NAME = 'AI Video Editor Asset Library'
+
 export interface LibraryOptions {
   /** Folder of starter assets (default: <resources>/engine/starter_assets). */
   starterDir?: string

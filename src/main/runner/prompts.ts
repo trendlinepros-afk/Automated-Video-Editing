@@ -25,7 +25,11 @@ export const WORKFLOW = `How to work with the app (tools from the "ave" MCP serv
   time and call save_transcript for each as soon as it is done; when resuming, skip sources list_footage shows as transcribed.
   Keep your scratch files in the project's scratch folder (get_engine_info) so a new session can find and reuse them.
 - Anchor B-roll, graphics, effects, sound effects and chapters to transcript words, not fixed times.
-- Search the asset library (search_library) before making a graphic or sound; offer to save reusable new ones (save_to_library).
+- Before making a graphic, animation, song or sound effect, search the asset library (search_library). Reuse one only when it fits
+  this moment perfectly (same purpose, emotion and energy, right for the story and the brand) and is as good as what you would
+  make fresh. Quality first: never reuse to save time or usage; when a new one would carry the story or emotion better, make it.
+- Save every new graphic, animation, custom effect, music track and sound effect you make to the library (save_to_library) right
+  after placing it, with a description of what it is, its mood and when it fits.
 - Anything the tools cannot express, build with your own scripts (get_engine_info gives the Python and ffmpeg to use) and
   bring the finished file in with import_file.
 - Claude cannot hear the result: check audio by measurement (get_audio_energy, measure_loudness, transcribing snippets).`

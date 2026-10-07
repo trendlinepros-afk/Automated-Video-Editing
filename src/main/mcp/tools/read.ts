@@ -261,8 +261,10 @@ export const readTools = [
     name: 'search_library',
     description:
       'Search the asset library (graphics, sounds, effects, music, clips saved from earlier videos) for this channel and the shared section. ' +
-      'ALWAYS search before making a graphic or sound. Results come preferred-first with name, description, when to use, tags, inputs ' +
-      '(parameters such as text, colors, length), use count, and the path of a preview image you can Read. Place one with place_library_asset. ' +
+      'Search before making a graphic, animation, song or sound effect, and reuse one ONLY if it fits this moment perfectly: the same purpose, ' +
+      'emotion and energy, right for the story and the brand, as good as anything you would make fresh. Never reuse something just to save ' +
+      'time or usage; if a new one would tell the story better, make the new one. Results come preferred-first with name, description, when ' +
+      'to use, tags, inputs (parameters such as text, colors, length), use count, and the path of a preview image you can Read. Place one with place_library_asset. ' +
       'An empty query lists everything.',
     input: {
       query: z.string().default(''),

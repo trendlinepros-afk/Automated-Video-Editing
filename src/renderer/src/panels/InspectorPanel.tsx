@@ -84,7 +84,7 @@ function ItemInspector({ r, d }: { r: ResolvedItem; d: Derived }) {
           <span className="tag">{item.type === 'effect' ? `Effect: ${item.effect.replace('_', ' ')}` : TYPE_LABELS[item.type]}</span>
           <span>{d.tracks.find((t) => t.id === item.trackId)?.name}</span>
           <span>· made by {item.createdBy === 'user' ? 'you' : item.createdBy === 'claude' ? 'Claude' : 'the app'}</span>
-          {item.libraryAssetId && <span>· from the library</span>}
+          {item.libraryAssetId && <span>· in the library</span>}
         </div>
         {r.orphaned && <div className="small warn">The word this was tied to was cut. It now follows the next kept word; move it if that is wrong.</div>}
       </div>

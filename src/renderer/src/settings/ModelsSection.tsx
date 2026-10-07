@@ -1,6 +1,6 @@
 /**
  * Settings > Claude models: which Claude model runs each part of the edit, and what Claude has cost.
- * Recommended defaults keep Opus where judgment decides quality and use cheaper models elsewhere.
+ * Recommended: Opus everywhere quality can show; Haiku only for transcribing, where the model makes no difference.
  */
 import {
   CLAUDE_MODELS,
@@ -30,9 +30,11 @@ export function ModelsSection() {
     <>
       <h1 style={{ marginBottom: 8 }}>Claude models</h1>
       <p className="muted" style={{ marginTop: 0 }}>
-        Each part of an edit runs as its own Claude run, so each can use its own model. The recommended set keeps Opus 5.5 where
-        judgment decides quality (cutting, B-roll, self-check, your requests) and uses cheaper models for well-specified work. That
-        is about a quarter cheaper than Opus everywhere, with no noticeable quality drop.
+        Each part of an edit can use its own model. The recommended set uses Opus 5.5 for everything where judgment or taste shows in
+        the video: cutting, B-roll, graphics and animations, music and sound, captions, self-check, thumbnails, titles and your
+        requests. The one exception is transcribing, which runs on Haiku 4.5: there Claude only starts faster-whisper on your GPU and
+        hands the app the file it wrote, so the transcript is word for word the same whichever model starts it. A cheaper model
+        anywhere else saves money but can cost quality, so it is your call.
       </p>
 
       <div className="section col">

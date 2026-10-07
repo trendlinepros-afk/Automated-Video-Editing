@@ -35,17 +35,26 @@ describe('planning runs per model', () => {
     store.mutate('t', 'app', (d) => {
       d.project.checklist.find((c) => c.id === 'transcript')!.status = 'done'
     })
+    // With the recommended models everything after transcribing runs on Opus, as one session.
     const second = planRun([req('start_edit')], store.project, {})!
-    // Cuts and B-roll both run on Opus: one run, which also writes the plan for later stages.
-    expect(second).toMatchObject({ model: 'claude-opus-5-5', stages: ['cuts', 'broll'] })
-    expect(second.laterStages[0]).toBe('graphics')
-    expect(stageInstructions(second)).toMatch(/concrete plan for the later stages/)
-    expect(stageInstructions(second)).toMatch(/Do not call finish_request yet/)
+    expect(second).toMatchObject({ model: 'claude-opus-5-5', stages: ['cuts', 'broll', 'graphics', 'audio', 'captions', 'self_check', 'thumbnails', 'publish'], laterStages: [] })
+    expect(stageInstructions(second)).toMatch(/last stages/)
+
+    // When the owner picks another model for a later part, the run stops there and writes the plan for it.
+    const mixed = planRun([req('start_edit')], store.project, { graphics: 'claude-sonnet-5-5' })!
+    expect(mixed).toMatchObject({ model: 'claude-opus-5-5', stages: ['cuts', 'broll'] })
+    expect(mixed.laterStages[0]).toBe('graphics')
+    expect(stageInstructions(mixed)).toMatch(/concrete plan for the later stages/)
+    expect(stageInstructions(mixed)).toMatch(/Do not call finish_request yet/)
+  })
+
+  it('recommends Opus everywhere except transcribing', () => {
+    for (const [section, model] of Object.entries(RECOMMENDED_MODELS)) expect([section, model]).toEqual([section, section === 'transcript' ? 'claude-haiku-4-5' : 'claude-opus-5-5'])
   })
 
   it('follows the owner\'s model choices and runs other requests by their own section', () => {
     const p = makeProject().project
-    const allOpus = planRun([req('start_edit')], p, { transcript: 'claude-opus-5-5' })!
+    const allOpus = planRun([req('start_edit')], p, { transcript: 'claude-opus-5-5', graphics: 'claude-sonnet-5-5' })!
     expect(allOpus.stages).toEqual(['transcript', 'cuts', 'broll'])
     const chat = planRun([req('chat'), req('fix_audio'), req('chat', 'req_chat2')], p, {})!
     expect(chat.section).toBe('chat')

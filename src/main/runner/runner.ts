@@ -16,6 +16,7 @@ import type { AppContext, RunnerService } from '../context'
 import type { McpServiceImpl } from '../mcp/server'
 import type { ProjectStore } from '../project/store'
 import { buildRunPrompt, buildSystemPrompt } from './prompts'
+import { saveNewAssetsToLibrary } from '../project/autoLibrary'
 import { recordRunCost } from './costs'
 import { doneStageCount, planRun, stageInstructions, type RunPlan } from './stages'
 
@@ -439,6 +440,8 @@ export function createRunnerService(ctx: AppContext, deps: RunnerDeps = {}): Run
         store.log.write('error', 'Could not record what the Claude run cost', { error: String(err) })
       }
     }
+    // Whatever Claude made in this run goes into the asset library (Claude saves most itself, with descriptions).
+    void saveNewAssetsToLibrary(ctx, store)
     const stillOpen = (() => {
       const s = ctx.projects.current()
       return s && s.project.id === run.projectId ? ctx.requests.open() : []

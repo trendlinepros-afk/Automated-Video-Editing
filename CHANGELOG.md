@@ -3,6 +3,12 @@
 Each release's section becomes its GitHub release text and the notes shown in the app's update dialog.
 A release is blocked until the section for its version has notes.
 
+## 1.9.0
+
+- **Grab screenshot** in the Thumbnails tab: takes the frame at the playhead straight from the footage at full quality (captions, graphics and effects are left out), sized for the thumbnail (1280x720 for YouTube). It becomes the base picture: Pikzels builds every new thumbnail around it with your persona and style.
+- **Claude writes the thumbnail description for you.** When an edit is finished, Claude picks the moment that shows what the video is about best, makes it the base picture, and writes a description in the prompt box that fits your persona, style and the video's story. Change it or delete it and write your own; a picture you grabbed yourself is never replaced. "Write it for me" asks again any time.
+- Recreate from a video frame, and frames Claude attaches to thumbnail prompts, are now clean footage too.
+
 ## 1.8.1
 
 - Fixed: opening a project that already had an edit could leave the preview on "Building the preview…" forever. Opening a project now always starts its preview.

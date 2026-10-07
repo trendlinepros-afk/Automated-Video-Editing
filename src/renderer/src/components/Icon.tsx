@@ -28,7 +28,8 @@ const PATHS: Record<string, string> = {
   zoomOut: 'M11 4a7 7 0 100 14 7 7 0 000-14zM20 20l-4-4M8 11h6',
   fit: 'M4 12h16M7 9l-3 3 3 3M17 9l3 3-3 3',
   image: 'M4 5h16v14H4zM4 16l5-5 4 4 3-3 4 4M15 9h.01',
-  sparkle: 'M12 3l2 6 6 2-6 2-2 6-2-6-6-2 6-2z'
+  sparkle: 'M12 3l2 6 6 2-6 2-2 6-2-6-6-2 6-2z',
+  camera: 'M4 8h4l2-3h4l2 3h4v11H4zM12 10a3.5 3.5 0 100 7 3.5 3.5 0 000-7z'
 }
 
 export function Icon({ name, size = 16, fill = false }: { name: keyof typeof PATHS | string; size?: number; fill?: boolean }) {

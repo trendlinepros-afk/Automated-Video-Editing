@@ -1,7 +1,8 @@
 /**
  * Thumbnails: persona and style for this project, the Pikzels model, your own prompt (works without
  * Claude), count, "Use my direction", the other Pikzels tools (recreate, edit, face swap, titles),
- * the options side by side with scores, the full history with prompts, and what it all cost.
+ * the options side by side with scores, the full history with prompts, and what it all cost. The base picture
+ * (a clean frame of the footage) and Claude's suggested description sit right under the prompt.
  */
 import { useEffect, useMemo, useRef, useState } from 'react'
 import type { PikzelsPricing } from '@shared/ipc'
@@ -10,10 +11,11 @@ import type { Thumbnail } from '@shared/project'
 import type { Pikzonality } from '@shared/settings'
 import { app, call, go, openSettings, toast } from '../state/app'
 import { applyOp, editor } from '../state/editor'
+import { seek } from '../state/player'
 import { useStore } from '../state/store'
 import { Empty, Toggle } from '../components/bits'
 import { Icon } from '../components/Icon'
-import { errorMessage, mediaUrl, relativeTime } from '../util'
+import { errorMessage, fmt, mediaUrl, relativeTime } from '../util'
 import { CostPerAction, costLabel, usePikzelsPricing } from './ThumbnailsPanelCosts'
 import { EditTool, FaceSwapTool, RecreateTool, TOOL_LABELS, TitlesTool, type ToolName } from './ThumbnailsPanelTools'
 
@@ -27,8 +29,9 @@ export function ThumbnailsPanel() {
   const ro = snap.readOnly
   const [pikz, setPikz] = useState<Pikzonality[]>([])
   const [hasKey, setHasKey] = useState(true)
-  const [prompt, setPrompt] = useState(th.direction)
+  const [prompt, setPrompt] = useState(th.direction || th.draft?.text || '')
   const [busy, setBusy] = useState(false)
+  const [grabbing, setGrabbing] = useState(false)
   const [model, setModel] = useState(() => app.get().settings?.pikzels.model || 'pkz_4_5')
   const [tool, setTool] = useState<ToolName | null>(null)
   const [targetId, setTargetId] = useState<string | null>(null)
@@ -58,6 +61,43 @@ export function ThumbnailsPanel() {
     saveTimer.current = setTimeout(() => patch({ direction: text }), 800)
   }
   useEffect(() => () => clearTimeout(saveTimer.current), [])
+
+  // Claude's description fills the box only while it holds nothing of yours (empty, or the previous draft).
+  const draft = th.draft
+  const lastDraft = useRef({ at: draft?.at, text: draft?.text ?? '' })
+  useEffect(() => {
+    if (!draft || draft.at === lastDraft.current.at) return
+    const prev = lastDraft.current.text
+    lastDraft.current = { at: draft.at, text: draft.text }
+    setPrompt((cur) => (!cur.trim() || cur === prev ? draft.text : cur))
+  }, [draft])
+
+  const drafting = snap.doc.project.requests.some((r) => r.kind === 'thumbnail_draft' && (r.status === 'queued' || r.status === 'in_progress'))
+  // `quiet`: the automatic first ask stays silent when it fails (Claude not connected yet, say).
+  const requestDraft = async (quiet = false) => {
+    try {
+      await window.api.thumbnails.requestDraft()
+      toast('Claude is writing the description and picking the frame…')
+    } catch (e) {
+      if (!quiet) toast(`Could not ask Claude: ${errorMessage(e)}`, { kind: 'error' })
+    }
+  }
+  // Once per visit: a finished edit with an empty box and nothing from Claude yet gets a description automatically.
+  const autoDrafted = useRef(false)
+  useEffect(() => {
+    if (autoDrafted.current) return
+    autoDrafted.current = true
+    const p = snap.doc.project
+    const done = p.status === 'ready_for_review' || p.status === 'exported'
+    if (!ro && done && !prompt.trim() && !th.draft && !drafting && p.items.some((i) => i.type === 'segment')) void requestDraft(true)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  const grab = async () => {
+    setGrabbing(true)
+    await call(() => window.api.thumbnails.grabBase(editor.get().playhead), 'Could not grab the frame')
+    setGrabbing(false)
+  }
 
   const generate = async () => {
     setBusy(true)
@@ -119,6 +159,13 @@ export function ThumbnailsPanel() {
             {prompt.length > MAX_PROMPT ? ' · Pikzels may shorten prompts this long' : ''}
           </span>
           {/https?:\/\/|www\./i.test(prompt) && <span className="warn">Links are removed from prompts</span>}
+          {draft && prompt === draft.text && <span className="tiny faint">Written by Claude — change anything</span>}
+          <span className="spacer" />
+          {drafting ? (
+            <span className="faint">Claude is writing…</span>
+          ) : (
+            !ro && <a onClick={() => void requestDraft()}>✨ Write it for me</a>
+          )}
         </div>
         <div className="row">
           <div className="seg" title="How many options">
@@ -133,6 +180,30 @@ export function ThumbnailsPanel() {
             <Icon name="sparkle" size={14} /> {busy ? 'Sending…' : `Generate ${th.count}${costLabel(pricing, 'thumbnail', model, th.count)}`}
           </button>
         </div>
+        <div className="row">
+          <button className="btn small" disabled={ro || grabbing} onClick={grab} title="Use the frame at the playhead as the base picture">
+            <Icon name="camera" size={13} /> {grabbing ? 'Grabbing…' : 'Grab screenshot'}
+          </button>
+          {th.base && (
+            <>
+              <img className="thumb-base" src={mediaUrl(th.base.file, snap.path)} alt="" title="Go to this frame" onClick={() => seek(th.base!.time)} />
+              <div className="col small grow" style={{ gap: 0 }}>
+                <span>Base picture</span>
+                <span className="faint">
+                  {fmt(th.base.time)} · {th.base.by === 'user' ? 'from you' : 'picked by Claude'}
+                </span>
+              </div>
+              <button className="btn small" disabled={ro} title="Stop using this picture" onClick={() => void call(() => window.api.thumbnails.clearBase())}>
+                <Icon name="close" size={12} />
+              </button>
+            </>
+          )}
+        </div>
+        <span className="hint">
+          {th.base
+            ? 'A clean frame from the footage: captions, graphics and effects are left out. Pikzels builds the thumbnail around it.'
+            : 'Pick the frame that shows what the video is about, then Grab screenshot.'}
+        </span>
         <Toggle
           checked={th.useMyDirection}
           disabled={ro}

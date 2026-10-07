@@ -24,6 +24,7 @@ import { buildDiagnostics } from './services/diagnostics'
 import { runExportCheck } from './services/exportCheck'
 import { moveLibrary } from './services/library'
 import { fetchYouTubeThumbnails } from './services/youtube'
+import { clearBase, grabBase } from './services/thumbnailBase'
 import { estimate } from './runner/costs'
 
 type Handler = (...args: any[]) => unknown
@@ -431,6 +432,25 @@ export function registerIpc(ctx: AppContext, getWindow: () => BrowserWindow | nu
     'thumbnails.faceSwap': async (req: FaceSwapRequest) => void (await ctx.pikzels.faceSwap(req)),
     'thumbnails.score': (id: string, title?: string) => ctx.pikzels.score(id, title),
     'thumbnails.titles': (req: TitlesRequest) => ctx.pikzels.titles({ ...req, source: 'user' }),
+    'thumbnails.grabBase': async (time: number) => void (await grabBase(ctx, store(), Number(time) || 0, 'user')),
+    'thumbnails.clearBase': () => clearBase(store()),
+    'thumbnails.requestDraft': () => {
+      const s = store()
+      if (!s.project.items.some((i) => i.type === 'segment')) throw new Error('There is no edit yet to write a thumbnail for.')
+      if (s.project.requests.some((r) => r.kind === 'thumbnail_draft' && (r.status === 'queued' || r.status === 'in_progress'))) return
+      // Names only: Claude writes for the persona and style the owner picked.
+      const names = new Map(ctx.pikzels.list().map((p) => [p.id, p.name]))
+      const th = s.project.thumbnails
+      ctx.requests.enqueue({
+        kind: 'thumbnail_draft',
+        text: '',
+        context: {
+          persona: th.personaId ? (names.get(th.personaId) ?? '') : '',
+          style: th.styleId ? (names.get(th.styleId) ?? '') : '',
+          keepBase: th.base?.by === 'user'
+        }
+      })
+    },
     'thumbnails.choose': (id: string) => {
       store().mutate('Choose thumbnail', 'user', (d) => {
         if (!d.project.thumbnails.items.some((t) => t.id === id)) throw new Error('That thumbnail no longer exists.')

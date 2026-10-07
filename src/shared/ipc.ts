@@ -392,6 +392,11 @@ export interface Api {
     faceSwap(req: FaceSwapRequest): Promise<void>
     score(thumbnailId: string, title?: string): Promise<ThumbnailScore>
     titles(req: TitlesRequest): Promise<string[]>
+    /** Use a clean frame of the footage at this timeline time (no captions, graphics or effects) as the base picture. */
+    grabBase(time: number): Promise<void>
+    clearBase(): Promise<void>
+    /** Ask Claude to write the description and pick the base frame (fills thumbnails.draft and thumbnails.base). */
+    requestDraft(): Promise<void>
   }
   preview: {
     state(): Promise<PreviewState>

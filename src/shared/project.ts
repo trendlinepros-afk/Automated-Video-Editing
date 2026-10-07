@@ -236,6 +236,7 @@ export const REQUEST_KINDS = [
   'redo_intro',
   'publish_regen',
   'thumbnail_direction',
+  'thumbnail_draft',
   'resume'
 ] as const
 export type RequestKind = (typeof REQUEST_KINDS)[number]
@@ -443,6 +444,13 @@ export const ProjectSchema = z.looseObject({
     format: z.enum(['16:9', '9:16', '1:1']).default('16:9'),
     items: z.array(ThumbnailSchema).default([]),
     chosenId: z.string().optional(),
+    /**
+     * The base picture for new thumbnails: a clean frame of the footage (no captions, graphics or effects), sized for
+     * the thumbnail format. Sent to Pikzels with every prompt so the real subject of the video is in the thumbnail.
+     */
+    base: z.looseObject({ file: z.string(), time: num, by: z.enum(['user', 'claude']), at: z.string() }).optional(),
+    /** Claude's suggested description for the prompt box (the owner can change or delete it). */
+    draft: z.looseObject({ text: z.string(), at: z.string() }).optional(),
     /** Pikzels spend on this project (successful calls only). Absent until the first paid call, so older projects open unchanged. */
     spend: PikzelsSpendSchema.optional()
   }),

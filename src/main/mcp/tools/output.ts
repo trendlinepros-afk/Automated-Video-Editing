@@ -10,6 +10,7 @@ import type { AppContext } from '../../context'
 import { newId } from '../../project/store'
 import { ToolError, anchorInput, defineTool, errMessage, json, toAnchor } from './common'
 import { renderDialogue } from './look'
+import { grabBase } from '../../services/thumbnailBase'
 
 export const PROMPT_WARN_CHARS = 750
 const THUMBNAIL_WAIT_MS = 240_000
@@ -118,6 +119,46 @@ export const outputTools = [
       } catch (err) {
         throw new ToolError(errMessage(err))
       }
+    }
+  }),
+
+  defineTool({
+    name: 'save_thumbnail_draft',
+    description:
+      "Put a thumbnail description in the owner's prompt box in the Thumbnails tab (they can change or delete it, then press Generate). " +
+      'base_time (timeline seconds) also makes the clean frame there the base picture: footage only, no captions, graphics or effects, sized ' +
+      'for the thumbnail. Every thumbnail made after that is built around it. Leave base_time out to keep a base picture the owner grabbed. ' +
+      'Costs nothing; nothing is sent to Pikzels.',
+    input: {
+      description: z.string().min(1).max(1000),
+      base_time: z.number().min(0).optional()
+    },
+    run: async (args, env) => {
+      const text = args.description.replace(/https?:\/\/\S+|www\.\S+/gi, '').replace(/\s+/g, ' ').trim()
+      if (!text) throw new ToolError('The description is empty once links are removed.')
+      let base: { file: string; time: number } | undefined
+      if (args.base_time !== undefined) {
+        if (env.store.project.thumbnails.base?.by === 'user') throw new ToolError('The owner grabbed the base picture themselves; save the description without base_time.')
+        try {
+          base = await grabBase(env.ctx, env.store, args.base_time, 'claude')
+        } catch (err) {
+          throw new ToolError(errMessage(err))
+        }
+      }
+      env.store.mutate(
+        'Thumbnail description from Claude',
+        'claude',
+        (d) => {
+          d.project.thumbnails.draft = { text, at: new Date().toISOString() }
+        },
+        { bypassLock: true, noHistory: true }
+      )
+      return json({
+        saved: true,
+        characters: text.length,
+        ...(text.length > PROMPT_WARN_CHARS ? { warning: `Over ${PROMPT_WARN_CHARS} characters; Pikzels may shorten it.` } : {}),
+        ...(base ? { basePicture: base.file } : {})
+      })
     }
   }),
 

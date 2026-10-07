@@ -25,6 +25,10 @@ import { runExportCheck } from './services/exportCheck'
 import { moveLibrary } from './services/library'
 import { fetchYouTubeThumbnails } from './services/youtube'
 import { clearBase, grabBase } from './services/thumbnailBase'
+import { writeThumbnailDraft } from './services/thumbnailDraft'
+
+/** The quick thumbnail draft in flight (one at a time). */
+let draftJob: Promise<unknown> | null = null
 import { estimate } from './runner/costs'
 
 type Handler = (...args: any[]) => unknown
@@ -434,22 +438,17 @@ export function registerIpc(ctx: AppContext, getWindow: () => BrowserWindow | nu
     'thumbnails.titles': (req: TitlesRequest) => ctx.pikzels.titles({ ...req, source: 'user' }),
     'thumbnails.grabBase': async (time: number) => void (await grabBase(ctx, store(), Number(time) || 0, 'user')),
     'thumbnails.clearBase': () => clearBase(store()),
-    'thumbnails.requestDraft': () => {
+    'thumbnails.requestDraft': async () => {
       const s = store()
       if (!s.project.items.some((i) => i.type === 'segment')) throw new Error('There is no edit yet to write a thumbnail for.')
-      if (s.project.requests.some((r) => r.kind === 'thumbnail_draft' && (r.status === 'queued' || r.status === 'in_progress'))) return
-      // Names only: Claude writes for the persona and style the owner picked.
-      const names = new Map(ctx.pikzels.list().map((p) => [p.id, p.name]))
-      const th = s.project.thumbnails
-      ctx.requests.enqueue({
-        kind: 'thumbnail_draft',
-        text: '',
-        context: {
-          persona: th.personaId ? (names.get(th.personaId) ?? '') : '',
-          style: th.styleId ? (names.get(th.styleId) ?? '') : '',
-          keepBase: th.base?.by === 'user'
-        }
-      })
+      // A slow draft still waiting in Claude's queue (from 1.9.0) is replaced by this quick one.
+      const stale = s.project.requests.filter((r) => r.kind === 'thumbnail_draft' && r.status === 'queued').map((r) => r.id)
+      if (stale.length)
+        s.mutate('Replace thumbnail description request', 'app', (d) => {
+          for (const r of d.project.requests) if (stale.includes(r.id)) Object.assign(r, { status: 'cancelled', finishedAt: new Date().toISOString(), summary: 'Replaced by a quick draft' })
+        }, BOOKKEEPING)
+      draftJob ??= writeThumbnailDraft(ctx, s).finally(() => (draftJob = null))
+      await draftJob
     },
     'thumbnails.choose': (id: string) => {
       store().mutate('Choose thumbnail', 'user', (d) => {

@@ -8,7 +8,7 @@ import { SettingsSchema } from '@shared/settings'
 import type { AppContext } from '../src/main/context'
 import { ActivityLog } from '../src/main/log'
 import { ProjectStore } from '../src/main/project/store'
-import { FEATURE_CHANGED, PIKZELS_API, createPikzelsService, plainError, stripLinks } from '../src/main/services/pikzels'
+import { FEATURE_CHANGED, PIKZELS_API, createPikzelsService, fieldProblems, plainError, stripLinks } from '../src/main/services/pikzels'
 import { createSecretsService, createSettingsService } from '../src/main/services/settings'
 import { initPaths, paths } from '../src/main/paths'
 import { clearBase, grabBase } from '../src/main/services/thumbnailBase'
@@ -476,5 +476,38 @@ describe('Thumbnail base picture', () => {
     store.mutate('t', 'user', (d) => void (d.project.thumbnails.format = '9:16'))
     const b = await grabBase(makeCtx(), store, 1, 'claude')
     expect(jpegSize(readFileSync(join(store.dir, b.file)))).toEqual({ width: 720, height: 1280 })
+  })
+})
+
+describe('Pikzels rejecting the base picture', () => {
+  const invalid = { status: 400, json: { error: { code: 'VALIDATION_ERROR', message: 'The request is invalid', details: [{ field: 'support_image_base64', message: 'must be a data URI' }] } } }
+  const ok = { status: 200, json: { output: 'https://cdn.example.com/ok.png', request_id: 'req_ok' } }
+
+  it('tries the picture as a data URI, then without it, and says so', async () => {
+    const ctx = makeCtx()
+    await grabBase(ctx, store, 2, 'user')
+    const bodies: any[] = []
+    const { fn } = fakeFetch({ routes: { [PIKZELS_API.thumbnailFromText]: (b) => (bodies.push(b), bodies.length < 2 ? invalid : ok) } })
+    await createPikzelsService(ctx, { fetch: fn, sleep: async () => {} }).generate({ prompts: ['Me and the car'], source: 'user' })
+    expect(bodies[0].support_image_base64.startsWith('/9j/')).toBe(true)
+    expect(bodies[1].support_image_base64.startsWith('data:image/jpeg;base64,/9j/')).toBe(true)
+    const t = store.project.thumbnails.items.at(-1)!
+    expect(t.status).toBe('done')
+    expect(t.warning ?? '').not.toMatch(/did not accept/)
+
+    bodies.length = 0
+    const { fn: fn2 } = fakeFetch({ routes: { [PIKZELS_API.thumbnailFromText]: (b) => (bodies.push(b), bodies.length < 3 ? invalid : ok) } })
+    await createPikzelsService(ctx, { fetch: fn2, sleep: async () => {} }).generate({ prompts: ['Again'], source: 'user' })
+    expect(bodies).toHaveLength(3)
+    expect(bodies[2].support_image_base64).toBeUndefined()
+    expect(store.project.thumbnails.items.at(-1)).toMatchObject({ status: 'done', warning: expect.stringMatching(/did not accept the base picture/) })
+  })
+
+  it("shows Pikzels' own words about the field it rejected", async () => {
+    const { fn } = fakeFetch({ routes: { [PIKZELS_API.thumbnailFromText]: () => invalid } })
+    await createPikzelsService(makeCtx(), { fetch: fn, sleep: async () => {} }).generate({ prompts: ['No base here'], source: 'user' })
+    expect(store.project.thumbnails.items.at(-1)!.error).toBe('Pikzels rejected the request: The request is invalid: support_image_base64 must be a data URI (VALIDATION_ERROR).')
+    expect(fieldProblems({ details: { prompt: ['is too long'] } })).toBe('prompt is too long')
+    expect(fieldProblems({ code: 'X' })).toBe('')
   })
 })

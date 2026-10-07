@@ -120,6 +120,15 @@ export function createProjectManager(ctx: AppContext, opts: { documentsDir?: str
     }
   }
 
+  /** The preview builds on changes, and on opening or closing a project (nothing else starts it then). */
+  const refreshPreview = (s: ProjectStore | null) => {
+    try {
+      ctx.preview?.invalidate()
+    } catch (err) {
+      ;(s?.log ?? ctx.appLog).write('error', 'Could not update the preview', { error: String(err) })
+    }
+  }
+
   const attach = (s: ProjectStore) => {
     let lastStatus: ProjectStatus = s.project.status
     const onChange = (e: ChangeEvent) => {
@@ -138,11 +147,7 @@ export function createProjectManager(ctx: AppContext, opts: { documentsDir?: str
       }
       const payload: ProjectChangeEvent = { snapshot: snapshotOf(ctx, s), source: e.source, label: e.label, changedItemIds: e.changedItemIds }
       ctx.send('project:change', payload)
-      try {
-        ctx.preview.invalidate()
-      } catch (err) {
-        s.log.write('error', 'Could not update the preview', { error: String(err) })
-      }
+      refreshPreview(s)
     }
     s.on('change', onChange)
     detach = () => s.off('change', onChange)
@@ -154,6 +159,7 @@ export function createProjectManager(ctx: AppContext, opts: { documentsDir?: str
     touchRecent(s)
     s.log.write('app', `Project opened in app ${ctx.appVersion}`, { dir: s.dir, readOnly: s.readOnly })
     announce(s)
+    refreshPreview(s)
     if (!existsSync(join(s.paths.cache, 'cover.png')) && s.project.items.length) void refreshCover(s)
   }
 
@@ -255,6 +261,7 @@ export function createProjectManager(ctx: AppContext, opts: { documentsDir?: str
       current = null
       s.log.write('app', 'Project closed')
       announce(null)
+      refreshPreview(null)
     },
 
     onOpened(cb) {

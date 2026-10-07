@@ -217,6 +217,8 @@ export interface RunnerService {
   stop(): Promise<void>
   resume(): void
   isRunning(): boolean
+  /** The last lines of Claude's output (for diagnostics). */
+  recentOutput(): { ts: string; text: string; kind: string }[]
 }
 
 export interface LibraryService {

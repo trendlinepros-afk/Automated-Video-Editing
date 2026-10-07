@@ -11,6 +11,7 @@ import { useStore } from '../state/store'
 import { ProfileChip } from '../components/bits'
 import { Icon } from '../components/Icon'
 import { UpdateButton } from '../components/Updates'
+import { DiagnosticsButton } from '../components/DiagnosticsButton'
 import { CostChip } from './CostChip'
 import { relativeTime } from '../util'
 
@@ -42,6 +43,7 @@ export function EditorTopBar() {
         <Icon name="log" size={14} /> Export log
       </button>
       <UpdateButton />
+      <DiagnosticsButton />
     </div>
   )
 }

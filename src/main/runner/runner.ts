@@ -276,8 +276,12 @@ export function createRunnerService(ctx: AppContext, deps: RunnerDeps = {}): Run
     emit()
   }
 
+  // The last lines Claude printed, for the diagnostics zip.
+  const recent: OutputLine[] = []
   const output = (kind: OutputLine['kind'], text: string, log = true) => {
     const line: OutputLine = { ts: new Date().toISOString(), text, kind }
+    recent.push(line)
+    if (recent.length > 500) recent.shift()
     for (const cb of outputListeners) {
       try {
         cb(line)
@@ -693,6 +697,9 @@ export function createRunnerService(ctx: AppContext, deps: RunnerDeps = {}): Run
     },
     isRunning() {
       return !!current
+    },
+    recentOutput() {
+      return [...recent]
     }
   }
 }

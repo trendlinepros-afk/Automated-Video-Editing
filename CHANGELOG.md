@@ -3,6 +3,18 @@
 Each release's section becomes its GitHub release text and the notes shown in the app's update dialog.
 A release is blocked until the section for its version has notes.
 
+## 1.6.0
+
+- **A check before every export.** Pressing Export first checks the video, with no Claude usage:
+  - Missing footage or files.
+  - Graphics and sounds whose word was cut.
+  - Claude still working.
+  - The self-check not done.
+  - In the finished picture and sound: black screens, frozen picture, stretches of silence, loudness off target, and peaks that would distort.
+- Photos, freeze frames and fades the edit asks for are not reported.
+- If nothing is wrong, the export starts straight away. If something is, you get the list with **Go to** for each problem, **Ask Claude to fix these** (sends the list to the chat) and **Export anyway**. The quick low-resolution export skips the check.
+- **Diagnostics zip.** The small log icon at the top right saves a zip to your Downloads folder with everything needed to sort out a problem: app and project logs, Claude's last output, the Claude Code version, settings, update status, and system and graphics card info. API keys and tokens are removed; no footage or transcripts are included.
+
 ## 1.5.0
 
 - **Video themes.** Settings > Video themes: paste a YouTube video or channel link (or choose a video file) and the app measures its editing style: cuts per minute, how fast the opening is, shot lengths, speech pace, loudness, and a contact sheet of its shots. For a channel it reads the newest 3 long-form videos (Shorts and live streams skipped). Only the first 12 minutes are read, at low resolution, and the downloads are deleted afterwards. Making a theme uses no Claude usage.

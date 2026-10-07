@@ -2,7 +2,7 @@
  * The handler table behind window.api: one ipcMain.handle per name in API_METHODS, each mapped to
  * the services in the AppContext, plus the glue that turns window actions into Claude requests.
  */
-import { BrowserWindow, clipboard, dialog, ipcMain, shell } from 'electron'
+import { BrowserWindow, app, clipboard, dialog, ipcMain, shell } from 'electron'
 import { copyFileSync, existsSync, mkdirSync } from 'node:fs'
 import { basename, extname, isAbsolute, join } from 'node:path'
 import { APP_NAME, MCP_SERVER_NAME } from '@shared/appInfo'
@@ -19,6 +19,8 @@ import { newId, type ProjectStore } from './project/store'
 import { applyUserOp, probeSource } from './project/userOps'
 import { exportLog, exportPack } from './services/publish'
 import { themeSheets } from './services/videoThemes'
+import { buildDiagnostics } from './services/diagnostics'
+import { runExportCheck } from './services/exportCheck'
 import { moveLibrary } from './services/library'
 import { fetchYouTubeThumbnails } from './services/youtube'
 import { estimate } from './runner/costs'
@@ -54,6 +56,17 @@ export function registerIpc(ctx: AppContext, getWindow: () => BrowserWindow | nu
       if (err) throw new Error(err)
     },
     'app.showItemInFolder': (p: string) => shell.showItemInFolder(p),
+    'app.saveDiagnostics': async () => {
+      const out = await buildDiagnostics(ctx, {
+        appName: APP_NAME,
+        appVersion: ctx.appVersion,
+        versions: { electron: process.versions.electron, chrome: process.versions.chrome, node: process.versions.node },
+        outDir: app.getPath('downloads')
+      })
+      shell.showItemInFolder(out)
+      return out
+    },
+    'project.exportCheck': (range?: Range) => runExportCheck(ctx, store(), { range, onProgress: (message) => ctx.send('exportcheck:progress', message) }),
     'app.openExternal': async (url: string) => {
       if (!/^https?:\/\//i.test(url)) throw new Error('Only web links can be opened.')
       await shell.openExternal(url)

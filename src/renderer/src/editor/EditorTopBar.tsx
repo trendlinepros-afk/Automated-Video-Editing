@@ -7,6 +7,7 @@ import type { ChecklistEntry } from '@shared/project'
 import { call, leaveEditor } from '../state/app'
 import { editor, openDialog } from '../state/editor'
 import { UndoButton } from './UndoButton'
+import { IntroBar } from './IntroBar'
 import { useStore } from '../state/store'
 import { ProfileChip } from '../components/bits'
 import { Icon } from '../components/Icon'
@@ -33,6 +34,7 @@ export function EditorTopBar() {
         Inspiration
       </button>
       <UndoButton />
+      <IntroBar />
       <div className="spacer" />
       <JobChip />
       <CostChip />

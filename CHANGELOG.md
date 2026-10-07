@@ -11,6 +11,9 @@ A release is blocked until the section for its version has notes.
 - The CC button on the Captions track now chooses: At key moments, On every word, or Off. Projects made before this update keep captions on every word until you switch.
 - Shorts are still captioned all the way through.
 - **"Like the intro?"** When the intro plays to its end, the viewer asks: **Yes, edit the rest of the video**, **Change the intro…** or **Stop after the intro**. The button in the corner still works too.
+- **Intro buttons in the top bar.** During the intro stage the top bar has **Continue editing** and **Redo intro…**.
+- **Compare intros (A/B).** Every redo keeps the intro you had as "Intro 1", "Intro 2" and so on, and the **Intro** picker in the top bar switches between them. Only the edit changes; your chat and settings stay. Undo switches back.
+- Fixed: the first version saved in a project showed twice in Versions (once as "Recovered …").
 - **Drag the playhead.** Grab the white line on the timeline and drag it to move through the video.
 - **Clear a selection with the ×** at its top-right on the time ruler, as well as the button on the left.
 

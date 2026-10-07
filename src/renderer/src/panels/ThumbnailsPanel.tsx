@@ -72,15 +72,18 @@ export function ThumbnailsPanel() {
     setPrompt((cur) => (!cur.trim() || cur === prev ? draft.text : cur))
   }, [draft])
 
-  const drafting = snap.doc.project.requests.some((r) => r.kind === 'thumbnail_draft' && (r.status === 'queued' || r.status === 'in_progress'))
-  // `quiet`: the automatic first ask stays silent when it fails (Claude not connected yet, say).
+  // One quick call: the description (and base picture) arrive when it returns, usually within half a minute.
+  const [writing, setWriting] = useState(false)
+  const drafting = writing || snap.doc.project.requests.some((r) => r.kind === 'thumbnail_draft' && r.status === 'in_progress')
+  // `quiet`: the automatic first ask stays silent when it fails (Claude Code not signed in, say).
   const requestDraft = async (quiet = false) => {
+    setWriting(true)
     try {
       await window.api.thumbnails.requestDraft()
-      toast('Claude is writing the description and picking the frame…')
     } catch (e) {
-      if (!quiet) toast(`Could not ask Claude: ${errorMessage(e)}`, { kind: 'error' })
+      if (!quiet) toast(`Claude could not write the description: ${errorMessage(e)}`, { kind: 'error' })
     }
+    setWriting(false)
   }
   // Once per visit: a finished edit with an empty box and nothing from Claude yet gets a description automatically.
   const autoDrafted = useRef(false)
@@ -162,7 +165,7 @@ export function ThumbnailsPanel() {
           {draft && prompt === draft.text && <span className="tiny faint">Written by Claude — change anything</span>}
           <span className="spacer" />
           {drafting ? (
-            <span className="faint">Claude is writing…</span>
+            <span className="faint"><span className="spinner" style={{ width: 10, height: 10, verticalAlign: -1 }} /> Claude is writing…</span>
           ) : (
             !ro && <a onClick={() => void requestDraft()}>✨ Write it for me</a>
           )}

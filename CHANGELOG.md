@@ -3,6 +3,12 @@
 Each release's section becomes its GitHub release text and the notes shown in the app's update dialog.
 A release is blocked until the section for its version has notes.
 
+## 1.9.1
+
+- **"Write it for me" is fast now** (usually well under a minute instead of sitting in Claude's queue). The app gathers up to 8 candidate frames from your footage into one sheet and Claude answers in a single quick call, without loading the whole editing session. It works even while no edit is running.
+- If Pikzels rejects the base picture, the app tries it in another format, then makes the thumbnail from the description alone and says so, instead of failing.
+- When Pikzels rejects a request, the message now includes its own words about what was wrong (for example which field).
+
 ## 1.9.0
 
 - **Grab screenshot** in the Thumbnails tab: takes the frame at the playhead straight from the footage at full quality (captions, graphics and effects are left out), sized for the thumbnail (1280x720 for YouTube). It becomes the base picture: Pikzels builds every new thumbnail around it with your persona and style.

@@ -608,17 +608,12 @@ export function installMockApi(): void {
         void commit((d) => void (d.project.thumbnails.base = { file: placeholder(`Frame ${time.toFixed(1)}s`, 160), time, by: 'user', at: now() }), 'user', 'Base picture'),
       clearBase: async () => void commit((d) => void delete d.project.thumbnails.base, 'user', 'Clear base picture'),
       requestDraft: async () => {
-        // Claude answers a second later: the description for the prompt box and a base frame it picked.
-        const id = `r${Date.now()}`
-        commit((d) => void d.project.requests.push({ id, kind: 'thumbnail_draft', status: 'in_progress', createdAt: now(), text: '', context: {} }), 'user', 'Ask for a thumbnail description')
-        setTimeout(() => {
-          commit((d) => {
-            const r = d.project.requests.find((x) => x.id === id)
-            if (r) Object.assign(r, { status: 'done', finishedAt: now() })
-            d.project.thumbnails.draft = { text: 'Me holding the H-Star D24 drift car up close, shocked face, big yellow text "$65 DRIFT KING?"', at: now() }
-            d.project.thumbnails.base = { file: placeholder('Frame 42.0s', 30), time: 42, by: 'claude', at: now() }
-          }, 'claude', 'Thumbnail description')
-        }, 1000)
+        // One quick call: the description and the base frame Claude picked arrive when it returns.
+        await new Promise((r) => setTimeout(r, 1500))
+        commit((d) => {
+          d.project.thumbnails.draft = { text: 'Me holding the H-Star D24 drift car up close, shocked face, big yellow text "$65 DRIFT KING?"', at: now() }
+          d.project.thumbnails.base = { file: placeholder('Frame 42.0s', 30), time: 42, by: 'claude', at: now() }
+        }, 'claude', 'Thumbnail description')
       },
       titles: async () => {
         const out = ['My LiPo Almost Caught Fire', 'Do Not Charge Your LiPo Like This']

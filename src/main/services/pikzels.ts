@@ -142,6 +142,23 @@ export function plainError(status: number, code = '', message = '', what: What =
   return message || `Pikzels error (HTTP ${status})`
 }
 
+/** What a validation error says about each field, e.g. "support_image_base64 is too large", in one short line. */
+export function fieldProblems(err: unknown): string {
+  if (!err || typeof err !== 'object') return ''
+  const e = err as Record<string, unknown>
+  const raw = e.details ?? e.errors ?? e.fields ?? e.issues
+  const items: string[] = []
+  const add = (field: unknown, msg: unknown) => {
+    const m = typeof msg === 'string' ? msg : Array.isArray(msg) ? msg.filter((x) => typeof x === 'string').join(', ') : ''
+    const f = Array.isArray(field) ? field.join('.') : typeof field === 'string' ? field : ''
+    if (m || f) items.push([f, m].filter(Boolean).join(' '))
+  }
+  if (Array.isArray(raw)) for (const d of raw) d && typeof d === 'object' ? add((d as any).field ?? (d as any).path ?? (d as any).loc ?? (d as any).param, (d as any).message ?? (d as any).msg) : add('', d)
+  else if (raw && typeof raw === 'object') for (const [k, v] of Object.entries(raw)) add(k, v)
+  else if (typeof raw === 'string') add('', raw)
+  return items.slice(0, 3).join('; ').slice(0, 240)
+}
+
 const isBusy = (status: number, code?: string) => status === 429 || status >= 500 || /busy|overloaded|rate[_ ]?limit/i.test(code ?? '')
 
 function imageExt(contentType: string | null, url: string): string {
@@ -221,7 +238,7 @@ export function createPikzelsService(ctx: AppContext, deps: PikzelsDeps = {}): P
       }
       const err = data?.[PIKZELS_API.response.error] ?? {}
       const code = typeof err === 'object' ? String(err.code ?? '') : String(err)
-      const message = typeof err === 'object' ? String(err.message ?? '') : ''
+      const message = [typeof err === 'object' ? String(err.message ?? '') : '', fieldProblems(err)].filter(Boolean).join(': ')
       const requestId = data?.[PIKZELS_API.response.requestId]
       if ((isBusy(status, code) || status === 0) && attempt < delays.length) {
         const wait = Math.min(30000, Math.max(delays[attempt], retryAfter * 1000))
@@ -353,11 +370,32 @@ export function createPikzelsService(ctx: AppContext, deps: PikzelsDeps = {}): P
   async function imageJob(
     store: ProjectStore,
     record: Thumbnail,
-    job: { path: string; body: Record<string, unknown>; action: PikzelsAction; model?: string; logData: Record<string, unknown>; mapError?: (e: PikzelsError) => string }
+    job: {
+      path: string
+      body: Record<string, unknown>
+      action: PikzelsAction
+      model?: string
+      logData: Record<string, unknown>
+      mapError?: (e: PikzelsError) => string
+      /** Other ways to send the same request, tried in order only while Pikzels rejects it as invalid (400/422). */
+      fallbacks?: { body: Record<string, unknown>; label: string; warning?: string }[]
+    }
   ): Promise<Thumbnail> {
     const logData = { action: job.action, ...job.logData }
     try {
-      const data = await call('POST', job.path, job.body, 'thumbnail')
+      let data: Record<string, any> | undefined
+      for (const attempt of [{ body: job.body, label: 'as written', warning: undefined as string | undefined }, ...(job.fallbacks ?? [])]) {
+        try {
+          data = await call('POST', job.path, attempt.body, 'thumbnail')
+          if (attempt.warning) updateThumb(store, record.id, { warning: [thumbOf(store, record.id).warning, attempt.warning].filter(Boolean).join(' ') })
+          break
+        } catch (err) {
+          const last = attempt === (job.fallbacks ?? []).at(-1) || !job.fallbacks?.length
+          if (!(err instanceof PikzelsError) || (err.status !== 400 && err.status !== 422) || last) throw err
+          store.log.write('thumbnail', `Pikzels rejected the request (${attempt.label}); trying another way`, { ...logData, pikzelsAnswer: err.details ?? null, errorCode: err.code ?? null })
+        }
+      }
+      if (!data) throw new PikzelsError('Pikzels returned no answer', 0)
       const url = data[PIKZELS_API.response.output]
       const requestId = data[PIKZELS_API.response.requestId]
       if (typeof url !== 'string' || !url) throw new PikzelsError('Pikzels returned no image', 200, 'no_output', requestId)
@@ -490,7 +528,19 @@ export function createPikzelsService(ctx: AppContext, deps: PikzelsDeps = {}): P
         if (persona) body[r.persona] = persona
         if (style) body[r.style] = style
         if (supportImage) body[r.supportImage] = supportImage
+        // Not every Pikzels version takes a bare picture: then a data URI, then without the picture (the thumbnail still gets made).
+        const fallbacks = supportImage
+          ? [
+              { label: 'picture as a data URI', body: { ...body, [r.supportImage]: `data:${supportImage.startsWith('/9j/') ? 'image/jpeg' : 'image/png'};base64,${supportImage}` } },
+              {
+                label: 'without the picture',
+                body: Object.fromEntries(Object.entries(body).filter(([k]) => k !== r.supportImage)),
+                warning: 'Pikzels did not accept the base picture, so this one was made from the description only.'
+              }
+            ]
+          : undefined
         await imageJob(store, it, {
+          fallbacks,
           path: PIKZELS_API.thumbnailFromText,
           body,
           action: 'thumbnail',

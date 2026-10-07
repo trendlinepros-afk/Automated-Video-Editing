@@ -169,6 +169,55 @@ describe('manual tweaks', () => {
     expect(ctx.recorded.map((x) => x.kind)).toEqual(['broll_shorter', 'graphics_shorter'])
   })
 
+  it('Reset puts a clip back to its original settings in one undo step, removing effects on it', async () => {
+    const { store, ctx } = setup()
+    store.mutate('dress up', 'claude', (d) => {
+      const c = d.project.items.find((i) => i.id === 'clip_before') as any
+      c.label = 'Charger screen'
+      c.transform = { x: 0.2, y: 0, scale: 1.5, rotation: 0, opacity: 1 }
+      c.keyframes = [{ t: 0, x: 0, y: 0 }]
+      c.speed = 2
+      c.fadeIn = 0.3
+      c.picture = { file: 'media/stabilized/clip_before.mp4', sourceStart: 49, kind: 'stabilized' }
+      d.project.items.push(
+        { id: 'fx_on', trackId: 'effects', createdBy: 'claude', type: 'effect', effect: 'zoom', anchor: { kind: 'time', time: 2.1 }, duration: 0.5, params: {} } as any,
+        { id: 'fx_elsewhere', trackId: 'effects', createdBy: 'claude', type: 'effect', effect: 'shake', anchor: { kind: 'time', time: 20 }, duration: 1, params: {} } as any
+      )
+    })
+    await applyUserOp(ctx, store, { op: 'resetItem', id: 'clip_before' })
+    const clip = find(store, 'clip_before')
+    expect(clip.transform).toBeUndefined()
+    expect(clip.keyframes).toBeUndefined()
+    expect(clip.picture).toBeUndefined()
+    expect(clip.speed).toBe(1)
+    expect(clip.fadeIn).toBe(0)
+    // It keeps its place, its footage and its name.
+    expect(clip.in).toBe(50)
+    expect(clip.anchor).toEqual({ kind: 'word', wordId: 'src_a_w4', offset: 0 })
+    expect(clip.label).toBe('Charger screen')
+    expect(find(store, 'fx_on')).toBeUndefined()
+    expect(find(store, 'fx_elsewhere')).toBeDefined()
+    expect(store.undoLabel).toBe('Reset B-roll clip "Charger screen" (position and size, motion, speed, fades, stabilization, 1 effect)')
+    expect(store.undoEntry?.source).toBe('user')
+
+    store.undo()
+    expect(find(store, 'clip_before').picture).toBeDefined()
+    expect(find(store, 'fx_on')).toBeDefined()
+
+    // Nothing to reset is refused, not recorded.
+    await applyUserOp(ctx, store, { op: 'resetItem', id: 'gfx_after' }).catch((e) => expect(String(e)).toMatch(/original settings/))
+  })
+
+  it('names changes in plain words for Undo', async () => {
+    const { store, ctx } = setup()
+    await applyUserOp(ctx, store, { op: 'moveItem', id: 'gfx_inside', start: 21.3 })
+    expect(store.undoLabel).toBe('Move graphic')
+    await applyUserOp(ctx, store, { op: 'updateItem', id: 'sfx_time', patch: { volume: -3 } })
+    expect(store.undoLabel).toBe('Change the volume of sound effect')
+    await applyUserOp(ctx, store, { op: 'nudgeSegment', id: 'seg_1', edge: 'out', delta: 0.01 })
+    expect(store.undoLabel).toMatch(/^Move the end of A-roll cut from \d+:\d\d of the footage$/)
+  })
+
   it('nudging a cut clamps to the source and keeps out after in', async () => {
     const { store, ctx } = setup()
     await applyUserOp(ctx, store, { op: 'nudgeSegment', id: 'seg_1', edge: 'in', delta: -5 })

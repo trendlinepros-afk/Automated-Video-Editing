@@ -4,6 +4,7 @@ import { basename, extname, isAbsolute, join } from 'node:path'
 import { z } from 'zod'
 import { EFFECT_KINDS, type AnchoredItem, type Item, type ProjectDoc } from '@shared/project'
 import { newId } from '../../project/store'
+import { changeVerb, itemName } from '@shared/describe'
 import {
   AUDIO_EXT,
   DEFAULT_TRACK_FOR,
@@ -125,7 +126,7 @@ export async function addItem(
     Object.assign(item, ref)
   }
   applyFields(item, { ...a, file: undefined, source_id: undefined })
-  env.mutate(`Add ${type} on ${track.name}`, (d) => {
+  env.mutate(`Add ${itemName(env.store.project, item as Item)} on ${track.name}`, (d) => {
     d.project.items.push(item as Item)
   })
   return id
@@ -193,7 +194,7 @@ export const placeTools = [
       applyFields(patch, { ...args, file: undefined, source_id: undefined })
       Object.assign(patch, args.fields ?? {})
       if (patch.id !== undefined && patch.id !== args.id) throw new ToolError('An item id never changes.')
-      env.mutate(`Update ${current.type} ${args.id}`, (d) => {
+      env.mutate(`${changeVerb(Object.keys(patch), patch)} ${itemName(doc.project, current)}`, (d) => {
         const item = d.project.items.find((i) => i.id === args.id) as unknown as Record<string, unknown>
         for (const [k, v] of Object.entries(patch)) {
           if (v === undefined) delete item[k]
@@ -224,7 +225,7 @@ export const placeTools = [
       const item = itemById(doc, args.id)
       if (item.type !== 'segment' && item.type !== 'clip') throw new ToolError('Only A-roll segments and B-roll clips have a picture to replace.')
       if (args.remove) {
-        env.mutate(`Original picture for ${args.id}`, (d) => {
+        env.mutate(`Remove stabilization from ${itemName(doc.project, item)}`, (d) => {
           delete (d.project.items.find((i) => i.id === args.id) as Record<string, unknown>).picture
         })
         return addResult(env, args.id)
@@ -260,7 +261,7 @@ export const placeTools = [
       const warnings: string[] = []
       if (src?.fps && info.fps && Math.abs(src.fps - info.fps) > 0.05) warnings.push(`Frame rate ${info.fps} differs from the source's ${src.fps}; frames will not line up with the sound.`)
       const picture = { file: rel, sourceStart: args.source_start, kind: args.kind ?? 'other', ...(args.note ? { note: args.note } : {}) }
-      env.mutate(`${picture.kind === 'stabilized' ? 'Stabilized' : 'Processed'} picture for ${args.id}`, (d) => {
+      env.mutate(`${picture.kind === 'stabilized' ? 'Stabilize' : 'Process the picture of'} ${itemName(doc.project, item)}`, (d) => {
         ;(d.project.items.find((i) => i.id === args.id) as Record<string, unknown>).picture = picture
       })
       return warnings.length ? json({ item: itemView(env, args.id), warnings }) : addResult(env, args.id)
@@ -277,7 +278,7 @@ export const placeTools = [
       if (current.type === 'segment') throw new ToolError('A-roll segments play in cut order; reorder them with set_aroll_cuts.')
       const anchor = toAnchor(args.anchor, doc)
       const trackId = args.track ? findTrack(doc, args.track).id : current.trackId
-      env.mutate(`Move ${current.type} ${args.id}`, (d) => {
+      env.mutate(`Move ${itemName(env.store.project, current)}`, (d) => {
         const item = d.project.items.find((i) => i.id === args.id) as AnchoredItem
         item.anchor = anchor
         item.trackId = trackId
@@ -292,7 +293,7 @@ export const placeTools = [
     input: { id: z.string() },
     run: (args, env) => {
       const item = itemById(env.store.snapshotDoc(), args.id)
-      env.mutate(`Remove ${item.type} ${args.id}`, (d) => {
+      env.mutate(`Delete ${itemName(env.store.project, item)}`, (d) => {
         d.project.items = d.project.items.filter((i) => i.id !== args.id)
       })
       return json({ removed: args.id })

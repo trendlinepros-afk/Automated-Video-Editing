@@ -1,5 +1,6 @@
 /** Cut tools: the transcript and the edit decision list. The app applies every cut exactly as given. */
 import { z } from 'zod'
+import { itemName } from '@shared/describe'
 import { existsSync, readFileSync } from 'node:fs'
 import { isAbsolute, join } from 'node:path'
 import type { SegmentItem, Word } from '@shared/project'
@@ -214,7 +215,7 @@ export const cutTools = [
       const nextIn = args.edge === 'in' ? args.time : seg.in
       const nextOut = args.edge === 'out' ? args.time : seg.out
       if (!seg.hold && nextOut <= nextIn) throw new ToolError(`That would make the segment end (${nextOut}s) before it starts (${nextIn}s).`)
-      env.mutate(`Adjust cut ${args.edge} of ${args.segment_id}`, (d) => {
+      env.mutate(`Move the ${args.edge === 'in' ? 'start' : 'end'} of ${itemName(doc.project, seg)}`, (d) => {
         const s = d.project.items.find((i) => i.id === args.segment_id) as SegmentItem
         s[args.edge] = args.time
       })

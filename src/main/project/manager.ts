@@ -67,6 +67,7 @@ export function snapshotOf(ctx: AppContext, store: ProjectStore): ProjectSnapsho
     canUndo: store.canUndo,
     canRedo: store.canRedo,
     ...(store.undoLabel ? { undoLabel: store.undoLabel } : {}),
+    ...(store.undoEntry ? { undoBy: store.undoEntry.source, undoAt: store.undoEntry.ts } : {}),
     ...(store.redoLabel ? { redoLabel: store.redoLabel } : {}),
     missingSources: missingSourceIds(store),
     profile: ctx.profiles.get(doc.project.profileId)

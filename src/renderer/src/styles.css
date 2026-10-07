@@ -399,3 +399,7 @@ button:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
   bottom: 16px;
   z-index: 5;
 }
+
+/* Undo: what the last change was, before it is taken back. */
+.undo-pop { width: 320px; white-space: normal; line-height: 1.45; }
+.undo-what { font-weight: 600; margin: 4px 0; color: var(--text); }

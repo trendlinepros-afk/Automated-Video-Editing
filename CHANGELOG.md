@@ -3,6 +3,12 @@
 Each release's section becomes its GitHub release text and the notes shown in the app's update dialog.
 A release is blocked until the section for its version has notes.
 
+## 1.4.0
+
+- **Undo button with words.** The top bar has an Undo button. Clicking it says in plain words what it will take back, who made the change and when ("Move B-roll clip "Charger screen". Made by Claude 3 minutes ago"), and Undo it confirms. Ctrl+Z still undoes at once; either way a message says what was undone, with Redo.
+- Changes now have readable names everywhere in the undo history, for your tweaks and Claude's ("Change the volume of sound effect", "Stabilize A-roll cut from 1:02 of the footage") instead of internal ids.
+- **Reset a clip.** Right-click any clip, graphic or sound on the timeline and choose Reset to put it back to its original settings: position and size, motion, speed, volume, fades, freeze, mute and stabilization, and effects that sit within it on the Effects track. It stays where it is, on the same part of the footage. One Undo brings everything back.
+
 ## 1.3.0
 
 - **Picks up where it left off after running out of usage or credits.** When Claude hits its usage limit, the app now tries again on its own when the limit resets (or every 30 minutes if Claude Code does not say when, for example when API credits run low) and carries on from the same stage. The top bar says when the next try is; Resume still works at any time.

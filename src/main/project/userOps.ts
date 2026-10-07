@@ -22,6 +22,7 @@ import {
   type Word
 } from '@shared/project'
 import { TimelineResolver, placeSegments, round3, segmentDuration } from '@shared/timeline'
+import { changeVerb, itemName } from '@shared/describe'
 import type { AppContext } from '../context'
 import { ValidationError, newId, type ProjectStore } from './store'
 
@@ -131,7 +132,15 @@ export async function applyUserOp(ctx: AppContext, store: ProjectStore, op: User
     swapSource = existing ?? (await probeSource(ctx, op.path, origin))
   }
 
-  const tweak = store.mutate(labelFor(op), 'user', (doc) => runOp(doc, op, swapSource))
+  let label = labelFor(op, store.snapshotDoc())
+  if (op.op === 'resetItem') {
+    // Name what the reset takes off, so Undo can say it: "Reset B-roll clip "X" (stabilization, 2 effects)".
+    const trial = structuredClone(store.snapshotDoc())
+    const item = trial.project.items.find((i) => i.id === op.id)
+    const done = item && item.type !== 'effect' ? resetItem(trial, item) : []
+    if (done.length) label = `${label} (${done.join(', ')})`
+  }
+  const tweak = store.mutate(label, 'user', (doc) => runOp(doc, op, swapSource))
   store.log.write('tweak', tweak.label, { op: op.op, before: tweak.before, after: tweak.after })
 
   const { id: projectId, profileId } = store.project
@@ -144,26 +153,35 @@ export async function applyUserOp(ctx: AppContext, store: ProjectStore, op: User
   }
 }
 
-function labelFor(op: UserOp): string {
+/** The undo history names each change in plain words: "Move B-roll clip "Charger screen"". */
+function labelFor(op: UserOp, doc: ProjectDoc): string {
+  const named = (id: string) => {
+    const item = doc.project.items.find((i) => i.id === id)
+    return item ? itemName(doc.project, item) : 'item'
+  }
   switch (op.op) {
-    case 'moveItem': return 'Move item'
-    case 'trimItem': return op.edge === 'start' ? 'Trim start' : 'Trim end'
-    case 'deleteItem': return 'Delete item'
-    case 'nudgeSegment': return `Nudge cut ${op.edge === 'in' ? 'start' : 'end'}`
-    case 'updateItem': return 'Change item'
+    case 'moveItem': return `Move ${named(op.id)}`
+    case 'trimItem': return `Trim the ${op.edge === 'start' ? 'start' : 'end'} of ${named(op.id)}`
+    case 'deleteItem': return `Delete ${named(op.id)}`
+    case 'nudgeSegment': return `Move the ${op.edge === 'in' ? 'start' : 'end'} of ${named(op.id)}`
+    case 'resetItem': return `Reset ${named(op.id)}`
+    case 'updateItem': {
+      const keys = Object.keys(op.patch).filter((k) => k !== 'id' && k !== 'type')
+      return `${changeVerb(keys, op.patch as Record<string, unknown>)} ${named(op.id)}`
+    }
     case 'updateTrack': return 'Change track'
     case 'addTrack': return `Add ${TRACK_LABELS[op.kind]} track`
     case 'editWord': return 'Fix transcript word'
     case 'setEmphasis': return op.emphasis ? 'Emphasise word' : 'Remove emphasis'
     case 'setInspiration': return 'Edit inspiration'
-    case 'swapFile': return 'Swap file'
+    case 'swapFile': return `Swap the file of ${named(op.id)}`
     case 'patchProject': return `Change ${op.path}`
   }
 }
 
 function runOp(doc: ProjectDoc, op: UserOp, swapSource: Source | null): Tweak {
   const project = doc.project
-  const label = labelFor(op)
+  const label = labelFor(op, doc)
   const corrections: CorrectionKind[] = []
 
   switch (op.op) {
@@ -215,6 +233,14 @@ function runOp(doc: ProjectDoc, op: UserOp, swapSource: Source | null): Tweak {
       if (kind === 'sfx') corrections.push('sfx_deleted')
       if (kind === 'broll') corrections.push('broll_deleted')
       return { label, before: item, after: null, corrections }
+    }
+
+    case 'resetItem': {
+      const item = findItem(doc, op.id)
+      const before = structuredClone(item)
+      const undone = resetItem(doc, item)
+      if (!undone.length) throw new ValidationError('This clip already has its original settings.')
+      return { label, before, after: structuredClone(item), corrections }
     }
 
     case 'nudgeSegment': {
@@ -377,4 +403,74 @@ function volumeCorrections(project: Project, before: AnchoredItem, after: Anchor
   }
   if (kind === 'sfx' && quieter) return ['sfx_quieter']
   return []
+}
+
+/**
+ * Reset: a clip back to its original settings. It keeps its place on the timeline and the part of the footage
+ * it shows, and loses what was applied to it: position and size, motion, speed, volume, fades, freeze, mute,
+ * stabilization, and effects that sit within it on an Effects track. Returns what was reset, in plain words.
+ */
+export function resetItem(doc: ProjectDoc, item: Item): string[] {
+  const project = doc.project
+  const done: string[] = []
+  const rec = item as unknown as Record<string, unknown>
+  const drop = (key: string, what: string) => {
+    if (rec[key] === undefined) return
+    delete rec[key]
+    if (!done.includes(what)) done.push(what)
+  }
+  const set = (key: string, value: unknown, what: string) => {
+    if ((rec[key] ?? value) === value) return
+    rec[key] = value
+    if (!done.includes(what)) done.push(what)
+  }
+  // Effects within the clip's time on screen, measured before its speed or length changes.
+  let effectIds: string[] = []
+  if (item.type === 'segment' || item.type === 'clip') {
+    const resolver = new TimelineResolver(project, doc.transcript)
+    const span = resolver.resolveItem(item)
+    effectIds = project.items
+      .filter((i) => i.type === 'effect' && trackKindOf(project, i.trackId) === 'effects')
+      .filter((i) => {
+        const r = resolver.resolveItem(i)
+        return r.start >= span.start - 0.01 && r.end <= span.end + 0.01
+      })
+      .map((i) => i.id)
+  }
+  switch (item.type) {
+    case 'segment':
+      set('speed', 1, 'speed')
+      drop('hold', 'freeze frame')
+      drop('muted', 'mute')
+      set('volume', 0, 'volume')
+      set('fadeIn', 0, 'fades')
+      set('fadeOut', 0, 'fades')
+      drop('picture', 'stabilization')
+      break
+    case 'clip':
+      drop('transform', 'position and size')
+      drop('keyframes', 'motion')
+      set('speed', 1, 'speed')
+      set('volume', -120, 'volume')
+      set('fadeIn', 0, 'fades')
+      set('fadeOut', 0, 'fades')
+      drop('picture', 'stabilization')
+      break
+    case 'graphic':
+      drop('transform', 'position and size')
+      drop('keyframes', 'motion')
+      break
+    case 'audio':
+      set('volume', 0, 'volume')
+      set('fadeIn', 0, 'fades')
+      set('fadeOut', 0, 'fades')
+      break
+    case 'effect':
+      throw new ValidationError('An effect has nothing to reset. Delete it to remove it.')
+  }
+  if (effectIds.length) {
+    project.items = project.items.filter((i) => !effectIds.includes(i.id))
+    done.push(effectIds.length === 1 ? '1 effect' : `${effectIds.length} effects`)
+  }
+  return done
 }

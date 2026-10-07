@@ -257,19 +257,23 @@ export function installMockApi(): void {
     setup: emitter<{ step: string; percent?: number; message: string; done?: boolean; error?: string }>()
   }
 
+  const undoLabels: string[] = []
   const snapshot = (): ProjectSnapshot => ({
     path: 'C:\\Projects\\LiPo',
     doc,
     readOnly: false,
     canUndo: undoStack.length > 0,
     canRedo: redoStack.length > 0,
-    undoLabel: undoStack.length ? 'your change' : undefined,
+    undoLabel: undoStack.length ? undoLabels[undoLabels.length - 1] ?? 'your change' : undefined,
+    undoBy: 'claude',
+    undoAt: new Date(Date.now() - 180000).toISOString(),
     missingSources: [],
     profile: profiles.find((p) => p.id === doc.project.profileId) ?? null
   })
 
   const commit = (fn: (d: ProjectDoc) => void, source: 'user' | 'claude' | 'app', label: string, ids: string[] = []) => {
     undoStack.push(doc)
+    undoLabels.push(label)
     redoStack.length = 0
     const next = clone(doc)
     fn(next)
@@ -451,11 +455,19 @@ export function installMockApi(): void {
     project: {
       get: async () => (open ? snapshot() : null),
       onChange: ev.change.on,
-      apply: async (op) => commit((d) => applyOp(op, d), 'user', op.op),
+      apply: async (op) => {
+        const named = (id: string) => {
+          const it = doc.project.items.find((i) => i.id === id)
+          return it?.label ? `"${it.label}"` : 'item'
+        }
+        const label = op.op === 'resetItem' ? `Reset B-roll clip ${named(op.id)} (position and size, stabilization, 1 effect)` : op.op
+        return commit((d) => applyOp(op, d), 'user', label)
+      },
       undo: async () => {
         if (undoStack.length) {
           redoStack.push(doc)
           doc = undoStack.pop()!
+          undoLabels.pop()
         }
         return snapshot()
       },

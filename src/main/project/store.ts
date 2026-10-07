@@ -353,6 +353,12 @@ export class ProjectStore extends EventEmitter {
     return this.history.undo[this.history.undo.length - 1]?.label
   }
 
+  /** The change Undo would take back: what, by whom and when. */
+  get undoEntry(): { label: string; source: string; ts: string } | undefined {
+    const e = this.history.undo[this.history.undo.length - 1]
+    return e ? { label: e.label, source: e.source, ts: e.ts } : undefined
+  }
+
   get redoLabel(): string | undefined {
     return this.history.redo[this.history.redo.length - 1]?.label
   }

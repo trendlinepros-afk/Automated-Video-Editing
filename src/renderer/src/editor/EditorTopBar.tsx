@@ -5,7 +5,8 @@
 import { useEffect, useRef, useState } from 'react'
 import type { ChecklistEntry } from '@shared/project'
 import { call, leaveEditor } from '../state/app'
-import { editor, openDialog, redo, undo } from '../state/editor'
+import { editor, openDialog } from '../state/editor'
+import { UndoButton } from './UndoButton'
 import { useStore } from '../state/store'
 import { ProfileChip } from '../components/bits'
 import { Icon } from '../components/Icon'
@@ -30,14 +31,7 @@ export function EditorTopBar() {
       <button className="btn ghost small" onClick={() => openDialog({ kind: 'inspiration' })} title="Your vision for this video">
         Inspiration
       </button>
-      <div className="row" style={{ gap: 2 }}>
-        <button className="btn ghost small icon" disabled={!snap.canUndo} onClick={() => void undo()} title={snap.undoLabel ? `Undo ${snap.undoLabel} (Ctrl+Z)` : 'Undo (Ctrl+Z)'}>
-          <Icon name="undo" size={15} />
-        </button>
-        <button className="btn ghost small icon" disabled={!snap.canRedo} onClick={() => void redo()} title={snap.redoLabel ? `Redo ${snap.redoLabel} (Ctrl+Y)` : 'Redo (Ctrl+Y)'}>
-          <Icon name="redo" size={15} />
-        </button>
-      </div>
+      <UndoButton />
       <div className="spacer" />
       <JobChip />
       <CostChip />

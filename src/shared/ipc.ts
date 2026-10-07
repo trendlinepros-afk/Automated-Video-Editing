@@ -82,6 +82,9 @@ export interface ProjectSnapshot {
   canUndo: boolean
   canRedo: boolean
   undoLabel?: string
+  /** Who made the change Undo would take back ('user', 'claude' or 'app') and when (ISO time). */
+  undoBy?: string
+  undoAt?: string
   redoLabel?: string
   missingSources: string[]
   profile: Profile | null
@@ -99,6 +102,8 @@ export type UserOp =
   | { op: 'moveItem'; id: string; start: number }
   | { op: 'trimItem'; id: string; edge: 'start' | 'end'; time: number }
   | { op: 'deleteItem'; id: string }
+  /** Back to the clip's original settings: position, size, motion, speed, volume, fades, stabilization, and effects on it. */
+  | { op: 'resetItem'; id: string }
   | { op: 'nudgeSegment'; id: string; edge: 'in' | 'out'; delta: number }
   | { op: 'updateTrack'; id: string; patch: Partial<Track> }
   | { op: 'addTrack'; kind: TrackKind; name?: string }

@@ -230,11 +230,11 @@ export function handleMenuCommand(cmd: string): void {
 }
 
 async function editorUndo() {
-  const snap = await call(() => window.api.project.undo())
-  if (snap) editor.set({ snapshot: snap })
+  const { undo } = await import('./editor')
+  await undo()
 }
 
 async function editorRedo() {
-  const snap = await call(() => window.api.project.redo())
-  if (snap) editor.set({ snapshot: snap })
+  const { redo } = await import('./editor')
+  await redo()
 }

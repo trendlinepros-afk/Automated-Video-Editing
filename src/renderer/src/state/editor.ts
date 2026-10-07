@@ -164,14 +164,21 @@ export async function applyOp(op: UserOp): Promise<boolean> {
   return true
 }
 
+/** Undo the last change and say in words what was undone, with Redo at hand. */
 export async function undo(): Promise<void> {
+  const label = editor.get().snapshot?.undoLabel
   const snap = await call(() => window.api.project.undo())
-  if (snap) editor.set({ snapshot: snap })
+  if (!snap) return
+  editor.set({ snapshot: snap })
+  if (label) toast(`Undone: ${label}`, { actions: [{ label: 'Redo', run: () => void redo() }] })
 }
 
 export async function redo(): Promise<void> {
+  const label = editor.get().snapshot?.redoLabel
   const snap = await call(() => window.api.project.redo())
-  if (snap) editor.set({ snapshot: snap })
+  if (!snap) return
+  editor.set({ snapshot: snap })
+  if (label) toast(`Redone: ${label}`)
 }
 
 export function select(ids: string[]): void {

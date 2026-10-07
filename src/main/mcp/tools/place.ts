@@ -205,6 +205,69 @@ export const placeTools = [
   }),
 
   defineTool({
+    name: 'set_item_picture',
+    description:
+      'Show a processed copy of a clip\'s picture (e.g. a stabilized version you rendered) in place of its original frames, on an A-roll ' +
+      'segment or a B-roll clip. Timing, cuts, transcript and sound stay on the original. `file` is a video you made: a project path ' +
+      '(media/...) or an absolute path (copied to media/processed/). `source_start` is the original source time at the file\'s first ' +
+      'frame, so the file must cover the item\'s source range at the same frame rate. Pass remove: true to go back to the original picture.',
+    input: {
+      id: z.string(),
+      file: z.string().optional(),
+      source_start: num.min(0).optional().describe('Source seconds at the first frame of the file'),
+      kind: z.enum(['stabilized', 'other']).optional().describe('What was done, shown to the owner (default other)'),
+      note: z.string().optional().describe('One line on what you did, e.g. "vidstab smoothing 20, 4% zoom"'),
+      remove: z.boolean().optional()
+    },
+    run: async (args, env) => {
+      const doc = env.store.snapshotDoc()
+      const item = itemById(doc, args.id)
+      if (item.type !== 'segment' && item.type !== 'clip') throw new ToolError('Only A-roll segments and B-roll clips have a picture to replace.')
+      if (args.remove) {
+        env.mutate(`Original picture for ${args.id}`, (d) => {
+          delete (d.project.items.find((i) => i.id === args.id) as Record<string, unknown>).picture
+        })
+        return addResult(env, args.id)
+      }
+      if (!args.file || args.source_start === undefined) throw new ToolError('Pass file and source_start (or remove: true).')
+      let rel = projectRelative(env.dir, args.file)
+      if (!rel) {
+        if (!isAbsolute(args.file) || !fileExists(args.file)) throw new ToolError(`File not found: ${args.file}`)
+        const destDir = join(env.dir, 'media', 'processed')
+        mkdirSync(destDir, { recursive: true })
+        const ext = extname(args.file).toLowerCase()
+        let name = `${slug(basename(args.file, ext))}${ext}`
+        for (let n = 2; existsSync(join(destDir, name)); n++) name = `${slug(basename(args.file, ext))}_${n}${ext}`
+        copyFileSync(args.file, join(destDir, name))
+        rel = `media/processed/${name}`
+      }
+      const abs = absInProject(env.dir, rel)
+      if (!fileExists(abs)) throw new ToolError(`File not found in the project: ${args.file}`)
+      let info: Awaited<ReturnType<ToolEnv['ctx']['engine']['probe']>>
+      try {
+        info = await env.ctx.engine.probe(abs)
+      } catch (err) {
+        throw new ToolError(`Could not read ${basename(abs)}: ${err instanceof Error ? err.message : String(err)}`)
+      }
+      if (info.kind !== 'video') throw new ToolError(`${basename(abs)} is not a video.`)
+      // The source range the item shows, in the file's own time.
+      const from = item.in - args.source_start
+      const length = item.type === 'segment' ? (item.hold ? 0 : item.out - item.in) : item.duration * (item.speed ?? 1)
+      if (from < -0.01) throw new ToolError(`The file starts at source ${args.source_start.toFixed(3)} s, after the item's in point (${item.in.toFixed(3)} s).`)
+      if (from + length > info.duration + 0.05)
+        throw new ToolError(`The file is ${info.duration.toFixed(3)} s long but the item needs file time ${from.toFixed(3)}–${(from + length).toFixed(3)} s.`)
+      const src = item.sourceId ? doc.project.sources.find((x) => x.id === item.sourceId) : undefined
+      const warnings: string[] = []
+      if (src?.fps && info.fps && Math.abs(src.fps - info.fps) > 0.05) warnings.push(`Frame rate ${info.fps} differs from the source's ${src.fps}; frames will not line up with the sound.`)
+      const picture = { file: rel, sourceStart: args.source_start, kind: args.kind ?? 'other', ...(args.note ? { note: args.note } : {}) }
+      env.mutate(`${picture.kind === 'stabilized' ? 'Stabilized' : 'Processed'} picture for ${args.id}`, (d) => {
+        ;(d.project.items.find((i) => i.id === args.id) as Record<string, unknown>).picture = picture
+      })
+      return warnings.length ? json({ item: itemView(env, args.id), warnings }) : addResult(env, args.id)
+    }
+  }),
+
+  defineTool({
     name: 'move_item',
     description: 'Move an item to a new anchor (a word plus offset, or a time) and optionally to another track. A-roll segments move with set_aroll_cuts.',
     input: { id: z.string(), anchor: anchorInput, track: z.string().optional() },

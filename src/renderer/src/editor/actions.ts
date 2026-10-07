@@ -76,8 +76,47 @@ export async function fixAudio(opts: { itemId?: string; segmentId?: string; time
   )
 }
 
+/** A-roll segments and B-roll clips that show moving footage (not stills) can be stabilized. */
+export function canStabilize(item: Item): boolean {
+  if (item.type !== 'segment' && item.type !== 'clip') return false
+  const src = item.sourceId ? editor.get().snapshot?.doc.project.sources.find((s) => s.id === item.sourceId) : undefined
+  if (src) return src.kind === 'video'
+  return item.type === 'clip' && !!item.file && !/\.(png|jpe?g|webp|bmp|gif|tiff?)$/i.test(item.file)
+}
+
+export async function stabilize(item: Item): Promise<void> {
+  if (!canEdit(item.id)) return
+  try {
+    await window.api.project.requestStabilize({ itemId: item.id })
+  } catch (e) {
+    toast(`Could not send that: ${errorMessage(e)}`, { kind: 'error' })
+    return
+  }
+  const runner = editor.get().runner
+  const est = await window.api.claude.estimate('stabilize').catch(() => null)
+  const cost = est ? ` Estimated cost ≈ $${est.usd < 1 ? est.usd.toFixed(4) : est.usd.toFixed(2)}.` : ''
+  const what = item.label ? `"${item.label}"` : 'this clip'
+  toast(
+    (runner.connected || runner.status === 'running' || runner.status === 'starting'
+      ? `Asked Claude to stabilize ${what}. It shows here with Before / After and Keep or Revert when done.`
+      : `Stabilizing ${what} is queued. It runs as soon as Claude connects.`) + cost
+  )
+}
+
+/** Back to the original frames. Undo brings the stabilized picture back. */
+export async function removePicture(item: Item): Promise<void> {
+  if (!canEdit(item.id)) return
+  await applyOp({ op: 'updateItem', id: item.id, patch: { picture: undefined } })
+  toast('Back to the original picture. Ctrl+Z brings the stabilized one back.')
+}
+
 export function itemMenu(e: ReactMouseEvent, item: Item, time: number): void {
   const entries: MenuEntry[] = []
+  if (canStabilize(item)) {
+    const pic = (item as { picture?: { kind?: string } }).picture
+    entries.push({ label: pic?.kind === 'stabilized' ? 'Stabilize again' : 'Stabilize', run: () => void stabilize(item) })
+    if (pic) entries.push({ label: pic.kind === 'stabilized' ? 'Remove stabilization' : 'Use the original picture', run: () => void removePicture(item) })
+  }
   if (canHaveAudio(item)) {
     entries.push({ label: 'Fix clipped audio', run: () => void fixAudio({ itemId: item.id, segmentId: item.type === 'segment' ? item.id : undefined, time }) })
   }

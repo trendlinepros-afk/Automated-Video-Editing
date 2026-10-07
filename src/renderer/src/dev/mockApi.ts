@@ -488,6 +488,7 @@ export function installMockApi(): void {
         if (r) r.review = decision === 'keep' ? 'kept' : 'reverted'
       }, 'user', 'Review'),
       introDecision: async () => undefined,
+      requestStabilize: async () => undefined,
       regeneratePublish: async () => undefined,
       seamAudio: async () => 'seam.wav',
       waveform: async (key) => {

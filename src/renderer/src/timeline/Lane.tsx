@@ -207,6 +207,7 @@ const ItemBlock = memo(function ItemBlock(p: {
     }
   }
 
+  const picture = (item as { picture?: { kind?: string; note?: string } }).picture
   const cls = ['tl-item']
   if (p.selected) cls.push('sel')
   if (r.orphaned) cls.push('orphan')
@@ -217,7 +218,8 @@ const ItemBlock = memo(function ItemBlock(p: {
     `${p.label}` +
     (r.orphaned ? '\nThe word this was tied to was cut. It now follows the next kept word.' : '') +
     (p.locked ? '\nLocked while Claude re-edits another section.' : '') +
-    (item.type === 'segment' ? '\nDrag an edge to adjust the cut. Right-click to fix clipped audio.' : '')
+    (picture ? `\n${picture.kind === 'stabilized' ? 'Stabilized' : 'Processed picture'}${picture.note ? `: ${picture.note}` : ''}. Right-click to go back to the original.` : '') +
+    (item.type === 'segment' ? '\nDrag an edge to adjust the cut. Right-click to fix clipped audio or stabilize.' : '')
   return (
     <div
       className={cls.join(' ')}
@@ -235,6 +237,7 @@ const ItemBlock = memo(function ItemBlock(p: {
     >
       <span className="lbl">
         {r.orphaned ? '⚠ ' : ''}
+        {picture?.kind === 'stabilized' ? '◎ ' : ''}
         {p.label}
       </span>
       {wave}

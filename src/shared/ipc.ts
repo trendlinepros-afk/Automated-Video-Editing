@@ -326,6 +326,8 @@ export interface Api {
     sendChat(opts: { text: string; range?: Range; playhead: number; selectedItemIds: string[] }): Promise<void>
     requestReedit(opts: { range: Range; direction: string }): Promise<void>
     requestFixAudio(opts: { segmentId?: string; itemId?: string; time: number }): Promise<void>
+    /** Ask Claude to stabilize one A-roll segment or B-roll clip. */
+    requestStabilize(opts: { itemId: string; direction?: string }): Promise<void>
     addNote(opts: { text: string; itemId?: string; range?: Range }): Promise<void>
     noteToRule(noteId: string): Promise<void>
     reviewRequest(requestId: string, decision: 'keep' | 'revert'): Promise<void>

@@ -76,19 +76,18 @@ export function buildPlan(doc: ProjectDoc, opts: PlanOptions): RenderPlan {
         id: s.id,
         trackId: s.trackId,
         role: 'aroll',
-        path: sourcePath(s.sourceId),
-        isImage: src?.kind === 'image',
+        path: s.picture ? resolvePath(s.picture.file) : sourcePath(s.sourceId),
+        isImage: !s.picture && src?.kind === 'image',
         start: seg.start,
         end: seg.end,
-        sourceIn: s.in,
+        sourceIn: s.picture ? s.in - s.picture.sourceStart : s.in,
         speed: s.speed || 1,
         hold: !!s.hold,
         transform: null,
         keyframes: [],
         fadeIn: 0,
         fadeOut: 0,
-        sourceWidth: src?.width,
-        sourceHeight: src?.height
+        ...(s.picture ? {} : { sourceWidth: src?.width, sourceHeight: src?.height })
       })
     }
     const g = gains.get(s.trackId) ?? 0
@@ -121,25 +120,26 @@ export function buildPlan(doc: ProjectDoc, opts: PlanOptions): RenderPlan {
       const src = item.sourceId ? sources.get(item.sourceId) : undefined
       const path = item.sourceId ? sourcePath(item.sourceId) : resolvePath(item.file!)
       const isImage = src ? src.kind === 'image' : /\.(png|jpe?g|webp|bmp|gif)$/i.test(path)
+      // A processed picture (stabilized) replaces the frames only; B-roll sound stays on the original.
+      const pic = item.picture && !isImage ? item.picture : null
       if (!track.hidden) {
         layers.push({
           kind: 'video',
           id: item.id,
           trackId: item.trackId,
           role: 'broll',
-          path,
+          path: pic ? resolvePath(pic.file) : path,
           isImage,
           start: r.start,
           end: r.end,
-          sourceIn: item.in ?? 0,
+          sourceIn: pic ? (item.in ?? 0) - pic.sourceStart : item.in ?? 0,
           speed: item.speed ?? 1,
           hold: false,
           transform: toTransform(item.transform),
           keyframes: keyframes(item.keyframes),
           fadeIn: item.fadeIn ?? 0,
           fadeOut: item.fadeOut ?? 0,
-          sourceWidth: src?.width,
-          sourceHeight: src?.height
+          ...(pic ? {} : { sourceWidth: src?.width, sourceHeight: src?.height })
         })
       }
       const vol = (item.volume ?? -120) + g

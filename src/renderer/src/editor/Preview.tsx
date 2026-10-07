@@ -153,7 +153,7 @@ function ReviewBar() {
   const pending = requests.filter((r) => r.review === 'pending')
   if (!pending.length) return null
   const r = pending[pending.length - 1]
-  const what = r.kind === 'reedit' ? 'Section re-edit' : r.kind === 'chat' ? 'Chat change' : r.kind === 'fix_audio' ? 'Audio fix' : 'Change'
+  const what = r.kind === 'reedit' ? 'Section re-edit' : r.kind === 'chat' ? 'Chat change' : r.kind === 'fix_audio' ? 'Audio fix' : r.kind === 'stabilize' ? 'Stabilize' : 'Change'
   return (
     <div className="review-bar">
       <b>{what}</b>

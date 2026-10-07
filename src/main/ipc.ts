@@ -227,6 +227,7 @@ export function registerIpc(ctx: AppContext, getWindow: () => BrowserWindow | nu
       ctx.requests.enqueue({ kind: 'reedit', text: o.direction ?? '', range: o.range, context: {} })
     },
     'project.requestFixAudio': async (o: { segmentId?: string; itemId?: string; time: number }) => fixAudio(ctx, store(), o),
+    'project.requestStabilize': (o: { itemId: string; direction?: string }) => requestStabilize(ctx, store(), o),
     'project.addNote': (o: { text: string; itemId?: string; range?: Range }) => {
       const s = store()
       const text = (o.text ?? '').trim()
@@ -427,6 +428,49 @@ export function registerIpc(ctx: AppContext, getWindow: () => BrowserWindow | nu
       }
     })
   }
+}
+
+// ------------------------------------------------------------------ Stabilize
+
+/** Seconds of source on each side of the clip that the stabilizer may read, for smoother motion at the edges. */
+const STABILIZE_PAD = 1
+
+/**
+ * Asks Claude to stabilize one A-roll segment or B-roll clip. The app only describes the clip; Claude
+ * renders the stabilized picture its own way and attaches it with set_item_picture.
+ */
+function requestStabilize(ctx: AppContext, s: ProjectStore, o: { itemId: string; direction?: string }): void {
+  const doc = s.snapshotDoc()
+  const item = doc.project.items.find((i) => i.id === o.itemId)
+  if (!item || (item.type !== 'segment' && item.type !== 'clip')) throw new Error('Only video clips on the A-roll or B-roll can be stabilized.')
+  const src = item.sourceId ? doc.project.sources.find((x) => x.id === item.sourceId) : undefined
+  const file = src ? src.path : item.type === 'clip' && item.file ? (isAbsolute(item.file) ? item.file : join(s.dir, item.file)) : null
+  if (!file || src?.kind === 'image' || /\.(png|jpe?g|webp|bmp|gif|tiff?)$/i.test(file)) throw new Error('A still image has nothing to stabilize.')
+  const span = new TimelineResolver(doc.project, doc.transcript).resolveItem(item)
+  const length = item.type === 'segment' ? item.out - item.in : item.duration * (item.speed ?? 1)
+  const sourceIn = item.in
+  const sourceOut = item.in + length
+  ctx.requests.enqueue({
+    kind: 'stabilize',
+    text: o.direction ?? '',
+    range: { start: span.start, end: span.end },
+    context: {
+      itemId: item.id,
+      itemType: item.type,
+      label: item.label ?? null,
+      sourceId: item.sourceId ?? null,
+      sourcePath: file,
+      sourceIn,
+      sourceOut,
+      readFrom: Math.max(0, sourceIn - STABILIZE_PAD),
+      readTo: src?.duration ? Math.min(src.duration, sourceOut + STABILIZE_PAD) : sourceOut + STABILIZE_PAD,
+      fps: src?.fps ?? null,
+      width: src?.width ?? null,
+      height: src?.height ?? null,
+      currentPicture: item.picture ?? null,
+      saveAs: `media/stabilized/${item.id}.mp4`
+    }
+  })
 }
 
 // ------------------------------------------------------------------ Fix clipped audio

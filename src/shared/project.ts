@@ -88,6 +88,18 @@ const itemCommon = {
   libraryAssetId: z.string().optional()
 }
 
+/**
+ * A processed copy of a clip's picture (e.g. stabilized) that Claude made. Frames come from `file`,
+ * where file time 0 is source time `sourceStart`; sound and timing still come from the original source.
+ */
+export const PictureSchema = z.looseObject({
+  file: z.string().min(1), // project-relative, e.g. media/stabilized/<item>.mp4
+  sourceStart: nonNeg,
+  kind: z.enum(['stabilized', 'other']).default('other'),
+  note: z.string().optional()
+})
+export type Picture = z.infer<typeof PictureSchema>
+
 /** One kept piece of the A-roll. Segments play one after another in array order. */
 export const SegmentItemSchema = z.looseObject({
   ...itemCommon,
@@ -101,7 +113,8 @@ export const SegmentItemSchema = z.looseObject({
   muted: z.boolean().optional(),
   volume: num.default(0), // dB
   fadeIn: nonNeg.default(0),
-  fadeOut: nonNeg.default(0)
+  fadeOut: nonNeg.default(0),
+  picture: PictureSchema.optional()
 })
 
 const anchoredCommon = {
@@ -122,7 +135,8 @@ export const ClipItemSchema = z.looseObject({
   fadeIn: nonNeg.default(0),
   fadeOut: nonNeg.default(0),
   transform: TransformSchema.optional(),
-  keyframes: z.array(KeyframeSchema).optional()
+  keyframes: z.array(KeyframeSchema).optional(),
+  picture: PictureSchema.optional()
 })
 
 export const GraphicItemSchema = z.looseObject({
@@ -214,6 +228,7 @@ export const REQUEST_KINDS = [
   'chat',
   'reedit',
   'fix_audio',
+  'stabilize',
   'continue_intro',
   'redo_intro',
   'publish_regen',

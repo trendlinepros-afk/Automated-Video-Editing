@@ -20,6 +20,7 @@
  *   services/pikzels.ts    -> PikzelsService
  *   updater.ts             -> UpdaterService
  */
+import type { VideoThemesService } from './services/videoThemes'
 import type {
   ExportPreset,
   ProjectDoc,
@@ -136,6 +137,10 @@ export interface EnvironmentService {
   ffprobe(): string
   /** Folder holding the engine for a given version, installed from app resources if missing. */
   engineDir(version: string): string
+  /** yt-dlp, downloaded on first use. */
+  ytdlp(onPercent?: (pct: number) => void): Promise<string>
+  /** engine/analysis/style.py from the app's own files. */
+  analysisScript(): string
   hasGpu(): Promise<boolean>
 }
 
@@ -289,6 +294,7 @@ export interface AppContext {
   mcp: McpService
   runner: RunnerService
   library: LibraryService
+  themes: VideoThemesService
   pikzels: PikzelsService
   updater: UpdaterService
   /** Send an event to the window (no-op when no window is open). */

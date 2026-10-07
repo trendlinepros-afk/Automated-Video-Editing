@@ -1,4 +1,5 @@
 /** The editor's dialogs: Export, Export log, Re-edit section, Inspiration, Save to library, Leave a note, Compare versions. */
+import type { VideoTheme } from '@shared/videoTheme'
 import { useEffect, useRef, useState } from 'react'
 import type { ExportPreset, Range } from '@shared/project'
 import { call, toast } from '../state/app'
@@ -199,7 +200,20 @@ function InspirationDialog({ onClose }: { onClose: () => void }) {
   const project = useStore(editor, (s) => s.snapshot!.doc.project)
   const readOnly = useStore(editor, (s) => s.snapshot!.readOnly)
   const [text, setText] = useState(project.inspiration)
+  const [themes, setThemes] = useState<VideoTheme[]>([])
+  const [themeId, setThemeId] = useState(project.videoTheme?.id ?? '')
+  useEffect(() => {
+    void window.api.themes.list().then(setThemes, () => undefined)
+  }, [])
   const save = async () => {
+    if ((project.videoTheme?.id ?? '') !== themeId) {
+      try {
+        await window.api.project.setVideoTheme(themeId || null)
+      } catch (e) {
+        toast(`Could not change the video theme: ${errorMessage(e)}`, { kind: 'error' })
+        return false
+      }
+    }
     if (text !== project.inspiration) return applyOp({ op: 'setInspiration', text })
     return true
   }
@@ -208,7 +222,9 @@ function InspirationDialog({ onClose }: { onClose: () => void }) {
     const d = currentDerived()
     const range: Range = { start: 0, end: d?.duration ?? 0 }
     try {
-      await window.api.project.requestReedit({ range, direction: `Re-edit the video following the updated inspiration:\n${text.trim()}` })
+      const themeName = themes.find((t) => t.id === themeId)?.name
+      const direction = [text.trim() && `Re-edit the video following the updated inspiration:\n${text.trim()}`, themeName && `Match the pace and style of the video theme "${themeName}" (get_video_theme).`].filter(Boolean).join('\n')
+      await window.api.project.requestReedit({ range, direction })
     } catch (e) {
       toast(`Could not send the re-edit: ${errorMessage(e)}`, { kind: 'error' })
       return
@@ -225,14 +241,24 @@ function InspirationDialog({ onClose }: { onClose: () => void }) {
           <button className="btn" onClick={async () => (await save()) && onClose()} disabled={readOnly}>
             Save
           </button>
-          <button className="btn primary" onClick={reedit} disabled={readOnly || project.status === 'new' || !text.trim()}>
-            Re-edit following the new inspiration
+          <button className="btn primary" onClick={reedit} disabled={readOnly || project.status === 'new' || (!text.trim() && !themeId)}>
+            Re-edit following this
           </button>
         </>
       }
     >
       <div className="muted small">Your vision for this video: tone, pacing, jokes, moments to feature, videos to take after. It is saved in the project.</div>
       <textarea rows={8} value={text} disabled={readOnly} onChange={(e) => setText(e.target.value)} placeholder="Leave empty and Claude does its best from the footage, the channel's rules and the brand kit. (Win+H to speak)" />
+      <label className="small">Video theme</label>
+      <select value={themeId} disabled={readOnly} onChange={(e) => setThemeId(e.target.value)}>
+        <option value="">None: the channel's usual style</option>
+        {themes.map((t) => (
+          <option key={t.id} value={t.id}>
+            {t.name}
+          </option>
+        ))}
+      </select>
+      <div className="muted small">Make themes from YouTube videos or channels in Settings &gt; Video themes. Claude follows the theme from the next request.</div>
     </Modal>
   )
 }

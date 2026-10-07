@@ -2,6 +2,7 @@
  * The contract between the window (renderer) and the app (main process).
  * The preload script exposes `window.api` with exactly this shape.
  */
+import type { VideoTheme, VideoThemeProgress } from './videoTheme'
 import type {
   ExportPreset,
   RequestKind,
@@ -327,7 +328,9 @@ export interface Api {
     undo(): Promise<ProjectSnapshot>
     redo(): Promise<ProjectSnapshot>
     relinkSource(sourceId: string, newPath: string): Promise<ProjectSnapshot>
-    startEdit(opts: { inspiration: string; scope: 'whole' | 'intro'; introMaxSeconds: number | null }): Promise<void>
+    startEdit(opts: { inspiration: string; scope: 'whole' | 'intro'; introMaxSeconds: number | null; videoThemeId?: string | null }): Promise<void>
+    /** Choose (or clear) the video theme for this project; Claude follows it from the next request. */
+    setVideoTheme(id: string | null): Promise<void>
     sendChat(opts: { text: string; range?: Range; playhead: number; selectedItemIds: string[] }): Promise<void>
     requestReedit(opts: { range: Range; direction: string }): Promise<void>
     requestFixAudio(opts: { segmentId?: string; itemId?: string; time: number }): Promise<void>
@@ -386,6 +389,17 @@ export interface Api {
     duplicate(id: string): Promise<LibraryAsset>
     remove(id: string): Promise<void>
     placeInProject(id: string, time: number): Promise<void>
+  }
+  /** Video themes (Settings > Video themes): the measured editing style of reference videos. */
+  themes: {
+    list(): Promise<VideoTheme[]>
+    analyze(input: { link?: string; file?: string; name?: string }): Promise<VideoTheme>
+    cancel(): Promise<void>
+    update(id: string, patch: { name?: string; notes?: string }): Promise<VideoTheme>
+    remove(id: string): Promise<void>
+    /** Contact sheet images (absolute paths) with a caption each. */
+    sheets(id: string): Promise<{ label: string; path: string }[]>
+    onProgress(cb: (p: VideoThemeProgress) => void): () => void
   }
   pikzels: {
     list(): Promise<Pikzonality[]>

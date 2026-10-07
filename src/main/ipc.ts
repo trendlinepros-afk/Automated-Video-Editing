@@ -18,6 +18,7 @@ import { snapshotOf } from './project/manager'
 import { newId, type ProjectStore } from './project/store'
 import { applyUserOp, probeSource } from './project/userOps'
 import { exportLog, exportPack } from './services/publish'
+import { themeSheets } from './services/videoThemes'
 import { fetchYouTubeThumbnails } from './services/youtube'
 import { estimate } from './runner/costs'
 
@@ -193,9 +194,18 @@ export function registerIpc(ctx: AppContext, getWindow: () => BrowserWindow | nu
       s.log.write('tweak', 'Footage relinked', { sourceId, from: src.path, to: newPath, alsoRelinked: moved })
       return snap()
     },
-    'project.startEdit': (o: { inspiration: string; scope: 'whole' | 'intro'; introMaxSeconds: number | null }) => {
+    'project.setVideoTheme': (id: string | null) => {
+      const t = id ? ctx.themes.get(id) : null
+      if (id && !t) throw new Error('That video theme no longer exists.')
+      store().mutate(t ? `Video theme: ${t.name}` : 'No video theme', 'user', (d) => {
+        d.project.videoTheme = t ? { id: t.id, name: t.name } : null
+      }, BOOKKEEPING)
+    },
+    'project.startEdit': (o: { inspiration: string; scope: 'whole' | 'intro'; introMaxSeconds: number | null; videoThemeId?: string | null }) => {
       const s = store()
+      const theme = o.videoThemeId ? ctx.themes.get(o.videoThemeId) : null
       s.mutate('Start edit', 'user', (d) => {
+        d.project.videoTheme = theme ? { id: theme.id, name: theme.name } : null
         d.project.inspiration = o.inspiration ?? ''
         d.project.scope.mode = o.scope === 'intro' ? 'intro' : 'whole'
         d.project.scope.introMaxSeconds = o.scope === 'intro' && o.introMaxSeconds && o.introMaxSeconds > 0 ? o.introMaxSeconds : null
@@ -403,6 +413,15 @@ export function registerIpc(ctx: AppContext, getWindow: () => BrowserWindow | nu
       const list = await fetchYouTubeThumbnails(links, { cacheDir: join(paths.data, 'cache', 'youtube') })
       ctx.appLog.write('thumbnail', `Listed ${list.items.length} YouTube thumbnails for training`, { source: list.source })
       return list
+    },
+    'themes.list': () => ctx.themes.list(),
+    'themes.analyze': (input: { link?: string; file?: string; name?: string }) => ctx.themes.analyze(input, (p) => ctx.send('themes:progress', p)),
+    'themes.cancel': () => ctx.themes.cancel(),
+    'themes.update': (id: string, patch: { name?: string; notes?: string }) => ctx.themes.update(id, { name: patch?.name, notes: patch?.notes }),
+    'themes.remove': (id: string) => ctx.themes.remove(id),
+    'themes.sheets': (id: string) => {
+      const t = ctx.themes.get(id)
+      return t ? themeSheets(ctx.themes.dir(id), t) : []
     },
     'pikzels.create': (kind: 'persona' | 'style', name: string, imagePaths: string[]) => ctx.pikzels.create(kind, name, imagePaths),
     'pikzels.refresh': () => ctx.pikzels.refresh(),

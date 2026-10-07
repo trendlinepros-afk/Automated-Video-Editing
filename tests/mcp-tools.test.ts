@@ -14,6 +14,11 @@ import { createRequestService } from '../src/main/project/requests'
 import { ProjectStore } from '../src/main/project/store'
 
 let dir: string
+const themeState: any = {
+  id: 'vt_test1', name: 'Fast RC style', createdAt: '', source: { kind: 'video', input: 'x' }, notes: 'Copy the pace',
+  averages: { cutsPerMinute: 24, cutsPerMinuteFirst30s: 40, medianShotSeconds: 1.8 },
+  videos: [{ title: 'Ref', stats: { analyzedSeconds: 600, cutsPerMinute: 24, cutsPerMinuteFirst30s: 40, shotSeconds: { median: 1.8 }, pace: [{ from: 0, cutsPerMinute: 40 }], cutTimes: [1.2, 2.9], sheets: [{ file: 'v1-hook.jpg', label: 'one frame from each shot in the first minute' }] } }]
+}
 let store: ProjectStore
 let mcp: McpServiceImpl
 let ctx: AppContext
@@ -33,6 +38,11 @@ function makeCtx(): AppContext {
     versions: { save: (name: string) => ({ id: `v_${name.length}`, name, createdAt: new Date().toISOString(), auto: true }) },
     runner: { kick: () => {} },
     preview: { invalidate: () => {} },
+    themes: {
+      get: (id: string) => (id === themeState.id ? themeState : null),
+      dir: () => join(dir, 'theme'),
+      update: (_id: string, patch: { summary?: string }) => Object.assign(themeState, patch)
+    },
     engine: { probe: async (p: string) => ({ kind: p.endsWith('.png') ? 'image' : 'video', duration: 8, fps: 30, width: 1920, height: 1080, hasAudio: false }) },
     send: () => {}
   } as unknown as AppContext
@@ -232,5 +242,30 @@ describe('stabilize', () => {
     const removed = await client.callTool({ name: 'set_item_picture', arguments: { id: seg.id, remove: true } })
     expect(removed.isError).toBeFalsy()
     expect((store.project.items.find((i) => i.id === seg.id) as any).picture).toBeUndefined()
+  })
+})
+
+describe('video theme tools', () => {
+  it('shows Claude the theme with its contact sheets until it has written a summary, then the summary only', async () => {
+    mkdirSync(join(dir, 'theme'), { recursive: true })
+    writeFileSync(join(dir, 'theme', 'v1-hook.jpg'), Buffer.from([0xff, 0xd8, 0xff, 0xd9]))
+    const client = await connect()
+    const none = await client.callTool({ name: 'get_video_theme', arguments: {} })
+    expect(textOf(none)).toMatch(/No video theme/)
+
+    store.mutate('theme', 'user', (d) => {
+      d.project.videoTheme = { id: 'vt_test1', name: 'Fast RC style' }
+    })
+    const first = (await client.callTool({ name: 'get_video_theme', arguments: {} })) as any
+    expect(first.content.some((c: any) => c.type === 'image')).toBe(true)
+    expect(textOf(first)).toMatch(/about 24 cuts a minute \(40 in the first 30 s\)/)
+    expect(textOf(first)).toMatch(/Copy the pace/)
+    expect(textOf(first)).toMatch(/save_video_theme_summary/)
+
+    const saved = await client.callTool({ name: 'save_video_theme_summary', arguments: { summary: 'Jump cuts every 1-2 s, punch-in zooms, bold captions.' } })
+    expect(saved.isError).toBeFalsy()
+    const again = (await client.callTool({ name: 'get_video_theme', arguments: {} })) as any
+    expect(again.content.every((c: any) => c.type === 'text')).toBe(true)
+    expect(textOf(again)).toMatch(/Jump cuts every 1-2 s/)
   })
 })

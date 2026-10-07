@@ -5,7 +5,8 @@
 import { useEffect, useState } from 'react'
 import type { ClaudeEstimate } from '@shared/ipc'
 import { EstimateNote, useEstimate } from './EstimateNote'
-import { toast } from '../state/app'
+import { openSettings, toast } from '../state/app'
+import { themeOneLine, type VideoTheme } from '@shared/videoTheme'
 import { errorMessage } from '../util'
 import { applyOp, editor } from '../state/editor'
 import { useStore } from '../state/store'
@@ -19,6 +20,12 @@ export function StartPanel({ onStarted }: { onStarted: () => void }) {
   const [maxSeconds, setMaxSeconds] = useState(String(project.scope.introMaxSeconds ?? 60))
   const [busy, setBusy] = useState(false)
   const [est, setEst] = useState<ClaudeEstimate | null>(null)
+  const [themes, setThemes] = useState<VideoTheme[]>([])
+  const [themeId, setThemeId] = useState<string>(project.videoTheme?.id ?? '')
+  useEffect(() => {
+    void window.api.themes.list().then(setThemes, () => undefined)
+  }, [])
+  const theme = themes.find((t) => t.id === themeId)
   useEffect(() => {
     let live = true
     window.api.claude.estimate('start_edit', { scope }).then((e) => live && setEst(e), () => undefined)
@@ -35,7 +42,7 @@ export function StartPanel({ onStarted }: { onStarted: () => void }) {
     setBusy(true)
     const introMaxSeconds = scope === 'intro' && !auto ? Math.max(5, parseFloat(maxSeconds) || 60) : null
     try {
-      await window.api.project.startEdit({ inspiration, scope, introMaxSeconds })
+      await window.api.project.startEdit({ inspiration, scope, introMaxSeconds, videoThemeId: themeId || null })
       onStarted()
       toast(scope === 'intro' ? 'Claude is starting on the intro. It reads the whole video first.' : 'Claude is starting the edit. Watch it land on the timeline.')
     } catch (e) {
@@ -61,6 +68,23 @@ export function StartPanel({ onStarted }: { onStarted: () => void }) {
             onBlur={saveInspiration}
             placeholder="Your vision: tone, pacing, jokes, moments to feature, videos to take after… (Win+H to speak)"
           />
+        </div>
+        <div className="field">
+          <label>Video theme (optional)</label>
+          <div className="row" style={{ gap: 8 }}>
+            <select value={themeId} disabled={readOnly} onChange={(e) => setThemeId(e.target.value)} style={{ minWidth: 240 }}>
+              <option value="">None: the channel's usual style</option>
+              {themes.map((t) => (
+                <option key={t.id} value={t.id}>
+                  {t.name}
+                </option>
+              ))}
+            </select>
+            <button className="btn small ghost" onClick={() => openSettings('themes')} title="Make a theme from a YouTube video or channel">
+              {themes.length ? 'Manage…' : 'Make one from a YouTube link…'}
+            </button>
+          </div>
+          {theme && <span className="hint">Claude edits to a similar pace and style: {themeOneLine(theme)}.</span>}
         </div>
         <div className="field">
           <label>Scope</label>

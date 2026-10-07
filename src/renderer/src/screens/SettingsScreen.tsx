@@ -10,6 +10,7 @@ import { Icon } from '../components/Icon'
 import { UpdateButton } from '../components/Updates'
 import { ProfilesSection } from '../settings/ProfilesSection'
 import { ModelsSection } from '../settings/ModelsSection'
+import { VideoThemesSection } from '../settings/VideoThemesSection'
 import { fmt } from '../util'
 import { PriceEditor } from '../panels/ThumbnailsPanelCosts'
 
@@ -18,6 +19,7 @@ const SECTIONS: [SettingsSection, string][] = [
   ['music', 'Music folders'],
   ['claude', 'Claude connection'],
   ['models', 'Claude models'],
+  ['themes', 'Video themes'],
   ['profiles', 'Profiles'],
   ['suggestions', 'Suggested rules'],
   ['about', 'About']
@@ -54,6 +56,8 @@ export function SettingsScreen() {
                 <Claude />
               ) : section === 'models' ? (
                 <ModelsSection />
+              ) : section === 'themes' ? (
+                <VideoThemesSection />
               ) : section === 'profiles' ? (
                 <ProfilesSection />
               ) : section === 'suggestions' ? (

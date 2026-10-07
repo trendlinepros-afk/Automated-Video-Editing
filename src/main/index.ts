@@ -24,6 +24,7 @@ import { createVersionService } from './project/versions'
 import { readJson } from './project/store'
 import { createCorrectionsService } from './services/corrections'
 import { createLibraryService } from './services/library'
+import { createVideoThemesService } from './services/videoThemes'
 import { createMusicService } from './services/music'
 import { createPikzelsService } from './services/pikzels'
 import {
@@ -126,6 +127,7 @@ function buildContext(log: ActivityLog): AppContext {
   c.mcp = createMcpService(c)
   c.runner = createRunnerService(c)
   c.library = createLibraryService(c)
+  c.themes = createVideoThemesService(c)
   c.pikzels = createPikzelsService(c)
   c.updater = createUpdaterService(c)
   return c

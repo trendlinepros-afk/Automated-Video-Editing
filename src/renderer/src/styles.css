@@ -403,3 +403,8 @@ button:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
 /* Undo: what the last change was, before it is taken back. */
 .undo-pop { width: 320px; white-space: normal; line-height: 1.45; }
 .undo-what { font-weight: 600; margin: 4px 0; color: var(--text); }
+
+/* Settings > Video themes */
+.theme-card .theme-name { font-weight: 600; font-size: 15px; background: transparent; border-color: transparent; }
+.theme-card .theme-name:hover, .theme-card .theme-name:focus { border-color: var(--line-2); }
+.theme-sheet { width: 100%; max-width: 900px; border-radius: 4px; border: 1px solid var(--line); }

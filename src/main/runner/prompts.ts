@@ -159,5 +159,9 @@ export function buildRunPrompt(requests: EditRequest[], project: Project, opts: 
   const inFlight = project.checklist.find((c) => c.status === 'in_progress')
   const resumeNote = inFlight ? `\nThe checklist shows "${inFlight.label}" in progress: continue from there and do not redo finished stages.` : ''
   const body = requests.map((r) => requestSection(r, project)).join('\n\n')
-  return `${intro}${resumeNote}\n\nOpen requests (handle them in this order; begin_request and finish_request each one):\n\n${body}`
+  const theme = project.videoTheme
+    ? `\nVideo theme: "${project.videoTheme.name}". Edit to a similar pace and style as its reference videos. Call get_video_theme before ` +
+      'deciding cuts, B-roll, graphics, captions or sound (the channel rules, brand kit and the inspiration still come first).'
+    : ''
+  return `${intro}${resumeNote}${theme}\n\nOpen requests (handle them in this order; begin_request and finish_request each one):\n\n${body}`
 }

@@ -3,6 +3,12 @@
 Each release's section becomes its GitHub release text and the notes shown in the app's update dialog.
 A release is blocked until the section for its version has notes.
 
+## 1.5.0
+
+- **Video themes.** Settings > Video themes: paste a YouTube video or channel link (or choose a video file) and the app measures its editing style: cuts per minute, how fast the opening is, shot lengths, speech pace, loudness, and a contact sheet of its shots. For a channel it reads the newest 3 long-form videos (Shorts and live streams skipped). Only the first 12 minutes are read, at low resolution, and the downloads are deleted afterwards. Making a theme uses no Claude usage.
+- Choose a theme on the Start edit panel, or later in Inspiration, and Claude edits to a similar pace and style, within your channel's rules and brand kit. The first time it uses a theme, Claude writes a short description of the style, shown in Settings; later edits read that instead of the pictures, which keeps usage down.
+- Add your own notes to a theme ("copy the pace and the zooms, skip the meme sounds") and Claude follows them.
+
 ## 1.4.0
 
 - **Undo button with words.** The top bar has an Undo button. Clicking it says in plain words what it will take back, who made the change and when ("Move B-roll clip "Charger screen". Made by Claude 3 minutes ago"), and Undo it confirms. Ctrl+Z still undoes at once; either way a message says what was undone, with Redo.

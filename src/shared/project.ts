@@ -399,6 +399,8 @@ export const ProjectSchema = z.looseObject({
   footageFolder: z.string(),
   status: z.enum(PROJECT_STATUSES).default('new'),
   inspiration: z.string().default(''),
+  /** The video theme this edit follows (Settings > Video themes), by id, with its name at the time. */
+  videoTheme: z.looseObject({ id: z.string(), name: z.string() }).nullable().optional(),
   scope: z.looseObject({
     mode: z.enum(['whole', 'intro']).default('whole'),
     introMaxSeconds: num.positive().nullable().default(null),

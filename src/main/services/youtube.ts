@@ -25,7 +25,7 @@ export interface YouTubeThumbnailList {
   items: YouTubeThumbnail[]
 }
 
-type FetchLike = (url: string, init?: { headers?: Record<string, string> }) => Promise<{
+export type FetchLike = (url: string, init?: { headers?: Record<string, string> }) => Promise<{
   ok: boolean
   status: number
   text(): Promise<string>
@@ -149,6 +149,25 @@ export interface FetchThumbnailsOptions {
 export async function fetchYouTubeThumbnails(input: string, opts: FetchThumbnailsOptions): Promise<YouTubeThumbnailList> {
   const doFetch: FetchLike = opts.fetch ?? ((url, init) => fetch(url, init))
   const limit = opts.limit ?? 30
+  const { source, videos: unique } = await resolveYouTubeVideos(input, { fetch: doFetch, limit })
+  mkdirSync(opts.cacheDir, { recursive: true })
+  const items: YouTubeThumbnail[] = []
+  // A few at a time keeps a 30-video channel quick without hammering YouTube.
+  for (let i = 0; i < unique.length; i += 6) {
+    const batch = await Promise.all(unique.slice(i, i + 6).map((v) => saveThumbnail(doFetch, v, opts.cacheDir)))
+    for (const t of batch) if (t) items.push(t)
+  }
+  if (!items.length) throw new YouTubeError('No thumbnails could be downloaded for that link.')
+  return { source, items }
+}
+
+/** The videos behind one or more links (a channel's newest uploads first), with titles where YouTube gives them. */
+export async function resolveYouTubeVideos(
+  input: string,
+  opts: { fetch?: FetchLike; limit?: number } = {}
+): Promise<{ source: string; kind: 'video' | 'playlist' | 'channel'; videos: { videoId: string; title: string }[] }> {
+  const doFetch: FetchLike = opts.fetch ?? ((url, init) => fetch(url, init))
+  const limit = opts.limit ?? 30
   const links = input.split(/[\s,]+/).filter(Boolean)
   if (!links.length) throw new YouTubeError('Paste a YouTube channel, video or playlist link.')
 
@@ -165,9 +184,11 @@ export async function fetchYouTubeThumbnails(input: string, opts: FetchThumbnail
 
   const videos: { videoId: string; title: string }[] = []
   const sources: string[] = []
+  let firstKind: 'video' | 'playlist' | 'channel' | undefined
   for (const raw of links) {
     const link = parseYouTubeLink(raw)
     if (!link) throw new YouTubeError(`That is not a YouTube channel, video or playlist link: ${raw}`)
+    firstKind ??= link.kind
     if (link.kind === 'video') {
       let title = ''
       try {
@@ -203,15 +224,7 @@ export async function fetchYouTubeThumbnails(input: string, opts: FetchThumbnail
   }
 
   const unique = [...new Map(videos.map((v) => [v.videoId, v])).values()].slice(0, Math.max(limit, links.length))
-  mkdirSync(opts.cacheDir, { recursive: true })
-  const items: YouTubeThumbnail[] = []
-  // A few at a time keeps a 30-video channel quick without hammering YouTube.
-  for (let i = 0; i < unique.length; i += 6) {
-    const batch = await Promise.all(unique.slice(i, i + 6).map((v) => saveThumbnail(doFetch, v, opts.cacheDir)))
-    for (const t of batch) if (t) items.push(t)
-  }
-  if (!items.length) throw new YouTubeError('No thumbnails could be downloaded for that link.')
-  return { source: sources.join(', '), items }
+  return { source: sources.join(', '), kind: firstKind ?? 'video', videos: unique }
 }
 
 /** Downloads the largest thumbnail YouTube has for a video. maxresdefault is missing on some videos. */

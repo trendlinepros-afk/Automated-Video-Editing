@@ -191,6 +191,10 @@ Draw every size as a fraction of `ctx.width`/`ctx.height` so the low-resolution 
 3. Update the schema in `src/shared/project.ts`.
 4. Add a sample project saved by the last released version under `tests/fixtures/projects/`. The upgrade tests open and upgrade every sample, and a release is blocked if any fails.
 
+## Video themes
+
+Settings > Video themes measures the editing style of a YouTube video, a channel's newest three long-form videos, or a video file: cuts per minute (overall, in the first 30 seconds and minute by minute, jump cuts included), shot lengths, speech pace from the captions, loudness, and contact sheets of the shots. The analysis is `engine/analysis/style.py` (measurement only, no Claude usage); yt-dlp is pinned in `engine/runtime.json`, downloaded on first use and updates itself when YouTube changes. Choose a theme on the Start edit panel (or later in Inspiration); Claude reads it with `get_video_theme`, writes a short description of the style once (`save_video_theme_summary`, shown in Settings), and edits to a similar pace and look within the channel's rules and brand kit.
+
 ## Where data lives
 
 Program files are replaced by updates. Nothing below is.
@@ -198,9 +202,9 @@ Program files are replaced by updates. Nothing below is.
 | Location | Holds |
 | --- | --- |
 | `%LOCALAPPDATA%\Programs\ai-video-editor\` | The installed program (replaced by each update) |
-| `%APPDATA%\AI Video Editor\` | `settings.json`, `profiles\`, `recent.json`, `secrets.json` (encrypted with Windows credential protection), `music-index.json`, `logs\app.log`, `backups\` |
+| `%APPDATA%\AI Video Editor\` | `settings.json`, `profiles\`, `recent.json`, `secrets.json` (encrypted with Windows credential protection), `music-index.json`, `video-themes\` (each theme's measurements and contact sheets), `logs\app.log`, `backups\` |
 | `%LOCALAPPDATA%\AI Video Editor\python\` | The managed Python environment |
-| `%LOCALAPPDATA%\AI Video Editor\tools\` | Pinned uv, Python and ffmpeg |
+| `%LOCALAPPDATA%\AI Video Editor\tools\` | Pinned uv, Python and ffmpeg, and yt-dlp once a video theme is made from a YouTube link |
 | `%LOCALAPPDATA%\AI Video Editor\engines\<version>\` | Every engine version used, so old projects render the same after updates |
 | `%LOCALAPPDATA%\ai-video-editor-updater\` | Downloaded updates waiting to install |
 | Your project folders | Everything about each video (see above) |
@@ -220,5 +224,6 @@ Local first. Footage, renders, projects, transcripts and logs stay on your PC. T
 
 - **GitHub**, to check for and download updates (no account or token needed).
 - **Pikzels**, to generate thumbnails and train personas and styles, with your API key.
+- **YouTube**, only when you ask for it: thumbnails for training a persona or style, and a small, temporary copy of a reference video when you make a video theme from a link (downloaded with yt-dlp, measured, then deleted).
 
 Claude Code runs on your PC under your own sign-in and talks to Anthropic as it always does; the app itself makes no AI model calls. API keys and tokens are never written to project files or logs.

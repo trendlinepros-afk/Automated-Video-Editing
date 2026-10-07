@@ -78,6 +78,8 @@ export function sectionForRequest(kind: RequestKind): ModelSection | null {
     case 'chat':
     case 'thumbnail_direction':
       return 'chat'
+    case 'thumbnail_draft':
+      return 'thumbnails'
     case 'reedit':
     case 'redo_intro':
     case 'insert_clip':

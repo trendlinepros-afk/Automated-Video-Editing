@@ -138,6 +138,21 @@ function Compose() {
   const typed = useMemo(() => findTimeRange(text), [text])
   const chatEstimate = useEstimate('chat')
 
+  // "Send time to chat" from the timeline: the time goes into the box, ready to finish the sentence.
+  const draft = useStore(editor, (s) => s.chatDraft)
+  const box = useRef<HTMLTextAreaElement>(null)
+  useEffect(() => {
+    if (!draft) return
+    setText((cur) => (cur.trim() ? `${cur.trimEnd()} ${draft.text}` : draft.text))
+    editor.set({ chatDraft: null })
+    requestAnimationFrame(() => {
+      const el = box.current
+      if (!el) return
+      el.focus()
+      el.setSelectionRange(el.value.length, el.value.length)
+    })
+  }, [draft])
+
   // Highlight a typed time range on the timeline as you type.
   useEffect(() => {
     const cur = editor.get().chatRange
@@ -167,6 +182,7 @@ function Compose() {
   return (
     <div className="chat-compose">
       <textarea
+        ref={box}
         rows={3}
         value={text}
         disabled={busy}

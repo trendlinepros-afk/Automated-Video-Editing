@@ -334,6 +334,11 @@ export interface Api {
     sendChat(opts: { text: string; range?: Range; playhead: number; selectedItemIds: string[] }): Promise<void>
     requestReedit(opts: { range: Range; direction: string }): Promise<void>
     requestFixAudio(opts: { segmentId?: string; itemId?: string; time: number }): Promise<void>
+    /**
+     * Add a photo or video at a spot ("Add clip here"): Claude places it and re-edits `seconds` on each side so it flows.
+     * mode 'insert' cuts it into the video (the video gets longer); 'overlay' shows it over the video (the sound carries on).
+     */
+    requestInsertClip(opts: { file: string; time: number; seconds: number; mode: 'insert' | 'overlay'; note?: string }): Promise<void>
     /** Ask Claude to stabilize one A-roll segment or B-roll clip. */
     requestStabilize(opts: { itemId: string; direction?: string }): Promise<void>
     addNote(opts: { text: string; itemId?: string; range?: Range }): Promise<void>
@@ -389,6 +394,8 @@ export interface Api {
     duplicate(id: string): Promise<LibraryAsset>
     remove(id: string): Promise<void>
     placeInProject(id: string, time: number): Promise<void>
+    /** Use another folder for the library, moving the assets there when move is true. */
+    changeFolder(dest: string, move: boolean): Promise<{ moved: number; skipped: number }>
   }
   /** Video themes (Settings > Video themes): the measured editing style of reference videos. */
   themes: {

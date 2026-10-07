@@ -19,6 +19,7 @@ import { newId, type ProjectStore } from './project/store'
 import { applyUserOp, probeSource } from './project/userOps'
 import { exportLog, exportPack } from './services/publish'
 import { themeSheets } from './services/videoThemes'
+import { moveLibrary } from './services/library'
 import { fetchYouTubeThumbnails } from './services/youtube'
 import { estimate } from './runner/costs'
 
@@ -238,6 +239,32 @@ export function registerIpc(ctx: AppContext, getWindow: () => BrowserWindow | nu
     },
     'project.requestFixAudio': async (o: { segmentId?: string; itemId?: string; time: number }) => fixAudio(ctx, store(), o),
     'project.requestStabilize': (o: { itemId: string; direction?: string }) => requestStabilize(ctx, store(), o),
+    'project.requestInsertClip': async (o: { file: string; time: number; seconds: number; mode: 'insert' | 'overlay'; note?: string }) => {
+      const s = store()
+      if (!o.file || !existsSync(o.file)) throw new Error('That file could not be found.')
+      const seconds = Math.max(1, Math.min(600, Number(o.seconds) || 10))
+      const time = Math.max(0, Number(o.time) || 0)
+      // The file stays where it is; it becomes a project source so Claude can place it by id.
+      const existing = s.project.sources.find((x) => x.path === o.file)
+      const source = existing ?? (await probeSource(ctx, o.file, 'other'))
+      if (!existing) s.mutate(`Add source ${basename(o.file)}`, 'user', (d) => void d.project.sources.push(source), BOOKKEEPING)
+      ctx.requests.enqueue({
+        kind: 'insert_clip',
+        text: (o.note ?? '').trim(),
+        range: { start: Math.max(0, time - seconds), end: time + seconds },
+        context: {
+          insertAt: Math.round(time * 1000) / 1000,
+          mode: o.mode === 'overlay' ? 'overlay' : 'insert',
+          secondsEachSide: seconds,
+          sourceId: source.id,
+          file: o.file,
+          kind: source.kind,
+          duration: source.duration,
+          ...(source.width ? { width: source.width, height: source.height } : {}),
+          hasAudio: source.hasAudio
+        }
+      })
+    },
     'project.addNote': (o: { text: string; itemId?: string; range?: Range }) => {
       const s = store()
       const text = (o.text ?? '').trim()
@@ -401,6 +428,15 @@ export function registerIpc(ctx: AppContext, getWindow: () => BrowserWindow | nu
     'claude.estimate': (kind: RequestKind, opts?: { scope?: 'whole' | 'intro' }) => estimate(ctx, ctx.projects.current()?.project ?? null, kind, opts),
 
     // ---------------------------------------------------------------- library
+    'library.changeFolder': (dest: string, move: boolean) => {
+      const from = ctx.settings.get().libraryFolder
+      if (!dest) throw new Error('Choose a folder.')
+      const result = move && from && existsSync(from) ? moveLibrary(from, dest) : { moved: 0, skipped: 0 }
+      ctx.settings.update({ libraryFolder: dest, libraryFolderConfirmed: true })
+      ctx.library.root()
+      ctx.appLog.write('app', `Asset library folder changed${move ? ' and assets moved' : ''}`, { from, to: dest, ...result })
+      return result
+    },
     'library.list': (filter?: { scope?: string; type?: string; query?: string }) => ctx.library.list(filter),
     'library.update': (id: string, patch: Partial<LibraryAsset>) => ctx.library.update(id, patch),
     'library.duplicate': (id: string) => ctx.library.duplicate(id),

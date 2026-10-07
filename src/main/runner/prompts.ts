@@ -122,6 +122,27 @@ export function requestSection(r: EditRequest, project: Project): string {
       )
       if (r.text.trim()) lines.push(`Note from the owner: "${r.text.trim()}"`)
       break
+    case 'insert_clip': {
+      const c = (r.context ?? {}) as { insertAt?: number; mode?: string; secondsEachSide?: number; kind?: string; sourceId?: string }
+      const at = typeof c.insertAt === 'number' ? `${formatTime(c.insertAt, true)} (${c.insertAt.toFixed(2)}s)` : 'the marked spot'
+      lines.push(
+        `The owner added a ${c.kind === 'image' ? 'photo' : 'video clip'} (source ${c.sourceId ?? 'in the attached context'}) at ${at} and wants it to ` +
+          `flow with the edit around it. You may re-edit ${rangeText(r.range)} (${c.secondsEachSide ?? '?'} s on each side); nothing outside it can change.`,
+        c.mode === 'overlay'
+          ? 'Show it OVER the video there as B-roll (add_item on the B-roll track, anchored to the words at that spot): the A-roll and its sound carry on underneath.'
+          : 'Cut it INTO the video there (set_aroll_cuts, inserting it between the pieces at that spot; the video gets longer and everything after shifts on its own). ' +
+              'Pick the exact cut points at word boundaries near the spot, so no word is clipped.',
+        'Look at the new clip first (frames of the source) and at the footage around the spot (get_range_frames). Decide how long it should be ' +
+          'and which part of it to use, then re-tune the range so it reads as one piece: trims, the cuts before and after, a transition only if it ' +
+          'helps, graphics, sound effects, music under it and captions. ' +
+          (c.kind === 'image'
+            ? 'For a photo, choose a length that suits the moment (usually 2-4 s) and give it gentle motion if that fits the style (keyframes, or render a short video from it with ffmpeg and import_file). '
+            : 'Keep its own sound only if it adds something; otherwise lower or mute it under the voice. ') +
+          'Follow the channel rules and the video theme if there is one. Reply with what you did.'
+      )
+      if (r.text.trim()) lines.push(`Note from the owner: "${r.text.trim()}"`)
+      break
+    }
     case 'stabilize':
       lines.push(
         `Stabilize the clip ${r.context?.itemId ?? ''} at ${rangeText(r.range)}. The attached context has its source file, the source range it ` +

@@ -50,7 +50,7 @@ export function SetupScreen() {
   const pickLibrary = async () => {
     const dir = await call(() => window.api.app.pickFolder('Choose a folder for your asset library', settings?.libraryFolder || undefined))
     if (dir) {
-      await updateSettings({ libraryFolder: dir })
+      await updateSettings({ libraryFolder: dir, libraryFolderConfirmed: true })
       void load()
     }
   }

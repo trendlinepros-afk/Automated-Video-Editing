@@ -142,3 +142,33 @@ describe('asset library', () => {
     }
   })
 })
+
+describe('moving the library to another folder', () => {
+  it('moves every asset folder and the starter marker, keeps what is already there, and tidies the old folder', async () => {
+    const { moveLibrary } = await import('../src/main/services/library')
+    const { mkdtempSync, mkdirSync, writeFileSync, existsSync, readFileSync, readdirSync } = await import('node:fs')
+    const { tmpdir } = await import('node:os')
+    const { join } = await import('node:path')
+    const base = mkdtempSync(join(tmpdir(), 'ave-libmove-'))
+    const from = join(base, 'old')
+    const to = join(base, 'new')
+    for (const rel of ['shared/a1', 'shared/a2', 'profiles/p1/a3']) {
+      mkdirSync(join(from, rel), { recursive: true })
+      writeFileSync(join(from, rel, 'asset.json'), `{"id":"${rel}"}`)
+    }
+    writeFileSync(join(from, '.starter-assets.json'), '{"seeded":[]}')
+    writeFileSync(join(from, 'notes.txt'), 'mine')
+    mkdirSync(join(to, 'shared', 'a2'), { recursive: true })
+    writeFileSync(join(to, 'shared', 'a2', 'asset.json'), '{"id":"kept"}')
+
+    expect(moveLibrary(from, to)).toEqual({ moved: 2, skipped: 1 })
+    expect(readFileSync(join(to, 'shared', 'a1', 'asset.json'), 'utf8')).toContain('shared/a1')
+    expect(readFileSync(join(to, 'profiles', 'p1', 'a3', 'asset.json'), 'utf8')).toContain('a3')
+    expect(readFileSync(join(to, 'shared', 'a2', 'asset.json'), 'utf8')).toContain('kept')
+    expect(existsSync(join(to, '.starter-assets.json'))).toBe(true)
+    // The old folder keeps only what was not moved: the clashing asset and the owner's own file.
+    expect(readdirSync(from).sort()).toEqual(['notes.txt', 'shared'])
+    expect(readdirSync(join(from, 'shared'))).toEqual(['a2'])
+    expect(() => moveLibrary(to, join(to, 'inside'))).toThrow(/not inside/)
+  })
+})

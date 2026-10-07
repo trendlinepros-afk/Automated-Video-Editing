@@ -229,6 +229,7 @@ export const REQUEST_KINDS = [
   'reedit',
   'fix_audio',
   'stabilize',
+  'insert_clip',
   'continue_intro',
   'redo_intro',
   'publish_regen',

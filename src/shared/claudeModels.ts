@@ -37,7 +37,7 @@ export const MODEL_SECTIONS = [
   { id: 'thumbnails', label: 'Thumbnails', detail: 'Writes thumbnail prompts for Pikzels.', stage: true },
   { id: 'publish', label: 'Publishing pack', detail: 'Titles, description, chapters and tags.', stage: true },
   { id: 'chat', label: 'Chat and notes', detail: 'Changes you ask for in the chat or in notes for Claude.', stage: false },
-  { id: 'reedit', label: 'Section re-edits', detail: 'Re-edit section and intro redo.', stage: false },
+  { id: 'reedit', label: 'Section re-edits', detail: 'Re-edit section, intro redo, and Add clip here.', stage: false },
   { id: 'fix_audio', label: 'Fix clipped audio', detail: 'Restores one clipped word at a cut.', stage: false },
   { id: 'stabilize', label: 'Stabilize', detail: 'Stabilizes one clip you right-click. ffmpeg does the work; the model runs it and checks the framing.', stage: false }
 ] as const
@@ -78,6 +78,7 @@ export function sectionForRequest(kind: RequestKind): ModelSection | null {
       return 'chat'
     case 'reedit':
     case 'redo_intro':
+    case 'insert_clip':
       return 'reedit'
     case 'fix_audio':
       return 'fix_audio'

@@ -3,6 +3,12 @@
 Each release's section becomes its GitHub release text and the notes shown in the app's update dialog.
 A release is blocked until the section for its version has notes.
 
+## 1.2.0
+
+- **Stabilize a clip.** Right-click an A-roll cut or a B-roll clip on the timeline and choose Stabilize. Claude makes a stabilized copy of that clip's picture (two-pass vidstab with ffmpeg, keeping the frame rate and as little zoom as the shake allows), checks the framing, and swaps it in. Sound, cuts, captions and timing stay on the original footage.
+- It shows up like other changes, with Before / After and Keep or Revert, and the estimated cost before it runs. Stabilized clips have a ◎ mark on the timeline. Right-click again for Remove stabilization (Ctrl+Z brings it back) or Stabilize again.
+- Settings → Claude models has a Stabilize row (Sonnet 5.5 by default: ffmpeg does the work, the model runs it and checks the result).
+
 ## 1.1.1
 
 - **Continue with the rest of the edit, any time.** After a Just the intro edit, Watch first now shrinks the intro card to a button in the corner of the preview instead of hiding it until the project is reopened. After Stop there, the same button stays, so you can edit the rest of the video whenever you like. The card also shows what continuing is likely to cost.

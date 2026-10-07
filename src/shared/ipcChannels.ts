@@ -12,7 +12,7 @@ export const API_METHODS = [
   'music.list', 'music.rescan', 'music.addFolder', 'music.removeFolder',
   'projects.recent', 'projects.create', 'projects.open', 'projects.locate', 'projects.removeRecent', 'projects.close',
   'project.get', 'project.apply', 'project.undo', 'project.redo', 'project.relinkSource', 'project.startEdit',
-  'project.sendChat', 'project.requestReedit', 'project.requestFixAudio', 'project.addNote', 'project.noteToRule',
+  'project.sendChat', 'project.requestReedit', 'project.requestFixAudio', 'project.requestStabilize', 'project.addNote', 'project.noteToRule',
   'project.reviewRequest', 'project.introDecision', 'project.regeneratePublish', 'project.seamAudio', 'project.waveform',
   'project.frameAt',
   'project.versions.list', 'project.versions.save', 'project.versions.restore', 'project.versions.remove',

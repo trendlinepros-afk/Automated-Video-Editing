@@ -92,7 +92,7 @@ export function ModelsSection() {
             <div className="hint">Average edit</div>
             <div className="big-number">{perMin === null ? '—' : `$${perMin.toFixed(2)}/min`}</div>
           </div>
-          {(['chat', 'reedit', 'fix_audio', 'publish'] as const).map((k) =>
+          {(['chat', 'reedit', 'fix_audio', 'stabilize', 'publish'] as const).map((k) =>
             stats[k]?.count ? (
               <div key={k}>
                 <div className="hint">Average {MODEL_SECTIONS.find((s) => s.id === k)?.label.toLowerCase()}</div>

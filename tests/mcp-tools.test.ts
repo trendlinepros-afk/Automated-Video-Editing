@@ -1,4 +1,4 @@
-import { mkdtempSync, rmSync } from 'node:fs'
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { request } from 'node:http'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -33,6 +33,7 @@ function makeCtx(): AppContext {
     versions: { save: (name: string) => ({ id: `v_${name.length}`, name, createdAt: new Date().toISOString(), auto: true }) },
     runner: { kick: () => {} },
     preview: { invalidate: () => {} },
+    engine: { probe: async (p: string) => ({ kind: p.endsWith('.png') ? 'image' : 'video', duration: 8, fps: 30, width: 1920, height: 1080, hasAudio: false }) },
     send: () => {}
   } as unknown as AppContext
   c.requests = createRequestService(c)
@@ -188,5 +189,48 @@ describe('MCP server', () => {
     }
     expect(entries.some((e) => e.msg.startsWith('add_item error'))).toBe(true)
     expect(JSON.stringify(store.log.read())).not.toContain(mcp.token())
+  })
+})
+
+describe('stabilize', () => {
+  it('queues a request that describes the clip, and attaches a processed picture that the render plan uses', async () => {
+    const seg = store.project.items.find((i) => i.type === 'segment' && i.in === 3)!
+    // The right-click request: the clip, its source range and where to save.
+    const req = ctx.requests.enqueue({ kind: 'stabilize', text: '', range: { start: 2, end: 5 }, context: { itemId: seg.id } })
+    expect(req.kind).toBe('stabilize')
+
+    const client = await connect()
+    mkdirSync(join(store.dir, 'media', 'stabilized'), { recursive: true })
+    writeFileSync(join(store.dir, 'media', 'stabilized', `${seg.id}.mp4`), 'x')
+    // The file starts at source 2 s and is 8 s long: it covers the segment's 3-6 s.
+    const set = await client.callTool({
+      name: 'set_item_picture',
+      arguments: { id: seg.id, file: `media/stabilized/${seg.id}.mp4`, source_start: 2, kind: 'stabilized', note: 'vidstab smoothing 20' }
+    })
+    expect(set.isError).toBeFalsy()
+    expect((store.project.items.find((i) => i.id === seg.id) as any).picture).toEqual({
+      file: `media/stabilized/${seg.id}.mp4`,
+      sourceStart: 2,
+      kind: 'stabilized',
+      note: 'vidstab smoothing 20'
+    })
+
+    const { buildPlan } = await import('../src/main/engine/plan')
+    const plan = buildPlan(store.snapshotDoc(), { projectDir: store.dir, width: 960, height: 540, fps: 30, burnCaptions: false })
+    const layer = plan.layers.find((l) => l.id === seg.id) as any
+    expect(layer.path).toBe(join(store.dir, 'media', 'stabilized', `${seg.id}.mp4`))
+    expect(layer.sourceIn).toBeCloseTo(1) // source 3 s is file time 1 s
+    // Sound stays on the original footage.
+    expect(plan.audio.clips.find((c) => c.id === seg.id)!.path).toBe(join(dir, 'a.mp4'))
+
+    // A file that starts after the in point, or is too short, is refused.
+    const late = await client.callTool({ name: 'set_item_picture', arguments: { id: seg.id, file: `media/stabilized/${seg.id}.mp4`, source_start: 3.5 } })
+    expect(late.isError).toBe(true)
+    const short = await client.callTool({ name: 'set_item_picture', arguments: { id: seg.id, file: `media/stabilized/${seg.id}.mp4`, source_start: -10 } })
+    expect(short.isError).toBe(true)
+
+    const removed = await client.callTool({ name: 'set_item_picture', arguments: { id: seg.id, remove: true } })
+    expect(removed.isError).toBeFalsy()
+    expect((store.project.items.find((i) => i.id === seg.id) as any).picture).toBeUndefined()
   })
 })

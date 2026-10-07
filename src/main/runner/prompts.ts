@@ -113,6 +113,24 @@ export function requestSection(r: EditRequest, project: Project): string {
       )
       if (r.text.trim()) lines.push(`Note from the owner: "${r.text.trim()}"`)
       break
+    case 'stabilize':
+      lines.push(
+        `Stabilize the clip ${r.context?.itemId ?? ''} at ${rangeText(r.range)}. The attached context has its source file, the source range it ` +
+          'shows (sourceIn–sourceOut) and a slightly wider range to read (readFrom–readTo) so motion at the edges is smoothed too.',
+        'How: get_engine_info for ffmpeg and the managed Python. Look at a few frames first (get_range_frames): if the shot is already steady ' +
+          '(tripod, locked-off), change nothing and say so. Otherwise run two-pass vidstab on readFrom–readTo only (vidstabdetect with ' +
+          'shakiness 5-8 and accuracy 15 into the scratch folder, then vidstabtransform with smoothing about 15-30, optzoom 1, interpol bicubic, ' +
+          'followed by a light unsharp). If this ffmpeg has no vidstab filters, use OpenCV in the managed Python (feature tracking, smoothed ' +
+          'trajectory, warp, minimal crop). Keep the source frame size and EXACT frame rate (no frame drops or duplicates), no audio, high ' +
+          'quality (NVENC with a low cq, or libx264 crf 14). Write it to the saveAs project path from the context.',
+        'Then call set_item_picture with that file, source_start = readFrom and kind "stabilized", with a one-line note of the settings. ' +
+          'Check the result with get_range_frames against the original: framing should stay close (optzoom zooms in as far as the shake ' +
+          'needs; if that is more than about 8 %, lower the smoothing or use optzoom 2 and say so in the reply). On a talking head, faces ' +
+          'must not wobble or warp. Sound, cuts and timing stay as they are. Reply in the chat with what you did and how much it zoomed.'
+      )
+      if (r.context?.currentPicture) lines.push('This clip already has a processed picture; make the new one from the ORIGINAL source, not from that file.')
+      if (r.text.trim()) lines.push(`Direction from the owner: "${r.text.trim()}"`)
+      break
     case 'publish_regen':
       lines.push(`Regenerate part of the publishing pack${r.text.trim() ? ` with this direction: "${r.text.trim()}"` : ''}. Save it with save_publish_pack.`)
       break

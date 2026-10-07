@@ -11,13 +11,14 @@ import type { AppContext, RequestInput, RequestService } from '../context'
 import { newId, type ProjectStore } from './store'
 
 /** Requests that change the video and so get Before / After with Keep and Revert. */
-export const VERSIONED_KINDS: RequestKind[] = ['chat', 'reedit', 'fix_audio', 'redo_intro', 'continue_intro']
+export const VERSIONED_KINDS: RequestKind[] = ['chat', 'reedit', 'fix_audio', 'stabilize', 'redo_intro', 'continue_intro']
 
 export const REQUEST_LABELS: Record<RequestKind, string> = {
   start_edit: 'start edit',
   chat: 'chat request',
   reedit: 'section re-edit',
   fix_audio: 'clipped audio fix',
+  stabilize: 'stabilize clip',
   continue_intro: 'continue after the intro',
   redo_intro: 'intro redo',
   publish_regen: 'publishing pack update',

@@ -72,6 +72,37 @@ describe('ProjectStore', () => {
     expect(leftovers(join(f, '..'))).toEqual([])
   })
 
+  it('after a power cut leaves project.json empty or damaged, opens from the newest saved copy and keeps the damaged file', () => {
+    const store = makeProject()
+    store.mutate('a', 'user', (d) => { d.project.inspiration = 'first' })
+    const dir = store.dir
+    ProjectStore.open(dir, '1.0.0-test') // opening makes a backup copy holding "first"
+    // Then an unfinished save with newer work, and a project.json that the power cut left empty.
+    const newer = { ...readJson(join(dir, 'project.json')), inspiration: 'newer' }
+    writeFileSync(join(dir, 'project.json.tmp-999'), JSON.stringify(newer))
+    writeFileSync(join(dir, 'project.json'), '')
+    const { store: reopened } = ProjectStore.open(dir, '1.0.0-test')
+    expect(reopened.project.inspiration).toBe('newer')
+    expect(reopened.recoveredFrom?.from).toMatch(/project\.json\.tmp-999$/)
+    expect(readdirSync(join(dir, 'backups')).some((f) => f.startsWith('project.damaged.'))).toBe(true)
+    expect(readdirSync(dir).filter((f) => f.includes('.tmp'))).toEqual([])
+
+    // With no unfinished save, the newest backup is used.
+    writeFileSync(join(dir, 'project.json'), '{"broken": ')
+    const { store: again } = ProjectStore.open(dir, '1.0.0-test')
+    expect(again.project.inspiration).toBe('newer')
+  })
+
+  it('a damaged transcript is restored from its backup instead of opening empty', () => {
+    const store = makeProject()
+    const words = Object.keys(store.transcript.clips).length
+    ProjectStore.open(store.dir, '1.0.0-test') // backs up the transcript too
+    writeFileSync(join(store.dir, 'transcript.json'), '')
+    const { store: reopened } = ProjectStore.open(store.dir, '1.0.0-test')
+    expect(Object.keys(reopened.transcript.clips).length).toBe(words)
+    expect(words).toBeGreaterThan(0)
+  })
+
   it('validation rejects bad items', () => {
     const store = makeProject()
     const items = () => store.project.items.length

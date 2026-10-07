@@ -5,14 +5,19 @@
  */
 import { EventEmitter } from 'node:events'
 import {
+  closeSync,
   copyFileSync,
   existsSync,
+  fsyncSync,
   mkdirSync,
+  openSync,
   readFileSync,
   readdirSync,
   renameSync,
   rmSync,
-  writeFileSync
+  statSync,
+  writeFileSync,
+  writeSync
 } from 'node:fs'
 import { join } from 'node:path'
 import { randomBytes } from 'node:crypto'
@@ -65,6 +70,7 @@ interface HistoryFile {
 }
 
 const HISTORY_LIMIT = 300
+const BACKUP_EVERY_MS = 10 * 60_000
 const BACKUP_LIMIT = 30
 
 export interface ChangeEvent {
@@ -80,10 +86,19 @@ export interface MutateOptions {
   noHistory?: boolean
 }
 
-/** Atomic write: a crash mid-write never leaves a half-written project.json. */
+/**
+ * Atomic, durable write: the new text is flushed to the disk before it replaces the old file, so a crash or a
+ * power cut leaves either the old project.json or the new one, never an empty or half-written file.
+ */
 export function writeJsonAtomic(file: string, data: unknown): void {
   const tmp = `${file}.tmp-${process.pid}`
-  writeFileSync(tmp, JSON.stringify(data, null, 2) + '\n')
+  const fd = openSync(tmp, 'w')
+  try {
+    writeSync(fd, JSON.stringify(data, null, 2) + '\n')
+    fsyncSync(fd)
+  } finally {
+    closeSync(fd)
+  }
   renameSync(tmp, file)
 }
 
@@ -101,6 +116,43 @@ export interface OpenResult {
   backupFile?: string
 }
 
+function readableJson(file: string): unknown | null {
+  try {
+    const v = readJson(file)
+    return v && typeof v === 'object' ? v : null
+  } catch {
+    return null
+  }
+}
+
+/**
+ * project.json could not be read (a power cut on a disk that lost the write, or a damaged file): use the newest
+ * readable copy, from an unfinished save next to it or from backups/. The damaged file is kept in backups/.
+ */
+function recoverJson(file: string, backupsDir: string, prefix: string): { from: string; when: Date } | null {
+  const dir = join(file, '..')
+  const name = file.slice(dir.length + 1)
+  const mtime = (f: string) => {
+    try {
+      return statSync(f).mtimeMs
+    } catch {
+      return 0
+    }
+  }
+  const leftovers = readdirSync(dir).filter((f) => f.startsWith(`${name}.tmp-`)).map((f) => join(dir, f))
+  const backups = existsSync(backupsDir)
+    ? readdirSync(backupsDir).filter((f) => f.startsWith(`${prefix}.`) && !f.includes('.damaged.')).map((f) => join(backupsDir, f))
+    : []
+  const candidates = [...leftovers, ...backups].sort((a, b) => mtime(b) - mtime(a))
+  const good = candidates.find((c) => readableJson(c) !== null)
+  if (!good) return null
+  mkdirSync(backupsDir, { recursive: true })
+  if (existsSync(file)) copyFileSync(file, join(backupsDir, `${prefix}.damaged.${stamp()}.json`))
+  writeJsonAtomic(file, readJson(good))
+  for (const l of leftovers) rmSync(l, { force: true })
+  return { from: good, when: new Date(mtime(good)) }
+}
+
 export class ProjectStore extends EventEmitter {
   private doc: ProjectDoc
   private history: HistoryFile = { formatVersion: 1, undo: [], redo: [] }
@@ -108,6 +160,8 @@ export class ProjectStore extends EventEmitter {
   private savedTranscriptText = ''
   readonly log: ActivityLog
   readonly paths: ReturnType<typeof projectPaths>
+  /** Set when project.json was unreadable on opening and a saved copy was used instead. */
+  recoveredFrom?: { from: string; when: Date }
 
   private constructor(
     readonly dir: string,
@@ -177,6 +231,11 @@ export class ProjectStore extends EventEmitter {
   static open(dir: string, appVersion: string): OpenResult {
     const p = projectPaths(dir)
     if (!existsSync(p.file)) throw new Error(`No project.json in ${dir}`)
+    let recovered: { from: string; when: Date } | null = null
+    if (readableJson(p.file) === null) {
+      recovered = recoverJson(p.file, p.backups, 'project')
+      if (!recovered) throw new Error('project.json is damaged and there is no readable backup in the backups folder.')
+    }
     const raw = readJson(p.file)
     const up = upgradeProject(raw)
     let backupFile: string | undefined
@@ -220,6 +279,10 @@ export class ProjectStore extends EventEmitter {
     store.savedProjectText = up.upgraded ? '' : JSON.stringify(project)
     store.savedTranscriptText = JSON.stringify(transcript)
     store.loadHistory()
+    if (recovered) {
+      store.recoveredFrom = recovered
+      store.log.write('error', `project.json could not be read and was restored from ${recovered.from}`, { savedAt: recovered.when.toISOString() })
+    }
     if (up.upgraded) {
       store.flush()
       store.log.write('upgrade', `Project upgraded from format ${up.from} to ${up.to}`, { backup: backupFile })
@@ -230,23 +293,38 @@ export class ProjectStore extends EventEmitter {
   private static readTranscript(dir: string, project: Project): Transcript {
     const file = join(dir, project.transcript?.file ?? 'transcript.json')
     if (!existsSync(file)) return emptyTranscript()
-    const parsed = TranscriptSchema.safeParse(readJson(file))
-    return parsed.success ? parsed.data : emptyTranscript()
+    if (readableJson(file) === null) recoverJson(file, projectPaths(dir).backups, 'transcript')
+    const raw = readableJson(file)
+    const parsed = raw === null ? null : TranscriptSchema.safeParse(raw)
+    return parsed?.success ? parsed.data : emptyTranscript()
   }
 
-  /** Automatic copy of project.json each time it is opened; the last 30 are kept. */
-  private static rotateBackup(dir: string): void {
+  /**
+   * Automatic copy of project.json (and the transcript) each time it is opened and every 10 minutes of editing;
+   * the last 30 are kept. A damaged file is restored from the newest of these.
+   */
+  private static rotateBackup(dir: string, transcriptFile = 'transcript.json'): void {
     const p = projectPaths(dir)
+    const keep = (prefix: string, limit: number) => {
+      const auto = readdirSync(p.backups)
+        .filter((f) => new RegExp(`^${prefix}\\.\\d{4}-`).test(f))
+        .sort()
+      for (const f of auto.slice(0, Math.max(0, auto.length - limit))) rmSync(join(p.backups, f), { force: true })
+    }
     try {
       copyFileSync(p.file, join(p.backups, `project.${stamp()}.json`))
-      const auto = readdirSync(p.backups)
-        .filter((f) => /^project\.\d{4}-/.test(f))
-        .sort()
-      for (const f of auto.slice(0, Math.max(0, auto.length - BACKUP_LIMIT))) rmSync(join(p.backups, f), { force: true })
+      keep('project', BACKUP_LIMIT)
+      const t = join(dir, transcriptFile)
+      if (existsSync(t) && readableJson(t) !== null) {
+        copyFileSync(t, join(p.backups, `transcript.${stamp()}.json`))
+        keep('transcript', 10)
+      }
     } catch {
       /* backups are best effort */
     }
   }
+
+  private lastBackup = Date.now()
 
   // ---------------------------------------------------------------- reading
 
@@ -410,6 +488,10 @@ export class ProjectStore extends EventEmitter {
     if (transcriptText !== this.savedTranscriptText) {
       writeJsonAtomic(join(this.dir, this.doc.project.transcript.file || 'transcript.json'), this.doc.transcript)
       this.savedTranscriptText = transcriptText
+    }
+    if (Date.now() - this.lastBackup > BACKUP_EVERY_MS) {
+      this.lastBackup = Date.now()
+      ProjectStore.rotateBackup(this.dir, this.doc.project.transcript.file || 'transcript.json')
     }
   }
 

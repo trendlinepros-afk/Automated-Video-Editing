@@ -99,7 +99,9 @@ The app runs a local MCP server on `http://127.0.0.1:47821/mcp` (port configurab
 
 **The app starts Claude for you.** Start edit, a chat message, a section re-edit, a note, Fix clipped audio or Stabilize (right-click a clip) adds a request to the project's queue and starts Claude Code in its non-interactive mode (`claude -p ... --output-format stream-json --mcp-config <per-project config> ...`). The per-project MCP config points Claude at this project's tools with the token. The app hands Claude the standard editing rules (the October 5 method), the profile's channel notes and rules, and the request. Progress shows live in the top bar and the chat, with Stop. Follow-ups resume the same Claude session where possible; otherwise a new session reads the progress checklist and handoff notes and carries on from the next unfinished stage.
 
-If Claude cannot start (signed out, usage limit), the request stays queued with the reason shown, and **Resume** runs the queue.
+If Claude cannot start or stops part way (signed out, usage limit, low API credits, lost connection), the request stays queued with the reason shown, and **Resume** runs the queue.
+
+**Interruptions cost little.** An edit runs in stages, each ticked off on the progress checklist with a handoff note, and every change is written to disk the moment it is made (flushed before it replaces the old file, so a power cut leaves the old or the new project.json, never a broken one). Backups of project.json and the transcript are taken on opening and every 10 minutes; a file that cannot be read is restored from the newest copy. After a usage limit the app tries again on its own when the limit resets (or every 30 minutes when Claude Code does not say when); after a dropped connection or a busy API, after 1, 2, 5, 10 and then every 30 minutes (Settings > Claude connection can turn this off). Opening a project that was interrupted puts the unfinished work back in the queue and shows where it carries on; **Resume** continues from that stage, continuing the same Claude session where possible.
 
 **Connecting by hand.** Settings > Claude connection > **Copy setup** copies a command like:
 

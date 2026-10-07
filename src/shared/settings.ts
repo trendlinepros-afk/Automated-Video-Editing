@@ -46,13 +46,16 @@ export const SettingsSchema = z.looseObject({
     args: z.array(z.string()).default(DEFAULT_RUNNER_ARGS),
     resumeArgs: z.array(z.string()).default(['--resume', '{sessionId}']),
     allowedTools: z.string().default('mcp__ave Bash Read Write Edit Glob Grep'),
-    autoStart: z.boolean().default(true)
+    autoStart: z.boolean().default(true),
+    /** Try again on its own when Claude's usage resets, credits are back or the connection returns. */
+    autoRetry: z.boolean().default(true)
   }).default({
     command: 'claude',
     args: DEFAULT_RUNNER_ARGS,
     resumeArgs: ['--resume', '{sessionId}'],
     allowedTools: 'mcp__ave Bash Read Write Edit Glob Grep',
-    autoStart: true
+    autoStart: true,
+    autoRetry: true
   }),
   mcpPort: z.number().int().default(DEFAULT_MCP_PORT),
   pikzels: z.looseObject({

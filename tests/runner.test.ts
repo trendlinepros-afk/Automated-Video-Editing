@@ -9,7 +9,7 @@ import type { AppContext } from '../src/main/context'
 import { ActivityLog } from '../src/main/log'
 import { ProjectStore } from '../src/main/project/store'
 import { buildRunPrompt, buildSystemPrompt } from '../src/main/runner/prompts'
-import { classifyOutcome, createRunnerService, templateArgs } from '../src/main/runner/runner'
+import { LIMIT_RETRY_MS, TRANSIENT_RETRY_MS, classifyOutcome, createRunnerService, retryDelay, templateArgs } from '../src/main/runner/runner'
 
 /** A stand-in for Claude Code: prints stream-json lines like `claude -p --output-format stream-json`. */
 const FAKE_CLAUDE = String.raw`
@@ -26,6 +26,10 @@ if (mode === 'resume_fail' && resumed) {
 const sid = resumed ? args[args.indexOf('--resume') + 1] : 'sess_' + Math.random().toString(36).slice(2, 8)
 out({ type: 'system', subtype: 'init', session_id: sid, mcp_servers: [{ name: 'ave', status: 'connected' }] })
 out({ type: 'assistant', session_id: sid, message: { content: [{ type: 'text', text: 'Reading the project.' }, { type: 'tool_use', name: 'mcp__ave__get_requests', input: {} }] } })
+if (mode === 'overloaded') {
+  out({ type: 'result', subtype: 'error_during_execution', is_error: true, result: 'API Error: 529 {"type":"error","error":{"type":"overloaded_error","message":"Overloaded"}}', session_id: sid })
+  process.exit(1)
+}
 if (mode === 'limit') {
   out({ type: 'result', subtype: 'success', is_error: true, result: 'Claude AI usage limit reached|1900000000', session_id: sid })
   process.exit(1)
@@ -42,6 +46,7 @@ let marker: string
 let requeued: string[]
 let waiting: (string | undefined)[]
 let requests: EditRequest[]
+let openedCb: ((s: ProjectStore | null) => void) | null
 
 function makeCtx(mode: string): AppContext {
   const settings = SettingsSchema.parse({})
@@ -51,7 +56,13 @@ function makeCtx(mode: string): AppContext {
     appLog: new ActivityLog(join(dir, 'app.log')),
     settings: { get: () => settings },
     profiles: { get: () => null },
-    projects: { current: () => store, onOpened: () => () => {} },
+    projects: {
+      current: () => store,
+      onOpened: (cb: (s: ProjectStore | null) => void) => {
+        openedCb = cb
+        return () => {}
+      }
+    },
     mcp: {
       url: (id?: string) => `http://127.0.0.1:47821/mcp${id ? '/' + id : ''}`,
       token: () => 'tok_secret_value_123',
@@ -84,6 +95,7 @@ beforeEach(() => {
   marker = join(dir, 'done')
   requeued = []
   waiting = []
+  openedCb = null
   store = ProjectStore.create(join(dir, 'proj'), {
     name: 'Run',
     profileId: 'p1',
@@ -143,15 +155,68 @@ describe('runner', () => {
     expect(readFileSync(store.log.file, 'utf8')).not.toContain('tok_secret_value_123')
   })
 
-  it('leaves the request queued with the reason when Claude hits its usage limit', async () => {
-    const runner = createRunnerService(makeCtx('limit'))
+  it('leaves the request queued when Claude hits its usage limit, and tries again on its own when it resets', async () => {
+    const timers: { fn: () => void; ms: number }[] = []
+    const now = 1899990000 * 1000 // 10 000 s before the reset Claude reports (1900000000)
+    const runner = createRunnerService(makeCtx('limit'), { setTimer: (fn, ms) => timers.push({ fn, ms }), clearTimer: () => undefined, now: () => now })
     runner.kick()
     const end = await waitIdle(runner)
     expect(end.status).toBe('waiting')
     expect(end.waitingReason).toMatch(/usage limit/i)
+    expect(end.waitingReason).toMatch(/Trying again on its own/)
     expect(waiting.at(-1)).toMatch(/usage limit/i)
     expect(requeued.at(-1)).toMatch(/usage limit/i)
-    expect(calls()).toHaveLength(1) // no automatic retry after a failed run
+    expect(calls()).toHaveLength(1)
+    // One retry, a minute after the reset time.
+    expect(timers).toHaveLength(1)
+    expect(timers[0].ms).toBe(10_000_000 + 60_000)
+    timers[0].fn()
+    await waitIdle(runner)
+    expect(calls()).toHaveLength(2) // it ran again, from the same request
+  })
+
+  it('retries after a dropped connection or a busy API, waiting longer each time, and not after Stop or with retries off', async () => {
+    const timers: { fn: () => void; ms: number }[] = []
+    const ctx = makeCtx('overloaded')
+    const runner = createRunnerService(ctx, { setTimer: (fn, ms) => timers.push({ fn, ms }), clearTimer: () => undefined })
+    runner.kick()
+    expect((await waitIdle(runner)).waitingReason).toMatch(/lost its connection or Anthropic was busy/)
+    timers[0].fn()
+    await waitIdle(runner)
+    expect(timers.map((t) => t.ms)).toEqual([60_000, 120_000])
+    expect(calls()).toHaveLength(2)
+
+    ctx.settings.get().runner.autoRetry = false
+    timers[1].fn()
+    await waitIdle(runner)
+    expect(timers).toHaveLength(2) // no new retry scheduled
+    expect(runner.state().status).toBe('waiting')
+  })
+
+  it('on opening a project that was interrupted mid-run, puts the work back in the queue and says where it carries on', () => {
+    const runner = createRunnerService(makeCtx('ok'))
+    runner.state() // wires the project listener
+    store.mutate('interrupted', 'app', (d) => {
+      d.project.status = 'editing'
+      d.project.requests.push({ id: 'req_9', kind: 'start_edit', status: 'in_progress', createdAt: new Date().toISOString(), text: '', context: {} } as EditRequest)
+      for (const c of d.project.checklist) if (c.id === 'transcript' || c.id === 'cuts') c.status = 'done'
+    }, { noHistory: true })
+    openedCb!(store)
+    expect(requeued.at(-1)).toMatch(/app closed while Claude was working/)
+    const s = runner.state()
+    expect(s.status).toBe('waiting')
+    expect(s.waitingReason).toMatch(/Claude was interrupted\. It carries on from: B-roll\. Finished work is saved\. Press Resume/)
+    expect(calls).toThrow() // nothing started on its own
+  })
+
+  it('classifies dropped connections and a busy API as worth retrying', () => {
+    const base = { stopping: false, resumed: false, exitCode: 1, text: '', command: 'claude' }
+    expect(classifyOutcome({ ...base, result: null, text: 'Error: fetch failed (ENOTFOUND api.anthropic.com)' }).kind).toBe('transient')
+    expect(classifyOutcome({ ...base, result: { is_error: true, result: 'API Error: 529 overloaded_error' } }).kind).toBe('transient')
+    expect(classifyOutcome({ ...base, result: { is_error: true, result: 'Credit balance is too low' } })).toMatchObject({ kind: 'limit', reason: expect.stringMatching(/credit balance/i) })
+    expect(retryDelay({ kind: 'limit', reason: '' }, 0)).toBe(LIMIT_RETRY_MS)
+    expect(retryDelay({ kind: 'transient', reason: '' }, 9)).toBe(TRANSIENT_RETRY_MS.at(-1))
+    expect(retryDelay({ kind: 'auth', reason: '' }, 0)).toBeNull()
   })
 
   it('continues the earlier session with --resume, and starts fresh when it cannot be resumed', async () => {

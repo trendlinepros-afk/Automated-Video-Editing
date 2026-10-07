@@ -19,6 +19,11 @@ export const WORKFLOW = `How to work with the app (tools from the "ave" MCP serv
 - Keep the progress checklist current (update_checklist) and write a handoff note (write_handoff_note) after every
   stage: what you decided and what is left. If this session is interrupted, the next one continues from there.
 - Resume from the next unfinished checklist stage. Never redo finished work; at most repeat the one stage in flight.
+- Work so that an interruption (power cut, usage limit, lost connection) costs little: every tool change is saved at once,
+  so apply results as you go instead of saving them all up for the end. In a long stage, update the checklist detail and the
+  handoff note at least every 10 minutes of footage covered (e.g. "cuts done to 12:30 of C0003"). Transcribe one source at a
+  time and call save_transcript for each as soon as it is done; when resuming, skip sources list_footage shows as transcribed.
+  Keep your scratch files in the project's scratch folder (get_engine_info) so a new session can find and reuse them.
 - Anchor B-roll, graphics, effects, sound effects and chapters to transcript words, not fixed times.
 - Search the asset library (search_library) before making a graphic or sound; offer to save reusable new ones (save_to_library).
 - Anything the tools cannot express, build with your own scripts (get_engine_info gives the Python and ffmpeg to use) and

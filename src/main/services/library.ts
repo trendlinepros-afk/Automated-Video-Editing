@@ -7,7 +7,7 @@
  * Each asset folder holds asset.json (description, inputs, tags, use count), the main file and preview.png.
  * asset.json carries a format version and is upgraded like a project, with a backup copy first.
  */
-import { copyFileSync, cpSync, existsSync, mkdirSync, readdirSync, readFileSync, renameSync, rmSync, statSync, writeFileSync } from 'node:fs'
+import { closeSync, copyFileSync, cpSync, existsSync, fsyncSync, mkdirSync, openSync, readdirSync, readFileSync, renameSync, rmSync, statSync, writeFileSync, writeSync } from 'node:fs'
 import { basename, extname, join } from 'node:path'
 import { randomBytes } from 'node:crypto'
 import { LIBRARY_FORMAT_VERSION } from '@shared/appInfo'
@@ -37,9 +37,16 @@ function isDir(p: string): boolean {
   }
 }
 
+/** Flushed to the disk before it replaces the old file, so a power cut never leaves a half-written asset.json. */
 function writeJson(file: string, data: unknown): void {
   const tmp = `${file}.tmp-${process.pid}`
-  writeFileSync(tmp, JSON.stringify(data, null, 2) + '\n')
+  const fd = openSync(tmp, 'w')
+  try {
+    writeSync(fd, JSON.stringify(data, null, 2) + '\n')
+    fsyncSync(fd)
+  } finally {
+    closeSync(fd)
+  }
   renameSync(tmp, file)
 }
 

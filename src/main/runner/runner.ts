@@ -24,6 +24,10 @@ type OutputLine = { ts: string; text: string; kind: 'text' | 'tool' | 'error' | 
 export interface RunnerDeps {
   spawn?: (command: string, args: string[], options: SpawnOptions) => ChildProcess
   platform?: NodeJS.Platform
+  /** Timers for automatic retries (tests replace them). */
+  setTimer?: (fn: () => void, ms: number) => unknown
+  clearTimer?: (t: unknown) => void
+  now?: () => number
 }
 
 /** Replace {placeholders} inside each argument. One argument stays one argument, whatever its content. */
@@ -33,21 +37,42 @@ export function templateArgs(args: string[], vars: Record<string, string>): stri
 
 export type Outcome =
   | { kind: 'ok' }
-  | { kind: 'not_found' | 'limit' | 'auth' | 'resume_failed' | 'error' | 'stopped'; reason: string }
+  | { kind: 'not_found' | 'auth' | 'resume_failed' | 'error' | 'transient' | 'stopped'; reason: string }
+  | { kind: 'limit'; reason: string; resetsAt?: Date }
 
 const LIMIT_RE = /usage limit|limit reached|hit your limit|limit will reset|resets? at|rate.?limit(ed)?|quota exceeded|out of (extra )?usage|credit balance is too low/i
 const AUTH_RE = /invalid api key|please run \/login|run \/login|not logged in|not signed in|log ?in again|sign ?in again|authentication[_ ](failed|error|required)|oauth token (has )?expired|invalid bearer|401 unauthorized/i
+// The connection dropped or Anthropic was busy: worth trying again on its own (Wi-Fi back after a power cut).
+const TRANSIENT_RE = /overloaded|\b529\b|\b50[234]\b|internal server error|api error: 5\d\d|ECONNRESET|ECONNREFUSED|ETIMEDOUT|ENOTFOUND|EAI_AGAIN|ENETUNREACH|EHOSTUNREACH|connection (error|refused|reset)|network error|fetch failed|socket hang up|request timed out/i
 const RESUME_RE = /no conversation found|session (id )?.*not found|could not (find|resume) (the )?session|cannot resume/i
 
-function limitReason(text: string): string {
-  // Claude Code reports "Claude AI usage limit reached|<unix seconds>" in some versions.
+/** When the usage limit resets, if Claude Code says ("Claude AI usage limit reached|<unix seconds>" in some versions). */
+export function limitResetsAt(text: string): Date | undefined {
   const epoch = /limit reached\|(\d{9,})/i.exec(text)
-  if (epoch) {
-    const at = new Date(Number(epoch[1]) * 1000)
-    return `Claude usage limit reached. It resets at ${at.toLocaleString()}. Press Resume then.`
-  }
+  return epoch ? new Date(Number(epoch[1]) * 1000) : undefined
+}
+
+function limitReason(text: string): string {
+  const at = limitResetsAt(text)
+  if (at) return `Claude usage limit reached. It resets at ${at.toLocaleString()}.`
+  if (/credit balance is too low/i.test(text)) return 'Your Anthropic API credit balance is too low. Add credits (console.anthropic.com > Billing).'
   const resets = /resets?\s+(?:at\s+)?([^\n.·|]{2,40})/i.exec(text)
-  return `Claude usage limit reached${resets ? ` (resets ${resets[1].trim()})` : ''}. Press Resume when it resets.`
+  return `Claude usage limit reached${resets ? ` (resets ${resets[1].trim()})` : ''}.`
+}
+
+/** Automatic retries while Claude is out of usage or credits: on the reset time when known, else this often. */
+export const LIMIT_RETRY_MS = 30 * 60_000
+/** After a dropped connection or a busy API: 1, 2, 5, 10, then every 30 minutes. */
+export const TRANSIENT_RETRY_MS = [60_000, 120_000, 300_000, 600_000, 30 * 60_000]
+
+/** How long to wait before trying again on its own, or null when it needs the owner. */
+export function retryDelay(outcome: Outcome, transientTries: number, now = Date.now()): number | null {
+  if (outcome.kind === 'limit') {
+    if (outcome.resetsAt && outcome.resetsAt.getTime() > now) return Math.min(outcome.resetsAt.getTime() - now + 60_000, 12 * 3600_000)
+    return LIMIT_RETRY_MS
+  }
+  if (outcome.kind === 'transient') return TRANSIENT_RETRY_MS[Math.min(transientTries, TRANSIENT_RETRY_MS.length - 1)]
+  return null
 }
 
 /** What a finished run means for the queue. */
@@ -70,8 +95,15 @@ export function classifyOutcome(r: {
   const all = `${r.result?.result ?? ''}\n${r.result?.error ?? ''}\n${r.text}`
   const failed = !r.result || !!r.result.is_error || (r.exitCode !== 0 && r.exitCode !== null)
   if (failed && r.resumed && RESUME_RE.test(all)) return { kind: 'resume_failed', reason: 'The earlier Claude session could not be resumed' }
-  if (failed && LIMIT_RE.test(all)) return { kind: 'limit', reason: limitReason(all) }
+  if (failed && LIMIT_RE.test(all)) {
+    const resetsAt = limitResetsAt(all)
+    return { kind: 'limit', reason: limitReason(all), ...(resetsAt ? { resetsAt } : {}) }
+  }
   if (failed && AUTH_RE.test(all)) return { kind: 'auth', reason: 'Claude Code is signed out. Open a terminal, run "claude" and sign in, then press Resume.' }
+  if (failed && TRANSIENT_RE.test(all)) {
+    const detail = (r.result?.result || r.result?.error || r.text.trim().split('\n').filter(Boolean).pop() || '').slice(0, 200)
+    return { kind: 'transient', reason: `Claude lost its connection or Anthropic was busy${detail ? ` (${detail})` : ''}.` }
+  }
   if (r.result && !r.result.is_error && (r.exitCode === 0 || r.exitCode === null)) return { kind: 'ok' }
   const detail = (r.result?.result || r.result?.error || r.text.trim().split('\n').filter(Boolean).pop() || '').slice(0, 300)
   return { kind: 'error', reason: `Claude stopped unexpectedly${r.exitCode !== null ? ` (exit code ${r.exitCode})` : ''}${detail ? `: ${detail}` : ''}` }
@@ -188,6 +220,16 @@ export function createRunnerService(ctx: AppContext, deps: RunnerDeps = {}): Run
   let forceFresh = false
   let waitingForHand = false
   let unwatchStore: (() => void) | null = null
+  // Automatic retry after a usage limit, low credits or a dropped connection.
+  const setTimer = deps.setTimer ?? ((fn: () => void, ms: number) => setTimeout(fn, ms).unref?.() ?? null)
+  const clearTimer = deps.clearTimer ?? ((t: unknown) => clearTimeout(t as NodeJS.Timeout))
+  const now = deps.now ?? (() => Date.now())
+  let retryTimer: unknown = null
+  let transientTries = 0
+  const cancelRetry = () => {
+    if (retryTimer !== null) clearTimer(retryTimer)
+    retryTimer = null
+  }
 
   const queuedCount = (): number => {
     try {
@@ -270,10 +312,34 @@ export function createRunnerService(ctx: AppContext, deps: RunnerDeps = {}): Run
       watchStore(store)
       if (current && (!store || store.project.id !== current.projectId)) void stop()
       runsWithoutProgress = 0
+      transientTries = 0
       held = false
+      cancelRetry()
       update({ pausedAt: undefined, waitingReason: undefined, sessionId: store?.project.claudeSessionId, status: current ? state.status : 'idle' })
+      if (!current && store && !store.readOnly) showInterrupted(store)
     })
     watchStore(ctx.projects.current())
+  }
+
+  /**
+   * On opening a project with unfinished requests (the app closed, crashed or lost power while Claude worked, or it
+   * was waiting for usage to reset): put them back in the queue and say where the edit will carry on from.
+   * Nothing is redone: finished stages are ticked on the checklist and every change was saved as it was made.
+   */
+  const showInterrupted = (store: ProjectStore): void => {
+    const open = store.project.requests.filter((r) => r.status === 'queued' || r.status === 'in_progress')
+    if (!open.length) return
+    const wasRunning = open.some((r) => r.status === 'in_progress')
+    if (wasRunning) ctx.requests.requeueInProgress('The app closed while Claude was working on this (power cut, crash or restart).')
+    const next = store.project.checklist.find((c) => c.status !== 'done')
+    const started = store.project.checklist.some((c) => c.status !== 'not_started')
+    const editing = open.some((r) => r.kind === 'start_edit' || r.kind === 'resume' || r.kind === 'continue_intro')
+    const where = editing && started && next ? ` It carries on from: ${next.label}.` : ''
+    const reason = wasRunning
+      ? `Claude was interrupted.${where} Finished work is saved. Press Resume to continue.`
+      : `${open.length} request${open.length > 1 ? 's' : ''} waiting.${where} Press Resume to continue.`
+    ctx.requests.setWaitingReason(reason)
+    update({ status: 'waiting', waitingReason: reason })
   }
 
   /** "Claude disconnected, edit paused at: Graphics" when an edit stopped part way. */
@@ -388,6 +454,7 @@ export function createRunnerService(ctx: AppContext, deps: RunnerDeps = {}): Run
     }
 
     if (outcome.kind === 'ok') {
+      transientTries = 0
       const finished = run.startOpenIds.filter((id) => !stillOpen.some((r) => r.id === id))
       // A staged run makes progress by finishing checklist stages, not requests.
       const stagesAdvanced = doneStageCount(store.project) > run.doneBefore
@@ -419,7 +486,26 @@ export function createRunnerService(ctx: AppContext, deps: RunnerDeps = {}): Run
       ctx.requests.requeueInProgress(reason)
       ctx.requests.setWaitingReason(reason)
     }
-    const waiting = outcome.kind === 'not_found' || outcome.kind === 'limit' || outcome.kind === 'auth'
+    // Out of usage or credits, or the connection dropped: everything finished so far is saved, and the app tries
+    // again on its own (when the limit resets, or after a short wait) and carries on from the same stage.
+    const delay = sameProject && ctx.settings.get().runner.autoRetry !== false ? retryDelay(outcome, transientTries, now()) : null
+    if (delay !== null) {
+      if (outcome.kind === 'transient') transientTries++
+      cancelRetry()
+      const projectId = run.projectId
+      retryTimer = setTimer(() => {
+        retryTimer = null
+        if (current || held || ctx.projects.current()?.project.id !== projectId) return
+        output('info', 'Trying again')
+        kick()
+      }, delay)
+      const at = new Date(now() + delay)
+      const when = delay >= 3600_000 ? at.toLocaleString([], { weekday: 'short', hour: 'numeric', minute: '2-digit' }) : at.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })
+      const full = `${reason} Finished work is saved. Trying again on its own at ${when}, or press Resume.`
+      if (sameProject) ctx.requests.setWaitingReason(full)
+      return update({ status: 'waiting', waitingReason: full, activeRequestId: undefined, lastActivity: reason, pausedAt: pausedAt(store) })
+    }
+    const waiting = outcome.kind === 'not_found' || outcome.kind === 'limit' || outcome.kind === 'auth' || outcome.kind === 'transient'
     update({ status: waiting ? 'waiting' : 'error', waitingReason: reason, activeRequestId: undefined, lastActivity: reason, pausedAt: pausedAt(store) })
   }
 
@@ -568,6 +654,7 @@ export function createRunnerService(ctx: AppContext, deps: RunnerDeps = {}): Run
     if (!run) return
     run.stopping = true
     held = true
+    cancelRetry()
     update({ status: 'stopping', lastActivity: 'Stopping Claude…' })
     killTree(run.proc, platform, spawnFn)
     await Promise.race([run.exited, new Promise((r) => setTimeout(r, 8000).unref?.())])
@@ -595,6 +682,8 @@ export function createRunnerService(ctx: AppContext, deps: RunnerDeps = {}): Run
       wire()
       held = false
       runsWithoutProgress = 0
+      transientTries = 0
+      cancelRetry()
       ctx.requests.setWaitingReason(undefined)
       update({ waitingReason: undefined, status: current ? state.status : 'idle' })
       kick()

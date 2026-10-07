@@ -3,6 +3,14 @@
 Each release's section becomes its GitHub release text and the notes shown in the app's update dialog.
 A release is blocked until the section for its version has notes.
 
+## 1.3.0
+
+- **Picks up where it left off after running out of usage or credits.** When Claude hits its usage limit, the app now tries again on its own when the limit resets (or every 30 minutes if Claude Code does not say when, for example when API credits run low) and carries on from the same stage. The top bar says when the next try is; Resume still works at any time.
+- **Rides out a dropped connection.** If the internet drops or Anthropic is busy, it tries again after 1, 2, 5 and 10 minutes, then every 30 minutes. Turn automatic retries off in Settings > Claude connection.
+- **Safe across a power cut.** Every save is flushed to the disk before it replaces the old file, so the project can never be left empty or half-written. Backups of the project and the transcript are now also taken every 10 minutes while you edit, and a file that cannot be read is restored from the newest copy automatically (the damaged one is kept in backups/).
+- **Reopening after a crash or power cut** puts the unfinished work back in the queue and says where it carries on ("Claude was interrupted. It carries on from: B-roll"). Press Resume. Finished stages are not redone.
+- Claude now records its progress more often within long stages (at least every 10 minutes of footage) and saves each clip's transcript as soon as it is done, so an interruption costs minutes, not a whole stage.
+
 ## 1.2.0
 
 - **Stabilize a clip.** Right-click an A-roll cut or a B-roll clip on the timeline and choose Stabilize. Claude makes a stabilized copy of that clip's picture (two-pass vidstab with ffmpeg, keeping the frame rate and as little zoom as the shake allows), checks the framing, and swaps it in. Sound, cuts, captions and timing stay on the original footage.

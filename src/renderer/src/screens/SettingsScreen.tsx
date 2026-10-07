@@ -387,6 +387,11 @@ function Claude() {
           <code>{'{sessionId}'}</code>
         </span>
         <Toggle checked={runner.autoStart} onChange={(v) => saveRunner({ autoStart: v })} label="Start Claude automatically when there is something to do" />
+        <Toggle
+          checked={runner.autoRetry !== false}
+          onChange={(v) => saveRunner({ autoRetry: v })}
+          label="Try again on its own when Claude's usage resets, credits run out, or the connection drops"
+        />
         <div className="row">
           <button
             className="btn ghost"

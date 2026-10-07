@@ -216,7 +216,7 @@ export class ProjectStore extends EventEmitter {
       tracks: defaultTracks(),
       items: [],
       checklist: defaultChecklist(),
-      captions: { enabled: true },
+      captions: { enabled: true, mode: 'moments', spans: [] },
       thumbnails: { ...opts.thumbnails, useMyDirection: false, format: '16:9', items: [] },
       publish: { titles: [], description: '', chapters: [], tags: [] },
       lock: null

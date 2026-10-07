@@ -90,6 +90,12 @@ export function stageInstructions(plan: RunPlan): string {
         '(the file parameter) instead of sending the words one by one. It is the same transcript at a fraction of the cost.'
     )
   }
+  if (plan.stages.includes('captions')) {
+    lines.push(
+      'Captions: choose where they appear with set_caption_spans (the hook, then key moments only, usually 10-25 % of the video), ' +
+        'check the words in those spans, and mark emphasis on the words that carry each line.'
+    )
+  }
   if (plan.stages.includes('cuts') && plan.laterStages.length) {
     lines.push(
       'After the cuts, write in your handoff note a concrete plan for the later stages: which B-roll, graphics, music cues and sound ' +

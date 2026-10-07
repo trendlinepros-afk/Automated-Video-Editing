@@ -125,6 +125,8 @@ export interface PreviewState {
   message?: string
   /** Before/After for a request under review. */
   beforeFile?: string
+  /** While the first preview renders, `file` plays the start of it: this many seconds are ready. */
+  partialUntil?: number
 }
 
 /** Shorts being tracked, rendered or exported: a short line of progress (or a failure) per Short id. */

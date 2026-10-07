@@ -423,3 +423,10 @@ button:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
 .short-placeholder { display: flex; align-items: center; justify-content: center; text-align: center; height: 100%; padding: 8px; }
 .short-meta { display: flex; flex-direction: column; gap: 2px; }
 .short-meta .row > .muted:first-child { width: 52px; flex: none; }
+
+/* Drag the playhead line to scrub; clear a selection with the × at its top-right. */
+.tl-playhead-grab { position: absolute; top: 0; bottom: 0; left: -5px; width: 11px; pointer-events: auto; cursor: ew-resize; }
+.tl-playhead-grab:hover { background: rgba(255, 255, 255, 0.12); }
+body.scrubbing, body.scrubbing * { cursor: ew-resize !important; user-select: none; }
+.tl-range-x { position: absolute; top: 1px; width: 18px; height: 18px; padding: 0; line-height: 16px; font-size: 15px; border-radius: 4px; border: 1px solid var(--line-2); background: var(--bg-2); color: var(--text); cursor: pointer; z-index: 3; }
+.tl-range-x:hover { background: var(--bad, #e5484d); border-color: transparent; color: #fff; }

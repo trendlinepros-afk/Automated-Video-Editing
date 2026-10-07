@@ -215,9 +215,32 @@ export function round3(n: number): number {
   return Math.round(n * 1000) / 1000
 }
 
-/** Caption lines built from the transcript Claude saved, so they follow the words through every cut. */
-export function buildCaptions(resolver: TimelineResolver, style: Pick<CaptionStyle, 'maxWords'>): CaptionLine[] {
-  const words = resolver.placedWords()
+/** Which words get burned-in captions: undefined = every word; a set = only those (captions at key moments). */
+export function captionFilter(project: Pick<Project, 'captions'>, transcript: Transcript): Set<string> | undefined {
+  return project.captions.mode === 'moments' ? captionWordIds(transcript, project.captions.spans ?? []) : undefined
+}
+
+/** The words inside the caption spans (from one word to another in the same clip, inclusive). */
+export function captionWordIds(transcript: Transcript, spans: { from: string; to: string }[]): Set<string> {
+  const ids = new Set<string>()
+  const where = new Map<string, { clip: string; index: number }>()
+  for (const [clip, c] of Object.entries(transcript.clips)) c.words.forEach((w, index) => where.set(w.id, { clip, index }))
+  for (const span of spans) {
+    const a = where.get(span.from)
+    const b = where.get(span.to)
+    if (!a || !b || a.clip !== b.clip) continue
+    const words = transcript.clips[a.clip].words
+    for (let i = Math.min(a.index, b.index); i <= Math.max(a.index, b.index); i++) ids.add(words[i].id)
+  }
+  return ids
+}
+
+/**
+ * Caption lines built from the transcript Claude saved, so they follow the words through every cut.
+ * With only = a set of word ids (captions at key moments), lines are made from those words alone.
+ */
+export function buildCaptions(resolver: TimelineResolver, style: Pick<CaptionStyle, 'maxWords'>, only?: Set<string>): CaptionLine[] {
+  const words = only ? resolver.placedWords().filter((w) => only.has(w.word.id)) : resolver.placedWords()
   const lines: CaptionLine[] = []
   let current: PlacedWord[] = []
   const flush = () => {

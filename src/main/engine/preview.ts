@@ -211,7 +211,13 @@ export async function buildPreviewFile(
   ctx: AppContext,
   store: ProjectStore,
   doc: ProjectDoc,
-  opts: { signal: AbortSignal; onProgress: (p: BuildProgress) => void; outName: (hash: string) => string }
+  opts: {
+    signal: AbortSignal
+    onProgress: (p: BuildProgress) => void
+    outName: (hash: string) => string
+    /** A playable start of the preview while the rest renders: the file and how many seconds it covers. */
+    onPartial?: (file: string, seconds: number) => void
+  }
 ): Promise<{ file: string; hash: string; rendered: number; total: number }> {
   const settings = ctx.settings.get()
   const fps = settings.previewFps || 30
@@ -240,6 +246,73 @@ export async function buildPreviewFile(
   const report = (message: string) =>
     opts.onProgress({ chunksTotal: chunks.length, chunksDone: done, chunksPending: chunks.length - done, message })
 
+  // Preview audio first (the same mix the export makes, cached by the audio plan), so the start of the
+  // preview can play with sound while the rest renders.
+  let wav: string | null = null
+  if (plan.audio.clips.length) {
+    const cached = cachedMix(store.dir, aHash)
+    if (cached) wav = cached.out
+    else {
+      report('Mixing preview audio…')
+      const out = join(dir, `audio-${aHash}.wav`)
+      const tmp = join(dir, `audio-${aHash}.part.wav`)
+      try {
+        const r = (await ctx.engine.run(plan.engineVersion, ['mix', '--plan', planFile, '--out', tmp], { signal: opts.signal })) as MixInfo | null
+        renameSync(tmp, out)
+        writeFileSync(join(dir, `audio-${aHash}.json`), JSON.stringify({ ...(r ?? {}), out }))
+        wav = out
+      } finally {
+        rmSync(tmp, { force: true })
+      }
+    }
+  }
+  if (opts.signal.aborted) throw abortError()
+
+  const ffmpeg = ctx.env.ffmpeg()
+  /** Joins chunks (and the mix, trimmed to their length) into one file. */
+  const join_ = async (list: ChunkSpec[], out: string, seconds?: number) => {
+    const listFile = join(chunkDir, `list-${overall}-${list.length}.txt`)
+    writeFileSync(listFile, concatList(list.map((c) => `${c.hash}.mp4`)))
+    const tmpOut = out.replace(/\.mp4$/, '.part.mp4')
+    const args = ['-hide_banner', '-y', '-f', 'concat', '-safe', '0', '-i', listFile]
+    if (wav) args.push('-i', wav, '-map', '0:v:0', '-map', '1:a:0', '-c:v', 'copy', '-c:a', 'aac', '-b:a', '192k')
+    else args.push('-map', '0:v:0', '-c:v', 'copy')
+    if (seconds !== undefined) args.push('-t', seconds.toFixed(3))
+    args.push('-movflags', '+faststart', tmpOut)
+    try {
+      const r = await spawnLines(ffmpeg, args, { signal: opts.signal })
+      if (r.code !== 0) {
+        store.log.write('render', 'Joining the preview failed', { command: formatCommand(ffmpeg, args), errorOutput: r.stderr.slice(-4000) })
+        throw new Error('Joining the preview chunks failed. See the log for details.')
+      }
+      renameSync(tmpOut, out)
+    } finally {
+      rmSync(tmpOut, { force: true })
+      rmSync(listFile, { force: true })
+    }
+  }
+
+  // While chunks render in order, publish the finished start of the video every 8 seconds or so.
+  let partialUntil = 0
+  let partialBusy = false
+  const maybePartial = () => {
+    if (!opts.onPartial || partialBusy) return
+    let n = 0
+    while (n < chunks.length && existsSync(chunkFile(chunks[n]))) n++
+    if (n >= chunks.length) return
+    const until = n ? chunks[n - 1].end : 0
+    if (until < 8 || until - partialUntil < 8) return
+    partialBusy = true
+    partialUntil = until
+    const out = join(dir, `preview-partial-${overall.slice(0, 12)}-${n}.mp4`)
+    void join_(chunks.slice(0, n), out, until)
+      .then(() => opts.onPartial?.(out, until))
+      .catch(() => undefined)
+      .finally(() => {
+        partialBusy = false
+      })
+  }
+
   if (missing.length) {
     report(`Rendering ${missing.length} of ${chunks.length} preview chunks…`)
     const jobs: ChunkJob[] = missing.map((c) => ({ index: c.index, start: c.start, end: c.end, out: join(chunkDir, `${c.hash}.part.mp4`) }))
@@ -260,6 +333,7 @@ export async function buildPreviewFile(
           settle(c)
           done++
           report(`Rendering preview… ${done} of ${chunks.length}`)
+          maybePartial()
         }
       })
       for (const c of missing) settle(c)
@@ -272,45 +346,10 @@ export async function buildPreviewFile(
   }
   if (opts.signal.aborted) throw abortError()
 
-  // Preview audio: the same mix the export makes, cached by the audio plan.
-  let wav: string | null = null
-  if (plan.audio.clips.length) {
-    const cached = cachedMix(store.dir, aHash)
-    if (cached) wav = cached.out
-    else {
-      report('Mixing preview audio…')
-      const out = join(dir, `audio-${aHash}.wav`)
-      const tmp = join(dir, `audio-${aHash}.part.wav`)
-      try {
-        const r = (await ctx.engine.run(plan.engineVersion, ['mix', '--plan', planFile, '--out', tmp], { signal: opts.signal })) as MixInfo | null
-        renameSync(tmp, out)
-        writeFileSync(join(dir, `audio-${aHash}.json`), JSON.stringify({ ...(r ?? {}), out }))
-        wav = out
-      } finally {
-        rmSync(tmp, { force: true })
-      }
-    }
-  }
-
   report('Joining preview…')
-  const listFile = join(chunkDir, `list-${overall}.txt`)
-  writeFileSync(listFile, concatList(chunks.map((c) => `${c.hash}.mp4`)))
-  const tmpOut = final.replace(/\.mp4$/, '.part.mp4')
-  const args = ['-hide_banner', '-y', '-f', 'concat', '-safe', '0', '-i', listFile]
-  if (wav) args.push('-i', wav, '-map', '0:v:0', '-map', '1:a:0', '-c:v', 'copy', '-c:a', 'aac', '-b:a', '192k')
-  else args.push('-map', '0:v:0', '-c:v', 'copy')
-  args.push('-movflags', '+faststart', tmpOut)
-  const ffmpeg = ctx.env.ffmpeg()
   try {
-    const r = await spawnLines(ffmpeg, args, { signal: opts.signal })
-    if (r.code !== 0) {
-      store.log.write('render', 'Joining the preview failed', { command: formatCommand(ffmpeg, args), errorOutput: r.stderr.slice(-4000) })
-      throw new Error('Joining the preview chunks failed. See the log for details.')
-    }
-    renameSync(tmpOut, final)
+    await join_(chunks, final)
   } finally {
-    rmSync(tmpOut, { force: true })
-    rmSync(listFile, { force: true })
     rmSync(planFile, { force: true })
   }
   return { file: final, hash: overall, rendered: missing.length, total: chunks.length }
@@ -328,6 +367,8 @@ export function createPreviewService(ctx: AppContext): PreviewService {
   let timer: ReturnType<typeof setTimeout> | null = null
   let controller: AbortController | null = null
   let running: Promise<void> | null = null
+  /** A change came in while a build was running: build again once it finishes. */
+  let rerun = false
   let generation = 0
   let lastHash = ''
   let lastDir = ''
@@ -418,6 +459,11 @@ export function createPreviewService(ctx: AppContext): PreviewService {
       onProgress: (p) => {
         if (gen === generation) emit({ status: 'rendering', ...p })
       },
+      // With no finished preview to show yet, play the start of this one while the rest renders.
+      onPartial: (file, seconds) => {
+        if (gen !== generation || (state.file && !state.partialUntil)) return
+        emit({ file, partialUntil: seconds, version: state.version + 1 })
+      },
       outName: (hash) => {
         if (hash === lastHash && state.file && existsSync(state.file)) {
           target = state.file
@@ -436,7 +482,8 @@ export function createPreviewService(ctx: AppContext): PreviewService {
       emit({
         status: 'ready',
         file: result.file,
-        version: m ? Number(m[1]) : state.version + 1,
+        partialUntil: undefined,
+        version: Math.max(m ? Number(m[1]) : 0, state.version + 1),
         chunksTotal: result.total,
         chunksDone: result.total,
         chunksPending: 0,
@@ -444,12 +491,19 @@ export function createPreviewService(ctx: AppContext): PreviewService {
       })
       store.log.write('render', `Preview updated: ${result.rendered} of ${result.total} chunks rendered in ${((Date.now() - started) / 1000).toFixed(1)} s`)
     } else {
-      emit({ status: 'ready', chunksTotal: result.total, chunksDone: result.total, chunksPending: 0, message: undefined })
+      emit({ status: 'ready', chunksTotal: result.total, chunksDone: result.total, chunksPending: 0, message: undefined, partialUntil: undefined })
     }
   }
 
   const kick = () => {
     timer = null
+    // Chunks are cached by content, so a running build is never wasted work: let it finish (what it renders that
+    // is still current is reused), then build again for the newest changes. Restarting on every change meant
+    // nothing finished while Claude was editing.
+    if (running && controller && !controller.signal.aborted) {
+      rerun = true
+      return
+    }
     controller?.abort()
     const ctl = new AbortController()
     controller = ctl
@@ -473,6 +527,10 @@ export function createPreviewService(ctx: AppContext): PreviewService {
       if (running === job) {
         running = null
         if (controller === ctl) controller = null
+        if (rerun) {
+          rerun = false
+          kick()
+        }
       }
     })
   }
@@ -485,8 +543,13 @@ export function createPreviewService(ctx: AppContext): PreviewService {
     },
     invalidate() {
       if (timer) clearTimeout(timer)
-      // A change cancels the running build at once; the new one starts after the debounce.
-      controller?.abort()
+      // Another project (or none) is open: stop the old build at once. Otherwise it finishes and the newest
+      // changes are built right after it.
+      const current = ctx.projects.current()
+      if (!current || current.dir !== lastDir) {
+        rerun = false
+        controller?.abort()
+      }
       timer = setTimeout(kick, DEBOUNCE_MS)
     },
     async showBefore(requestId) {

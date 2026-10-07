@@ -10,6 +10,7 @@ import { themeOneLine, type VideoTheme } from '@shared/videoTheme'
 import { errorMessage } from '../util'
 import { applyOp, editor } from '../state/editor'
 import { useStore } from '../state/store'
+import { useDerived } from '../state/derived'
 
 export function StartPanel({ onStarted }: { onStarted: () => void }) {
   const project = useStore(editor, (s) => s.snapshot!.doc.project)
@@ -137,6 +138,13 @@ export function IntroPanel({ stopped = false }: { stopped?: boolean }) {
   const [mode, setMode] = useState<'choose' | 'redo' | 'min' | 'hidden'>(stopped ? 'min' : 'choose')
   const est = useEstimate('continue_intro')
   const [direction, setDirection] = useState('')
+  // When the intro has played to its end, ask right there in the viewer.
+  const derived = useDerived()
+  const end = derived?.duration ?? 0
+  const atEnd = useStore(editor, (s) => !s.playing && end > 1 && s.playhead >= end - 0.35)
+  useEffect(() => {
+    if (atEnd) setMode((m) => (m === 'min' ? 'choose' : m))
+  }, [atEnd])
   const decide = async (decision: 'continue' | 'redo' | 'stop') => {
     try {
       await window.api.project.introDecision(decision, decision === 'redo' ? direction : undefined)
@@ -162,27 +170,30 @@ export function IntroPanel({ stopped = false }: { stopped?: boolean }) {
     <div className="start-panel" style={{ background: 'transparent', alignItems: 'flex-end', paddingBottom: 16, pointerEvents: 'none' }}>
       <div className="card" style={{ pointerEvents: 'auto', background: 'var(--bg-2)' }}>
         <div className="row">
-          <h3 className="grow">{stopped ? 'Edit the rest of the video?' : 'The intro is ready'}</h3>
-          <button className="btn ghost small" onClick={() => setMode('min')} title="Watch it first; the button in the corner of the preview brings this back">
-            {stopped ? 'Not now' : 'Watch first'}
+          <h3 className="grow">{atEnd || stopped ? 'Like the intro?' : 'The intro is ready'}</h3>
+          <button className="btn ghost small" onClick={() => setMode('min')} title="Watch it first; this comes back when the intro ends, or from the button in the corner">
+            {stopped || atEnd ? 'Not now' : 'Watch first'}
           </button>
         </div>
         {mode === 'choose' ? (
-          <div className="row wrap">
-            <button className="btn primary" onClick={() => void decide('continue')}>
-              Continue with the rest
-            </button>
-            <button className="btn" onClick={() => setMode('redo')}>
-              Redo the intro with new direction
-            </button>
-            {!stopped && (
-              <button className="btn ghost" onClick={() => void decide('stop')}>
-                Stop there
+          <>
+            <div className="muted small">Keep it and have Claude edit the rest of the video, or tell Claude what to change in the intro first.</div>
+            <div className="row wrap">
+              <button className="btn primary" onClick={() => void decide('continue')} title="The intro stays exactly as it is; Claude edits the rest of the video from its last frame">
+                Yes, edit the rest of the video
               </button>
-            )}
-            <span className="spacer" />
-            <EstimateNote estimate={est} />
-          </div>
+              <button className="btn" onClick={() => setMode('redo')} title="Tell Claude what to change; it redoes the intro and asks you again">
+                Change the intro…
+              </button>
+              {!stopped && (
+                <button className="btn ghost" onClick={() => void decide('stop')} title="Keep just the intro for now; you can continue later">
+                  Stop after the intro
+                </button>
+              )}
+              <span className="spacer" />
+              <EstimateNote estimate={est} />
+            </div>
+          </>
         ) : (
           <>
             <textarea rows={3} autoFocus value={direction} onChange={(e) => setDirection(e.target.value)} placeholder="What should change? e.g. faster, start with the crash (Win+H to speak)" />
@@ -191,8 +202,8 @@ export function IntroPanel({ stopped = false }: { stopped?: boolean }) {
                 Back
               </button>
               <span className="spacer" />
-              <button className="btn primary" onClick={() => void decide('redo')}>
-                Redo the intro
+              <button className="btn primary" onClick={() => void decide('redo')} disabled={!direction.trim()}>
+                Redo the intro with these changes
               </button>
             </div>
           </>

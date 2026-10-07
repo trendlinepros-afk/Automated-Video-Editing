@@ -34,6 +34,7 @@ function tick() {
   if (video && video.src && video.readyState > 0) {
     t = video.currentTime
     if (video.ended) {
+      editor.set({ playhead: video.currentTime })
       pause()
       return
     }

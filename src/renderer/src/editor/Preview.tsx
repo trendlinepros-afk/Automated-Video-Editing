@@ -54,7 +54,9 @@ export function Preview() {
         {preview.status === 'rendering' && (
           <div className="preview-overlay">
             <span className="spinner" />
-            Updating preview… {preview.chunksDone} of {preview.chunksTotal}
+            {preview.partialUntil
+              ? `The first ${fmt(preview.partialUntil)} is ready to watch. Rendering the rest… ${preview.chunksDone} of ${preview.chunksTotal}`
+              : `Updating preview… ${preview.chunksDone} of ${preview.chunksTotal}`}
           </div>
         )}
         {preview.status === 'error' && <div className="preview-overlay bad">Preview could not be rendered: {preview.message}</div>}

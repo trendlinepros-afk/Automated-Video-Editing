@@ -25,6 +25,10 @@ export const WORKFLOW = `How to work with the app (tools from the "ave" MCP serv
   time and call save_transcript for each as soon as it is done; when resuming, skip sources list_footage shows as transcribed.
   Keep your scratch files in the project's scratch folder (get_engine_info) so a new session can find and reuse them.
 - Anchor B-roll, graphics, effects, sound effects and chapters to transcript words, not fixed times.
+- Captions on long-form videos are a tool, not wallpaper: caption the hook (about the first 3-6 seconds) and then only the
+  moments where they pull attention back (a key number or price, a punchline or strong claim, the payoff, hard-to-hear speech, a
+  re-hook). Choose them with set_caption_spans, usually 10-25 % of the video. Never caption a whole intro or the whole video unless
+  the owner or the channel rules ask for it (set_caption_spans with mode "all"). Shorts are captioned throughout by the app.
 - Before making a graphic, animation, song or sound effect, search the asset library (search_library). Reuse one only when it fits
   this moment perfectly (same purpose, emotion and energy, right for the story and the brand) and is as good as what you would
   make fresh. Quality first: never reuse to save time or usage; when a new one would carry the story or emotion better, make it.

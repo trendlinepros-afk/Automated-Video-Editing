@@ -210,7 +210,7 @@ Program files are replaced by updates. Nothing below is.
 | Your project folders | Everything about each video (see above) |
 | Your library folder | Reusable assets, shared and per profile |
 
-The app log is reached from Settings > About > Open app log. Each project's Export log button saves a text file of everything done on it.
+The app log is reached from Settings > About > Open app log. The log icon at the top right saves a diagnostics zip (logs, Claude's last output, settings, system info; keys removed) to Downloads. Each project's Export log button saves a text file of everything done on it.
 
 ## The October 5 scripts
 

@@ -1,13 +1,15 @@
 /** The editor's dialogs: Export, Export log, Re-edit section, Inspiration, Save to library, Leave a note, Compare versions. */
 import type { VideoTheme } from '@shared/videoTheme'
+import { blocking, type ExportCheckResult } from '@shared/exportCheck'
 import { useEffect, useRef, useState } from 'react'
 import type { ExportPreset, Range } from '@shared/project'
 import { call, toast } from '../state/app'
-import { editor, openDialog, applyOp, type Dialog } from '../state/editor'
+import { editor, openDialog, applyOp, setRange, setTab, type Dialog } from '../state/editor'
+import { seek } from '../state/player'
 import { currentDerived, useDerived } from '../state/derived'
 import { useStore } from '../state/store'
 import { Modal } from '../components/Modal'
-import { Toggle } from '../components/bits'
+import { Spinner, Toggle } from '../components/bits'
 import { CAPTION_EXPORT_LABELS, PresetEditor } from '../components/PresetEditor'
 import { errorMessage, fmt, fmtRange, itemLabel, mediaUrl } from '../util'
 import { listenReminderDismissed } from './Preview'
@@ -46,14 +48,118 @@ function ExportDialog({ onClose }: { onClose: () => void }) {
   const [quick, setQuick] = useState(false)
   const [captions, setCaptions] = useState(project.settings.captionExport)
   const busy = job?.status === 'running'
-  const start = async () => {
+  const [checking, setChecking] = useState<string | null>(null)
+  const [check, setCheck] = useState<ExportCheckResult | null>(null)
+  useEffect(() => window.api.project.onCheckProgress((m) => setChecking(m)), [])
+  const exportRange = what === 'section' && range ? range : undefined
+
+  const doExport = async (note?: string) => {
     try {
-      await window.api.project.exportVideo({ range: what === 'section' && range ? range : undefined, preset, quick, captions })
+      await window.api.project.exportVideo({ range: exportRange, preset, quick, captions })
       onClose()
-      toast('Exporting. Progress shows in the top bar; you can keep working.')
+      toast(`${note ? `${note} ` : ''}Exporting. Progress shows in the top bar; you can keep working.`)
     } catch (e) {
       toast(`Could not start the export: ${errorMessage(e)}`, { kind: 'error' })
     }
+  }
+  // Export runs the check first (not for a quick low-resolution check export).
+  const start = async () => {
+    if (quick) return doExport()
+    setChecking('Checking the video…')
+    let result: ExportCheckResult
+    try {
+      result = await window.api.project.exportCheck(exportRange)
+    } catch (e) {
+      setChecking(null)
+      setCheck({ problems: [], checked: [], skipped: [`the whole check: ${errorMessage(e)}`] })
+      return
+    }
+    setChecking(null)
+    if (!blocking(result).length && !result.skipped.length) {
+      const infos = result.problems.length
+      return doExport(`Check passed: no problems found${infos ? ` (${infos} note${infos > 1 ? 's' : ''})` : ''}.`)
+    }
+    setCheck(result)
+  }
+  const askClaude = async () => {
+    if (!check) return
+    const list = blocking(check)
+      .map((p) => `- ${p.title}${p.detail ? `: ${p.detail}` : ''}`)
+      .join('\n')
+    try {
+      await window.api.project.sendChat({
+        text: `The check before export found these problems. Please fix them (or tell me if one is intended):\n${list}`,
+        playhead: editor.get().playhead,
+        selectedItemIds: []
+      })
+    } catch (e) {
+      toast(`Could not send it to Claude: ${errorMessage(e)}`, { kind: 'error' })
+      return
+    }
+    onClose()
+    setTab('chat')
+    toast('Sent the problems to Claude. Export again when it is done; the check runs again.')
+  }
+  const goTo = (r: Range) => {
+    onClose()
+    setRange(r)
+    seek(r.start)
+  }
+
+  if (checking) {
+    return (
+      <Modal title="Checking before export" onClose={onClose}>
+        <div className="row" style={{ gap: 10 }}>
+          <Spinner />
+          <span>{checking}</span>
+        </div>
+        <span className="hint">Looks for missing files, black or frozen picture, silence, and loudness, so nothing broken gets uploaded. No Claude usage.</span>
+      </Modal>
+    )
+  }
+  if (check) {
+    const blockers = blocking(check)
+    return (
+      <Modal
+        title={blockers.length ? `The check found ${blockers.length} problem${blockers.length > 1 ? 's' : ''}` : 'Check before export'}
+        onClose={onClose}
+        footer={
+          <>
+            <button className="btn" onClick={() => setCheck(null)}>
+              Back
+            </button>
+            <span className="spacer" />
+            {blockers.length > 0 && (
+              <button className="btn" onClick={() => void askClaude()}>
+                Ask Claude to fix these
+              </button>
+            )}
+            <button className="btn primary" disabled={busy || check.problems.some((p) => p.severity === 'error')} onClick={() => void doExport()} title={check.problems.some((p) => p.severity === 'error') ? 'Fix the missing files first: the export would fail.' : ''}>
+              Export anyway
+            </button>
+          </>
+        }
+      >
+        <div className="col check-list">
+          {check.problems.map((p) => (
+            <div key={p.id} className={`check-item ${p.severity}`}>
+              <span className="check-dot" />
+              <div className="grow">
+                <div>{p.title}</div>
+                {p.detail && <div className="small muted selectable">{p.detail}</div>}
+              </div>
+              {p.range && (
+                <button className="btn small ghost" onClick={() => goTo(p.range!)} title="Show this spot on the timeline">
+                  Go to {fmt(p.range.start)}
+                </button>
+              )}
+            </div>
+          ))}
+          {!check.problems.length && <div className="muted">No problems found.</div>}
+        </div>
+        {check.skipped.length > 0 && <div className="warn small">Not checked: {check.skipped.join('; ')}.</div>}
+      </Modal>
+    )
   }
   return (
     <Modal

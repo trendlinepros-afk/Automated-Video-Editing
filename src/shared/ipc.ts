@@ -3,6 +3,7 @@
  * The preload script exposes `window.api` with exactly this shape.
  */
 import type { VideoTheme, VideoThemeProgress } from './videoTheme'
+import type { ExportCheckResult } from './exportCheck'
 import type {
   ExportPreset,
   RequestKind,
@@ -276,6 +277,8 @@ export interface Api {
     saveFile(opts: { title?: string; defaultPath?: string; filters?: { name: string; extensions: string[] }[] }): Promise<string | null>
     fileUrl(path: string): string
     copyText(text: string): Promise<void>
+    /** Save the diagnostics zip (logs, system info, settings, keys removed) to Downloads and show it. Returns its path. */
+    saveDiagnostics(): Promise<string>
     onMenu(cb: (cmd: string) => void): () => void
   }
   updates: {
@@ -357,6 +360,9 @@ export interface Api {
       compareFrames(aId: string, bId: string, time: number): Promise<{ a: string | null; b: string | null }>
     }
     exportVideo(opts: { range?: Range; preset: ExportPreset; quick: boolean; captions: 'burn' | 'srt' | 'both' | 'none' }): Promise<string>
+    /** The check before export: timeline problems, then the picture and sound of the preview. */
+    exportCheck(range?: Range): Promise<ExportCheckResult>
+    onCheckProgress(cb: (message: string) => void): () => void
     cancelExport(): Promise<void>
     onRenderJob(cb: (j: RenderJobState) => void): () => void
     exportLog(filter: 'all' | 'last_session'): Promise<string>

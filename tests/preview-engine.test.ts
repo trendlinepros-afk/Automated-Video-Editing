@@ -167,6 +167,18 @@ describe.skipIf(!available)('preview with the real engine', () => {
     expect(job.out).toMatch(/Tiny test_whole_\d{4}-\d{2}-\d{2}_\d{2}-\d{2}\.mp4$/)
   })
 
+  it('checks the finished picture and sound before export, on the preview', async () => {
+    const { runExportCheck } = await import('../src/main/services/exportCheck')
+    ;(ctx.env as any).analysisScript = () => resolve('engine/analysis/style.py')
+    const steps: string[] = []
+    const r = await runExportCheck(ctx, store, { onProgress: (m) => steps.push(m) })
+    expect(r.skipped).toEqual([])
+    expect(r.checked.join(' ')).toMatch(/picture.*sound/)
+    // Two moving pieces with a steady tone: nothing black, frozen or silent.
+    expect(r.problems.filter((p) => /Black|frozen|silence|no sound/i.test(p.title))).toEqual([])
+    expect(steps).toContain('Checking the picture and sound…')
+  })
+
   it('makes stills, waveforms and the seam audio around a cut', async () => {
     const png = await frameAt(ctx, 1.5)
     expect(png && existsSync(png)).toBe(true)

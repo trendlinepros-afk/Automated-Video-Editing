@@ -2,7 +2,7 @@
 export const MEDIA_PROTOCOL = 'ave-media'
 
 export const API_METHODS = [
-  'app.info', 'app.openPath', 'app.showItemInFolder', 'app.openExternal', 'app.pickFolder', 'app.pickFiles',
+  'app.info', 'app.openPath', 'app.showItemInFolder', 'app.saveDiagnostics', 'app.openExternal', 'app.pickFolder', 'app.pickFiles',
   'app.saveFile', 'app.copyText',
   'updates.state', 'updates.check', 'updates.restartNow', 'updates.later',
   'setup.status', 'setup.installEnvironment',
@@ -12,7 +12,7 @@ export const API_METHODS = [
   'music.list', 'music.rescan', 'music.addFolder', 'music.removeFolder',
   'projects.recent', 'projects.create', 'projects.open', 'projects.locate', 'projects.removeRecent', 'projects.close',
   'project.get', 'project.apply', 'project.undo', 'project.redo', 'project.relinkSource', 'project.startEdit',
-  'project.sendChat', 'project.requestReedit', 'project.requestFixAudio', 'project.requestStabilize', 'project.requestInsertClip', 'project.addNote', 'project.noteToRule',
+  'project.sendChat', 'project.requestReedit', 'project.requestFixAudio', 'project.requestStabilize', 'project.requestInsertClip', 'project.exportCheck', 'project.addNote', 'project.noteToRule',
   'project.reviewRequest', 'project.introDecision', 'project.setVideoTheme', 'project.regeneratePublish', 'project.seamAudio', 'project.waveform',
   'project.frameAt',
   'project.versions.list', 'project.versions.save', 'project.versions.restore', 'project.versions.remove',
@@ -41,5 +41,6 @@ export const API_EVENTS = {
   'preview.onState': 'preview:state',
   'claude.onState': 'claude:state',
   'claude.onOutput': 'claude:output',
-  'themes.onProgress': 'themes:progress'
+  'themes.onProgress': 'themes:progress',
+  'project.onCheckProgress': 'exportcheck:progress'
 } as const

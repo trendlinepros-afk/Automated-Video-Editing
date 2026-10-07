@@ -408,3 +408,10 @@ button:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
 .theme-card .theme-name { font-weight: 600; font-size: 15px; background: transparent; border-color: transparent; }
 .theme-card .theme-name:hover, .theme-card .theme-name:focus { border-color: var(--line-2); }
 .theme-sheet { width: 100%; max-width: 900px; border-radius: 4px; border: 1px solid var(--line); }
+
+/* The check before export */
+.check-list { gap: 6px; max-height: 50vh; overflow-y: auto; }
+.check-item { display: flex; gap: 10px; align-items: flex-start; padding: 8px 10px; border: 1px solid var(--line); border-radius: 6px; }
+.check-item .check-dot { width: 8px; height: 8px; border-radius: 50%; margin-top: 6px; flex: none; background: var(--muted, #888); }
+.check-item.error .check-dot { background: var(--bad, #e5484d); }
+.check-item.warning .check-dot { background: var(--warn, #f5a524); }

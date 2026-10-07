@@ -256,7 +256,8 @@ export function installMockApi(): void {
     job: emitter<RenderJobState>(),
     suggestion: emitter<Suggestion>(),
     setup: emitter<{ step: string; percent?: number; message: string; done?: boolean; error?: string }>(),
-    themes: emitter<VideoThemeProgress>()
+    themes: emitter<VideoThemeProgress>(),
+    check: emitter<string>()
   }
 
   const undoLabels: string[] = []
@@ -383,6 +384,7 @@ export function installMockApi(): void {
       saveFile: async () => 'C:\\Users\\Adam\\out.png',
       fileUrl: (path) => placeholder(path.split(/[\\/]/).pop() ?? '', 200),
       copyText: async (t) => navigator.clipboard?.writeText(t).catch(() => undefined),
+      saveDiagnostics: async () => 'C:\\Users\\you\\Downloads\\AI-Video-Editor-diagnostics-2026-10-07_11-40.zip',
       onMenu: () => () => undefined
     },
     updates: {
@@ -522,6 +524,22 @@ export function installMockApi(): void {
       setVideoTheme: async (id) => void commit((d) => void (d.project.videoTheme = id ? { id, name: themes.find((t) => t.id === id)?.name ?? '' } : null), 'user', 'Video theme'),
       requestStabilize: async () => undefined,
       requestInsertClip: async () => undefined,
+      exportCheck: async () => {
+        for (const m of ['Waiting for the preview to finish…', 'Checking the picture and sound…']) {
+          ev.check.emit(m)
+          await new Promise((r) => setTimeout(r, 500))
+        }
+        return {
+          checked: ['the timeline', 'the picture', 'the sound'],
+          skipped: [],
+          problems: [
+            { id: 'black_1', severity: 'warning', title: 'Black screen for 1.4 s', detail: '3:12.400 to 3:13.800: nothing on screen.', range: { start: 192.4, end: 193.8 } },
+            { id: 'silence_1', severity: 'warning', title: '4.2 s of silence', detail: '7:02.000 to 7:06.200: no voice, music or sound. Dead air, or a muted clip?', range: { start: 422, end: 426.2 } },
+            { id: 'pending', severity: 'info', title: '1 change waiting for Keep or Revert', detail: 'They are in the video as it stands; the export uses them.' }
+          ]
+        }
+      },
+      onCheckProgress: (cb) => ev.check.on(cb),
       regeneratePublish: async () => undefined,
       seamAudio: async () => 'seam.wav',
       waveform: async (key) => {

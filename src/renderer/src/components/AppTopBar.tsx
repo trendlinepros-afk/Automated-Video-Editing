@@ -5,6 +5,7 @@ import { editor } from '../state/editor'
 import { useStore } from '../state/store'
 import { Icon } from './Icon'
 import { UpdateButton } from './Updates'
+import { DiagnosticsButton } from './DiagnosticsButton'
 
 export function AppTopBar({ children }: { children?: ReactNode }) {
   const screen = useStore(app, (s) => s.screen)
@@ -42,6 +43,7 @@ export function AppTopBar({ children }: { children?: ReactNode }) {
       <div className="spacer" />
       {children}
       <UpdateButton />
+      <DiagnosticsButton />
     </div>
   )
 }

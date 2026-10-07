@@ -143,6 +143,35 @@ export function requestSection(r: EditRequest, project: Project): string {
       if (r.text.trim()) lines.push(`Note from the owner: "${r.text.trim()}"`)
       break
     }
+    case 'make_shorts': {
+      const c = (r.context ?? {}) as { count?: number; recap?: boolean; redoId?: string }
+      if (c.redoId) {
+        lines.push(
+          `Remake the Short ${c.redoId} (list_shorts shows it) with save_short and replace_id "${c.redoId}".` +
+            (r.text.trim() ? ` The owner wants: "${r.text.trim()}"` : ' Make it stronger: a better hook, tighter, or a better moment.')
+        )
+      } else {
+        lines.push(
+          `Make vertical Shorts from this video for YouTube Shorts and TikTok. The owner asked for up to ${c.count ?? 3} highlight Short${(c.count ?? 3) > 1 ? 's' : ''}.`,
+          'Read the transcript (get_transcript) and look through the footage (get_range_frames over the source, and the edit so far) to find the moments ' +
+            'that stop a scroll: the hook of the video, high-action moments, surprises, reveals, funny or striking moments, strong opinions. Each Short ' +
+            'opens on its hook in the first second, keeps only what earns its place (cut pauses and filler with several pieces), ends on a payoff, and ' +
+            'makes sense to someone who never saw the video. Usually 15-60 s.',
+          'Quality over count: Shorts must not feel like copies of each other. If the video only has, say, 7 distinct strong moments, make 7 and ' +
+            'say why in your reply. The app refuses a highlight that shares too much footage with another one.',
+          c.recap
+            ? 'Also, if this video is an unboxing or a review (for example of an RC car), make ONE extra Short of kind "recap", about 30 s, ' +
+                'hyper-focused with none of the bloat: the box opening, a quick look at what is inside, then it in use, done. It may reuse moments ' +
+                'from the highlights. If the video is not an unboxing or review, skip it and say so.'
+            : '',
+          'For each Short call save_short with its pieces from the SOURCE footage, a punchy YouTube Shorts title (under 70 characters), a TikTok ' +
+            'caption, a one-line description and 3-6 hashtags, in the channel\'s voice. Use list_shorts to see what exists; do not repeat it. ' +
+            'Follow the channel rules and the video theme if there is one. Reply with the list and one line on each.'
+        )
+        if (r.text.trim()) lines.push(`Note from the owner: "${r.text.trim()}"`)
+      }
+      break
+    }
     case 'stabilize':
       lines.push(
         `Stabilize the clip ${r.context?.itemId ?? ''} at ${rangeText(r.range)}. The attached context has its source file, the source range it ` +

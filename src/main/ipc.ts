@@ -66,6 +66,26 @@ export function registerIpc(ctx: AppContext, getWindow: () => BrowserWindow | nu
       shell.showItemInFolder(out)
       return out
     },
+    'project.requestShorts': (o: { count: number; recap: boolean; note?: string; redoId?: string }) => {
+      const count = Math.max(1, Math.min(30, Math.round(Number(o.count) || 3)))
+      ctx.requests.enqueue({
+        kind: 'make_shorts',
+        text: (o.note ?? '').trim(),
+        context: o.redoId ? { redoId: o.redoId, count: 1 } : { count, recap: !!o.recap }
+      })
+    },
+    'shorts.state': () => ctx.shorts.state(),
+    'shorts.exportShort': async (id: string) => {
+      const out = await ctx.shorts.exportShort(id)
+      return out
+    },
+    'shorts.exportAll': () => ctx.shorts.exportAll(),
+    'shorts.remove': (id: string) => {
+      store().mutate('Delete Short', 'user', (d) => {
+        d.project.shorts = (d.project.shorts ?? []).filter((s) => s.id !== id)
+      }, BOOKKEEPING)
+    },
+    'shorts.refresh': (id: string) => ctx.shorts.prepare(id),
     'project.exportCheck': (range?: Range) => runExportCheck(ctx, store(), { range, onProgress: (message) => ctx.send('exportcheck:progress', message) }),
     'app.openExternal': async (url: string) => {
       if (!/^https?:\/\//i.test(url)) throw new Error('Only web links can be opened.')

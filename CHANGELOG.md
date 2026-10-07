@@ -3,6 +3,16 @@
 Each release's section becomes its GitHub release text and the notes shown in the app's update dialog.
 A release is blocked until the section for its version has notes.
 
+## 1.7.0
+
+- **Shorts.** A new Shorts tab in the editor. Press Make Shorts and choose how many: 1, 3, 6, 10 or 15. Claude finds the hook, the high-action moments and anything that stops a scroll, and cuts each into a vertical 9:16 Short from your footage. Each one opens on its hook, cuts the dead air and ends on a payoff.
+- **No look-alikes.** Shorts never share more than a quarter of their footage. If the video has fewer strong moments than you asked for, Claude makes fewer and says why.
+- **A 30-second recap for unboxings and reviews** (on by default): box open, a quick look at what is inside, it in use, done.
+- **Framing that follows the subject.** The app finds your face (or the car, by its motion) and keeps it centred in the vertical frame, smoothly, on your own PC.
+- **Bold captions:** big, a few words at a time, in your brand's font and colours.
+- **Titles written per platform:** a YouTube Shorts title, a TikTok caption, a description and hashtags, each with a Copy button.
+- **Review and export:** preview each Short in the tab. Export one or all at 1080x1920, each with a text file of its titles and hashtags. Change… asks Claude to remake one ("start on the crash").
+
 ## 1.6.0
 
 - **A check before every export.** Pressing Export first checks the video, with no Claude usage:

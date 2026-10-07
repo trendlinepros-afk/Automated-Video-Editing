@@ -7,6 +7,7 @@
  *  - IDs never change once given.
  */
 import { z } from 'zod'
+import { ShortSchema } from './shorts'
 
 export const TRACK_KINDS = ['aroll', 'broll', 'graphics', 'effects', 'captions', 'music', 'sfx'] as const
 export type TrackKind = (typeof TRACK_KINDS)[number]
@@ -230,6 +231,7 @@ export const REQUEST_KINDS = [
   'fix_audio',
   'stabilize',
   'insert_clip',
+  'make_shorts',
   'continue_intro',
   'redo_intro',
   'publish_regen',
@@ -401,6 +403,8 @@ export const ProjectSchema = z.looseObject({
   status: z.enum(PROJECT_STATUSES).default('new'),
   inspiration: z.string().default(''),
   /** The video theme this edit follows (Settings > Video themes), by id, with its name at the time. */
+  /** Shorts made from this video (see shorts.ts). */
+  shorts: z.array(ShortSchema).optional(),
   videoTheme: z.looseObject({ id: z.string(), name: z.string() }).nullable().optional(),
   scope: z.looseObject({
     mode: z.enum(['whole', 'intro']).default('whole'),

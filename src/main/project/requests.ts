@@ -20,6 +20,7 @@ export const REQUEST_LABELS: Record<RequestKind, string> = {
   fix_audio: 'clipped audio fix',
   stabilize: 'stabilize clip',
   insert_clip: 'new clip',
+  make_shorts: 'Shorts',
   continue_intro: 'continue after the intro',
   redo_intro: 'intro redo',
   publish_regen: 'publishing pack update',

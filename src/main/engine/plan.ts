@@ -83,8 +83,9 @@ export function buildPlan(doc: ProjectDoc, opts: PlanOptions): RenderPlan {
         sourceIn: s.picture ? s.in - s.picture.sourceStart : s.in,
         speed: s.speed || 1,
         hold: !!s.hold,
-        transform: null,
-        keyframes: [],
+        // A-roll pieces are full frame; a Short's pieces carry the crop that follows the subject.
+        transform: toTransform((s as { transform?: Transform }).transform),
+        keyframes: keyframes((s as { keyframes?: PlanKeyframe[] }).keyframes),
         fadeIn: 0,
         fadeOut: 0,
         ...(s.picture ? {} : { sourceWidth: src?.width, sourceHeight: src?.height })

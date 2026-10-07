@@ -39,6 +39,7 @@ export const MODEL_SECTIONS = [
   { id: 'chat', label: 'Chat and notes', detail: 'Changes you ask for in the chat or in notes for Claude.', stage: false },
   { id: 'reedit', label: 'Section re-edits', detail: 'Re-edit section, intro redo, and Add clip here.', stage: false },
   { id: 'fix_audio', label: 'Fix clipped audio', detail: 'Restores one clipped word at a cut.', stage: false },
+  { id: 'shorts', label: 'Shorts', detail: 'Finds the hook, the action and the best moments, and cuts them into vertical Shorts with titles.', stage: false },
   { id: 'stabilize', label: 'Stabilize', detail: 'Stabilizes one clip you right-click. ffmpeg does the work; the model runs it and checks the framing.', stage: false }
 ] as const
 
@@ -62,7 +63,8 @@ export const RECOMMENDED_MODELS: Record<ModelSection, ClaudeModelId> = {
   chat: 'claude-opus-5-5',
   reedit: 'claude-opus-5-5',
   fix_audio: 'claude-opus-5-5',
-  stabilize: 'claude-opus-5-5'
+  stabilize: 'claude-opus-5-5',
+  shorts: 'claude-opus-5-5'
 }
 
 export function modelLabel(id: string | undefined | null): string {
@@ -84,6 +86,8 @@ export function sectionForRequest(kind: RequestKind): ModelSection | null {
       return 'fix_audio'
     case 'stabilize':
       return 'stabilize'
+    case 'make_shorts':
+      return 'shorts'
     case 'publish_regen':
       return 'publish'
     default:
@@ -121,5 +125,6 @@ export const DEFAULT_ESTIMATES = {
   reedit: 0.6,
   fix_audio: 0.15,
   stabilize: 0.2,
+  shorts: 0.6,
   publish: 0.2
 }

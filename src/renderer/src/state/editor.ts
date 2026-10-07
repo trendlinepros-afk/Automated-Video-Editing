@@ -8,7 +8,7 @@ import type { Range } from '@shared/project'
 import { createStore } from './store'
 import { call, toast } from './app'
 
-export type SideTab = 'chat' | 'inspector' | 'transcript' | 'thumbnails' | 'publish' | 'versions' | 'notes'
+export type SideTab = 'chat' | 'inspector' | 'transcript' | 'thumbnails' | 'publish' | 'shorts' | 'versions' | 'notes'
 
 export interface OutputLine {
   ts: string

@@ -195,6 +195,10 @@ Draw every size as a fraction of `ctx.width`/`ctx.height` so the low-resolution 
 
 Settings > Video themes measures the editing style of a YouTube video, a channel's newest three long-form videos, or a video file: cuts per minute (overall, in the first 30 seconds and minute by minute, jump cuts included), shot lengths, speech pace from the captions, loudness, and contact sheets of the shots. The analysis is `engine/analysis/style.py` (measurement only, no Claude usage); yt-dlp is pinned in `engine/runtime.json`, downloaded on first use and updates itself when YouTube changes. Choose a theme on the Start edit panel (or later in Inspiration); Claude reads it with `get_video_theme`, writes a short description of the style once (`save_video_theme_summary`, shown in Settings), and edits to a similar pace and look within the channel's rules and brand kit.
 
+## Shorts
+
+The editor's Shorts tab asks Claude (a `make_shorts` request, Opus by default) for up to 1, 3, 6, 10 or 15 highlight Shorts, plus a 30-second recap for unboxings and reviews. Claude saves each with `save_short`: pieces of the source footage, titles for YouTube Shorts and TikTok, and hashtags. Highlights may share at most 25 % of their footage with each other. The app then finds the subject in each piece (`engine/analysis/reframe.py`: faces first, then motion, smoothed), turns that into a crop that fills the 9:16 frame, renders a preview with the same engine and bold captions, and exports 1080x1920 files to `<exports>/Shorts/` with a text file of titles and hashtags.
+
 ## Where data lives
 
 Program files are replaced by updates. Nothing below is.

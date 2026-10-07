@@ -6,6 +6,7 @@ import { InspectorPanel } from './InspectorPanel'
 import { TranscriptPanel } from './TranscriptPanel'
 import { ThumbnailsPanel } from './ThumbnailsPanel'
 import { PublishPanel } from './PublishPanel'
+import { ShortsPanel } from './ShortsPanel'
 import { VersionsPanel } from './VersionsPanel'
 import { NotesPanel } from './NotesPanel'
 
@@ -15,6 +16,7 @@ const TABS: [SideTab, string][] = [
   ['transcript', 'Transcript'],
   ['thumbnails', 'Thumbnails'],
   ['publish', 'Publish'],
+  ['shorts', 'Shorts'],
   ['versions', 'Versions'],
   ['notes', 'Notes for Claude']
 ]
@@ -39,6 +41,7 @@ export function SidePanel() {
       {tab === 'transcript' && <TranscriptPanel />}
       {tab === 'thumbnails' && <ThumbnailsPanel />}
       {tab === 'publish' && <PublishPanel />}
+      {tab === 'shorts' && <ShortsPanel />}
       {tab === 'versions' && <VersionsPanel />}
       {tab === 'notes' && <NotesPanel />}
     </div>

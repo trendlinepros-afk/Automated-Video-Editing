@@ -127,6 +127,11 @@ export interface PreviewState {
   beforeFile?: string
 }
 
+/** Shorts being tracked, rendered or exported: a short line of progress (or a failure) per Short id. */
+export interface ShortsState {
+  working: Record<string, string>
+}
+
 export interface RunnerState {
   status: 'idle' | 'starting' | 'running' | 'stopping' | 'waiting' | 'error'
   connected: boolean // a Claude client (started by the app or by hand) is connected to the MCP server
@@ -342,6 +347,8 @@ export interface Api {
      * mode 'insert' cuts it into the video (the video gets longer); 'overlay' shows it over the video (the sound carries on).
      */
     requestInsertClip(opts: { file: string; time: number; seconds: number; mode: 'insert' | 'overlay'; note?: string }): Promise<void>
+    /** Ask Claude to make Shorts (up to count highlights, plus a recap when the video is an unboxing or review), or remake one. */
+    requestShorts(opts: { count: number; recap: boolean; note?: string; redoId?: string }): Promise<void>
     /** Ask Claude to stabilize one A-roll segment or B-roll clip. */
     requestStabilize(opts: { itemId: string; direction?: string }): Promise<void>
     addNote(opts: { text: string; itemId?: string; range?: Range }): Promise<void>
@@ -402,6 +409,16 @@ export interface Api {
     placeInProject(id: string, time: number): Promise<void>
     /** Use another folder for the library, moving the assets there when move is true. */
     changeFolder(dest: string, move: boolean): Promise<{ moved: number; skipped: number }>
+  }
+  /** Shorts made from the open project. */
+  shorts: {
+    state(): Promise<ShortsState>
+    exportShort(id: string): Promise<string>
+    exportAll(): Promise<string[]>
+    remove(id: string): Promise<void>
+    /** Render the preview again (for example after the footage was relinked). */
+    refresh(id: string): Promise<void>
+    onState(cb: (s: ShortsState) => void): () => void
   }
   /** Video themes (Settings > Video themes): the measured editing style of reference videos. */
   themes: {

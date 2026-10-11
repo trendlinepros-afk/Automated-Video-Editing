@@ -77,6 +77,13 @@ export const SettingsSchema = z.looseObject({
     /** All-time Claude cost on this PC as reported by Claude Code (API-equivalent USD). */
     totalUsd: z.number().default(0)
   }).default({ models: {}, stats: {}, totalUsd: 0 }),
+  /** The owner's own YouTube channel, read-only (audience retention for Claude). The client secret and sign-in are in the secrets store. */
+  youtube: z.looseObject({
+    clientId: z.string().default(''),
+    channelId: z.string().default(''),
+    channelTitle: z.string().default(''),
+    videoCount: z.number().default(0)
+  }).default({ clientId: '', channelId: '', channelTitle: '', videoCount: 0 }),
   setupDone: z.boolean().default(false),
   previewHeight: z.number().int().default(540),
   previewFps: z.number().default(30)

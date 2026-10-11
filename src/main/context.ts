@@ -18,9 +18,11 @@
  *   runner/runner.ts       -> RunnerService
  *   services/library.ts    -> LibraryService
  *   services/pikzels.ts    -> PikzelsService
+ *   services/youtubeAnalytics.ts -> YouTubeAnalyticsService (the owner's channel retention, read-only)
  *   updater.ts             -> UpdaterService
  */
 import type { VideoThemesService } from './services/videoThemes'
+import type { YouTubeAnalyticsService } from './services/youtubeAnalytics'
 import type { ShortsService } from './shorts/service'
 import type {
   ExportPreset,
@@ -70,8 +72,8 @@ export interface ProfileService {
 
 export interface SecretsService {
   /** Encrypted with Windows credential protection (Electron safeStorage). Never logged. */
-  get(name: 'pikzels' | 'mcpToken' | 'githubToken'): string | null
-  set(name: 'pikzels' | 'mcpToken' | 'githubToken', value: string | null): void
+  get(name: 'pikzels' | 'mcpToken' | 'githubToken' | 'googleClientSecret' | 'googleRefreshToken'): string | null
+  set(name: 'pikzels' | 'mcpToken' | 'githubToken' | 'googleClientSecret' | 'googleRefreshToken', value: string | null): void
 }
 
 export interface RecentService {
@@ -300,6 +302,7 @@ export interface AppContext {
   themes: VideoThemesService
   shorts: ShortsService
   pikzels: PikzelsService
+  youtube: YouTubeAnalyticsService
   updater: UpdaterService
   /** Send an event to the window (no-op when no window is open). */
   send(channel: string, payload: unknown): void

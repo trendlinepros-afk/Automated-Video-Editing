@@ -28,6 +28,7 @@ import { createVideoThemesService } from './services/videoThemes'
 import { createShortsService } from './shorts/service'
 import { createMusicService } from './services/music'
 import { createPikzelsService } from './services/pikzels'
+import { createYouTubeAnalyticsService } from './services/youtubeAnalytics'
 import {
   createProfileService,
   createRecentService,
@@ -131,6 +132,7 @@ function buildContext(log: ActivityLog): AppContext {
   c.themes = createVideoThemesService(c)
   c.shorts = createShortsService(c)
   c.pikzels = createPikzelsService(c)
+  c.youtube = createYouTubeAnalyticsService(c, { openExternal: (url) => shell.openExternal(url) })
   c.updater = createUpdaterService(c)
   return c
 }

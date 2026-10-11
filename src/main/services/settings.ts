@@ -228,7 +228,7 @@ export interface SafeStorageLike {
   decryptString(encrypted: Buffer): string
 }
 
-type SecretName = 'pikzels' | 'mcpToken' | 'githubToken'
+type SecretName = 'pikzels' | 'mcpToken' | 'githubToken' | 'googleClientSecret' | 'googleRefreshToken'
 
 interface SecretsFile {
   formatVersion: 1

@@ -522,7 +522,14 @@ export function registerIpc(ctx: AppContext, getWindow: () => BrowserWindow | nu
     'pikzels.remove': (id: string) => ctx.pikzels.remove(id),
     'pikzels.rename': (id: string, name: string) => ctx.pikzels.rename(id, name),
     'pikzels.pricing': () => ctx.pikzels.pricing(),
-    'pikzels.setPrices': (overrides: Record<string, number> | null) => ctx.pikzels.setPrices(overrides)
+    'pikzels.setPrices': (overrides: Record<string, number> | null) => ctx.pikzels.setPrices(overrides),
+
+    // ---------------------------------------------------------------- youtube (the owner's channel, read-only)
+    'youtube.status': () => ctx.youtube.status(),
+    'youtube.setClient': (clientId: string, clientSecret?: string | null) => ctx.youtube.setClient(String(clientId ?? ''), clientSecret),
+    'youtube.connect': () => ctx.youtube.connect(),
+    'youtube.disconnect': () => ctx.youtube.disconnect(),
+    'youtube.insights': (opts?: { videos?: number; refresh?: boolean }) => ctx.youtube.channelRetention(opts)
   }
 
   for (const name of API_METHODS) {

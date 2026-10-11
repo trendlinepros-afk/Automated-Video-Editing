@@ -26,7 +26,8 @@ export const API_METHODS = [
   'pikzels.list', 'pikzels.create', 'pikzels.refresh', 'pikzels.updateInstructions', 'pikzels.remove',
   'pikzels.rename', 'pikzels.pricing', 'pikzels.setPrices', 'pikzels.thumbnailsFromLink',
   'shorts.state', 'shorts.exportShort', 'shorts.exportAll', 'shorts.remove', 'shorts.refresh',
-  'themes.list', 'themes.analyze', 'themes.cancel', 'themes.update', 'themes.remove', 'themes.sheets'
+  'themes.list', 'themes.analyze', 'themes.cancel', 'themes.update', 'themes.remove', 'themes.sheets',
+  'youtube.status', 'youtube.setClient', 'youtube.connect', 'youtube.disconnect', 'youtube.insights'
 ] as const
 
 export type ApiMethod = (typeof API_METHODS)[number]

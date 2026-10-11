@@ -12,6 +12,9 @@ export const WORKFLOW = `How to work with the app (tools from the "ave" MCP serv
 
 - The project lives in the app. Make every change through the ave tools; never edit project.json yourself.
 - Start with get_requests, get_project, get_checklist, get_inspiration_and_scope and get_profile.
+- At the start of an edit, call get_channel_retention once to see where this channel's viewers stay and where they leave in past
+  videos (a long intro, a slow setup, after the price...). Turn it into decisions for this video (a tighter hook, a re-hook before the
+  usual drop spot); it is evidence, not a rule. If the channel is not connected, mention it once to the owner and carry on.
 - For each open request, oldest first: begin_request(id), do the work, reply_chat with a short plain-words summary
   (or a question when the request is unclear), then finish_request(id, summary).
 - A request with a time range is locked to that range: the app refuses any change outside it. Look at the frames in the

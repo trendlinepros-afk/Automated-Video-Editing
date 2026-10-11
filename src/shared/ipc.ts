@@ -4,6 +4,7 @@
  */
 import type { VideoTheme, VideoThemeProgress } from './videoTheme'
 import type { ExportCheckResult } from './exportCheck'
+import type { ChannelRetention, YouTubeStatus } from './retention'
 import type {
   ExportPreset,
   RequestKind,
@@ -454,6 +455,16 @@ export interface Api {
     pricing(): Promise<PikzelsPricing>
     /** Save price overrides (null = reset to the published prices). */
     setPrices(overrides: Record<string, number> | null): Promise<PikzelsPricing>
+  }
+  /** The owner's own YouTube channel, read-only: Google sign-in and audience retention insights. */
+  youtube: {
+    status(): Promise<YouTubeStatus>
+    /** Save the Google OAuth client; leave the secret undefined to keep the saved one. */
+    setClient(clientId: string, clientSecret?: string | null): Promise<YouTubeStatus>
+    /** Opens Google sign-in in the browser; resolves once connected (or fails after 5 minutes). */
+    connect(): Promise<YouTubeStatus>
+    disconnect(): Promise<YouTubeStatus>
+    insights(opts?: { videos?: number; refresh?: boolean }): Promise<ChannelRetention>
   }
 }
 

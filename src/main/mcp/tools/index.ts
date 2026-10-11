@@ -1,5 +1,6 @@
 /** Every tool the app exposes to Claude, in the order Claude sees them. */
 import type { ToolDef } from './common'
+import { channelTools } from './channel'
 import { cutTools } from './cut'
 import { graphicsTools } from './graphics'
 import { lookTools } from './look'
@@ -11,6 +12,7 @@ import { musicTools, progressTools, reviewTools } from './review'
 
 export const ALL_TOOLS: ToolDef[] = [
   ...readTools,
+  ...channelTools,
   ...lookTools,
   ...cutTools,
   ...placeTools,

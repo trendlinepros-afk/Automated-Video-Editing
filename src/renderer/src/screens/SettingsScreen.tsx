@@ -12,6 +12,7 @@ import { ProfilesSection } from '../settings/ProfilesSection'
 import { ModelsSection } from '../settings/ModelsSection'
 import { changeLibraryFolder } from '../components/LibraryFolder'
 import { VideoThemesSection } from '../settings/VideoThemesSection'
+import { YouTubeChannelSection } from '../settings/YouTubeChannelSection'
 import { fmt } from '../util'
 import { PriceEditor } from '../panels/ThumbnailsPanelCosts'
 
@@ -156,6 +157,7 @@ function General() {
         )}
       </div>
       <PriceEditor />
+      <YouTubeChannelSection />
       <FolderRow
         label="Asset library folder"
         hint="Every graphic, animation, song and sound effect Claude makes is saved here. Any drive works, including a synced one. Changing it asks whether to move the saved assets too."

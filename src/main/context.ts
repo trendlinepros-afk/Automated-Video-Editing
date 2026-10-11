@@ -144,6 +144,8 @@ export interface EnvironmentService {
   engineDir(version: string): string
   /** yt-dlp, downloaded on first use. */
   ytdlp(onPercent?: (pct: number) => void): Promise<string>
+  /** The face detector model file, downloaded on first use; null when unavailable (faces are then not checked). */
+  faceModel(): Promise<string | null>
   /** engine/analysis/style.py from the app's own files. */
   analysisScript(): string
   hasGpu(): Promise<boolean>

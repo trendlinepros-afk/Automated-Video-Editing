@@ -160,13 +160,15 @@ async function runPython<T>(ctx: AppContext, args: string[], opts: { signal?: Ab
 }
 
 export function scriptRunner(ctx: AppContext): IndexRunner {
-  return ({ video, outDir, onProgress, signal }) =>
-    runPython<FootageIndex>(ctx, [scriptPath(ctx, 'index_footage.py'), '--ffmpeg', ctx.env.ffmpeg(), '--video', video, '--out-dir', outDir, '--threads', String(decoderThreads())], {
+  return async ({ video, outDir, onProgress, signal }) => {
+    const face = await Promise.resolve(ctx.env.faceModel?.()).catch(() => null)
+    return runPython<FootageIndex>(ctx, [scriptPath(ctx, 'index_footage.py'), '--ffmpeg', ctx.env.ffmpeg(), '--video', video, '--out-dir', outDir, '--threads', String(decoderThreads()), ...(face ? ['--face-model', face] : [])], {
       signal,
       onEvent: (e) => {
         if (e.event === 'progress' && Number(e.total) > 0) onProgress(Math.round((Number(e.done) / Number(e.total)) * 100))
       }
     })
+  }
 }
 
 export function sheetRunner(ctx: AppContext): SheetRunner {

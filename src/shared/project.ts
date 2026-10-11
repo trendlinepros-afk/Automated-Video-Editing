@@ -168,7 +168,12 @@ export const AudioItemSchema = z.looseObject({
   fadeOut: nonNeg.default(0),
   /** Music: lower under speech by the project's mix setting. */
   duck: z.boolean().default(false),
-  loop: z.boolean().default(false)
+  loop: z.boolean().default(false),
+  /** A voiceover in the owner's voice: mixed as speech (music ducks under it). Absent on older items. */
+  voiceover: z.boolean().optional(),
+  /** What the voiceover says (with any audio tags) and the ElevenLabs model it was made with. */
+  voiceText: z.string().optional(),
+  voiceModel: z.string().optional()
 })
 
 export const ItemSchema = z.discriminatedUnion('type', [

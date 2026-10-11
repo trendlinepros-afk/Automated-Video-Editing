@@ -193,6 +193,40 @@ export interface VersionInfo {
   reason?: string
 }
 
+export interface VoiceStatus {
+  ok: boolean
+  /** Plain words when not ok (no key, wrong key, voice not found, no connection). */
+  message?: string
+  voiceName: string
+  voiceId?: string
+  model: string
+  /** ElevenLabs plan name, e.g. "creator". */
+  tier?: string
+  charactersUsed?: number
+  characterLimit?: number
+  /** ISO time the monthly characters reset. */
+  resetsAt?: string
+}
+
+export interface VoiceoverRequest {
+  /** What to say. On eleven_v3/v4, audio tags like [excited] or [laughs] shape the delivery. */
+  text: string
+  /** Timeline time to start at. */
+  time: number
+  /** Model for this one line; default the one in Settings. */
+  model?: string
+}
+
+export interface VoiceoverResult {
+  itemId: string
+  file: string
+  duration: number
+  characters: number
+  /** Characters left this month after this line, when ElevenLabs says. */
+  charactersLeft?: number
+  warning?: string
+}
+
 export interface ThumbnailRequest {
   prompt: string
   count: number
@@ -305,6 +339,8 @@ export interface Api {
     update(patch: Partial<Settings>): Promise<Settings>
     setPikzelsKey(key: string | null): Promise<void>
     hasPikzelsKey(): Promise<boolean>
+    setElevenLabsKey(key: string | null): Promise<void>
+    hasElevenLabsKey(): Promise<boolean>
     openAppLog(): Promise<void>
     claudeSetup(): Promise<{ command: string; json: string; url: string }>
   }
@@ -441,6 +477,15 @@ export interface Api {
     /** Contact sheet images (absolute paths) with a caption each. */
     sheets(id: string): Promise<{ label: string; path: string }[]>
     onProgress(cb: (p: VideoThemeProgress) => void): () => void
+  }
+  /** Voiceovers in the owner's ElevenLabs voice. */
+  voice: {
+    /** Checks the key, finds the voice by name and reads how many characters are left this month. */
+    check(): Promise<VoiceStatus>
+    /** Speaks the text in the owner's voice and puts it on the Voiceover track at this timeline time. */
+    generate(req: VoiceoverRequest): Promise<VoiceoverResult>
+    /** A short test line in the voice (an mp3 file to play); costs its characters. */
+    sample(text?: string): Promise<string>
   }
   pikzels: {
     list(): Promise<Pikzonality[]>

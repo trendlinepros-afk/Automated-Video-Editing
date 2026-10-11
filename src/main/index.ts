@@ -28,6 +28,7 @@ import { createVideoThemesService } from './services/videoThemes'
 import { createShortsService } from './shorts/service'
 import { createMusicService } from './services/music'
 import { createPikzelsService } from './services/pikzels'
+import { createVoiceService } from './services/elevenlabs'
 import {
   createProfileService,
   createRecentService,
@@ -131,6 +132,7 @@ function buildContext(log: ActivityLog): AppContext {
   c.themes = createVideoThemesService(c)
   c.shorts = createShortsService(c)
   c.pikzels = createPikzelsService(c)
+  c.voice = createVoiceService(c)
   c.updater = createUpdaterService(c)
   return c
 }

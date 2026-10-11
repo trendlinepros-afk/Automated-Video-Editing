@@ -20,6 +20,7 @@ function kindOf(project: Project, item: Item): Kind | null {
   if (item.type === 'graphic') return 'graphic'
   if (item.type === 'effect') return item.effect === 'custom' ? 'effect' : null
   if (item.type === 'audio') {
+    if (item.voiceover) return null // the owner's voice saying one specific line: not a reusable asset
     const track = project.tracks.find((t) => t.id === item.trackId)?.kind
     return track === 'music' ? 'music' : track === 'sfx' ? 'sound' : null
   }

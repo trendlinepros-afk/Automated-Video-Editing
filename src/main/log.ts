@@ -14,6 +14,7 @@ export type LogCategory =
   | 'export'
   | 'selfcheck'
   | 'thumbnail'
+  | 'voice'
   | 'upgrade'
   | 'update'
   | 'claude'

@@ -435,6 +435,8 @@ export function installMockApi(): void {
       update: async (patch) => (settings = { ...settings, ...patch }),
       setPikzelsKey: async () => undefined,
       hasPikzelsKey: async () => true,
+      setElevenLabsKey: async () => undefined,
+      hasElevenLabsKey: async () => true,
       openAppLog: async () => undefined,
       claudeSetup: async () => ({ command: 'claude mcp add --transport http ave http://127.0.0.1:47821/mcp', json: '{\n  "mcpServers": { "ave": { "type": "http", "url": "http://127.0.0.1:47821/mcp" } }\n}', url: 'http://127.0.0.1:47821/mcp' })
     },
@@ -689,6 +691,28 @@ export function installMockApi(): void {
       remove: async (id) => void themes.splice(themes.findIndex((x) => x.id === id), 1),
       sheets: async () => [],
       onProgress: (cb) => ev.themes.on(cb)
+    },
+    voice: {
+      check: async () => {
+        await sleep(400)
+        const v = settings.voice
+        return { ok: true, voiceName: v.voiceName, voiceId: 'mockvoice', model: v.model, tier: 'creator', charactersUsed: 12340, characterLimit: 100000, resetsAt: '2026-10-28T00:00:00Z' }
+      },
+      generate: async (req) => {
+        await sleep(1000)
+        const id = `vo${Date.now()}`
+        const duration = +(1 + req.text.length * 0.06).toFixed(2)
+        commit((d) => {
+          if (!d.project.tracks.some((t) => t.id === 'voiceover'))
+            d.project.tracks.push({ id: 'voiceover', kind: 'sfx', name: 'Voiceover', muted: false, solo: false, volume: 0, hidden: false })
+          d.project.items.push({ id, trackId: 'voiceover', type: 'audio', anchor: { kind: 'time', time: req.time }, duration, file: `audio/${id}.mp3`, in: 0, volume: 0, fadeIn: 0, fadeOut: 0, duck: false, loop: false, createdBy: 'user', label: req.text.slice(0, 40) })
+        }, 'user', 'Voiceover', [id])
+        return { itemId: id, file: `audio/${id}.mp3`, duration, characters: req.text.length, charactersLeft: 87660 - req.text.length }
+      },
+      sample: async () => {
+        await sleep(600)
+        return 'C:\\mock\\voice-sample.mp3'
+      }
     },
     pikzels: {
       list: async () => pikzels,

@@ -34,6 +34,8 @@ export const WORKFLOW = `How to work with the app (tools from the "ave" MCP serv
   make fresh. Quality first: never reuse to save time or usage; when a new one would carry the story or emotion better, make it.
 - Save every new graphic, animation, custom effect, music track and sound effect you make to the library (save_to_library) right
   after placing it, with a description of what it is, its mood and when it fits.
+- Voiceovers are always in the owner's own voice: generate_voiceover, only when the owner asks for one or the channel rules call
+  for it (it uses their monthly ElevenLabs characters). Never use another text-to-speech voice or engine.
 - Thumbnails are built around a base picture: a clean frame of the footage (no captions or graphics) where the subject of the
   video is shown best. Before request_thumbnails, pick that moment (check candidates with get_frame footage_only) and call
   save_thumbnail_draft with your best description and base_time; leave base_time out when get_project shows the owner grabbed

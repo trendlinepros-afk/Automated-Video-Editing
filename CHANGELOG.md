@@ -3,6 +3,13 @@
 Each release's section becomes its GitHub release text and the notes shown in the app's update dialog.
 A release is blocked until the section for its version has notes.
 
+## 1.10.0
+
+- **Voiceovers in your own voice (ElevenLabs).** Add your ElevenLabs API key in Settings > General; every voiceover uses your voice "Adam V3 Pro" (change the name there if you ever rename it). Check shows the voice was found and how many characters are left this month, and Play a test line lets you hear it.
+- Right-click the timeline > **Add voiceover here…**: type the line, press Generate, and it lands on a new Voiceover track, pinned to your words so it moves with cuts. Music ducks under it like under your talking.
+- Default model ElevenLabs v3: tags like [excited], [laughs], [whispers] or [pause] shape how a line is said. v4, Multilingual v2, Turbo and Flash can be picked in Settings (tags are removed for the models that would read them out).
+- Claude can add voiceover lines too, in your voice only, when you ask for one.
+
 ## 1.9.1
 
 - **"Write it for me" is fast now** (usually well under a minute instead of sitting in Claude's queue). The app gathers up to 8 candidate frames from your footage into one sheet and Claude answers in a single quick call, without loading the whole editing session. It works even while no edit is running.

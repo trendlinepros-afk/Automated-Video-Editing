@@ -32,6 +32,7 @@ export type Dialog =
   | { kind: 'note'; itemId?: string; range?: Range; time?: number }
   | { kind: 'compare'; a: string; b: string }
   | { kind: 'insertClip'; time: number; file: string }
+  | { kind: 'voiceover'; time: number }
 
 export interface EditorState {
   snapshot: ProjectSnapshot | null

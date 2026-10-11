@@ -146,13 +146,24 @@ export async function addClipHere(time: number): Promise<void> {
   if (files?.[0]) openDialog({ kind: 'insertClip', time, file: files[0] })
 }
 
+/** "Add voiceover here…": say a line in the owner's ElevenLabs voice at this time. */
+export function addVoiceoverHere(time: number): void {
+  const snap = editor.get().snapshot
+  if (!snap || snap.readOnly) {
+    toast(snap?.readOnlyReason ?? 'This project is open read-only.')
+    return
+  }
+  openDialog({ kind: 'voiceover', time })
+}
+
 /** The entries every timeline right-click offers for the spot clicked. */
 function timeEntries(time: number): MenuEntry[] {
   const range = editor.get().range
   const inRange = range && time >= range.start && time <= range.end
   return [
     { label: inRange ? `Send ${fmtShort(range.start)}–${fmtShort(range.end)} to chat` : `Send ${fmtShort(time)} to chat`, run: () => sendTimeToChat(time) },
-    { label: 'Add clip here…', run: () => void addClipHere(time) }
+    { label: 'Add clip here…', run: () => void addClipHere(time) },
+    { label: 'Add voiceover here…', run: () => addVoiceoverHere(time) }
   ]
 }
 

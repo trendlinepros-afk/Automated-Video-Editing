@@ -53,6 +53,7 @@ import type { MusicFolder, Pikzonality, Profile, Settings, CorrectionKind } from
 import type { RenderPlan } from '@shared/plan'
 import type { ActivityLog } from './log'
 import type { ProjectStore } from './project/store'
+import type { VoiceService } from './services/elevenlabs'
 
 export interface SettingsService {
   get(): Settings
@@ -70,8 +71,8 @@ export interface ProfileService {
 
 export interface SecretsService {
   /** Encrypted with Windows credential protection (Electron safeStorage). Never logged. */
-  get(name: 'pikzels' | 'mcpToken' | 'githubToken'): string | null
-  set(name: 'pikzels' | 'mcpToken' | 'githubToken', value: string | null): void
+  get(name: 'pikzels' | 'elevenlabs' | 'mcpToken' | 'githubToken'): string | null
+  set(name: 'pikzels' | 'elevenlabs' | 'mcpToken' | 'githubToken', value: string | null): void
 }
 
 export interface RecentService {
@@ -300,6 +301,7 @@ export interface AppContext {
   themes: VideoThemesService
   shorts: ShortsService
   pikzels: PikzelsService
+  voice: VoiceService
   updater: UpdaterService
   /** Send an event to the window (no-op when no window is open). */
   send(channel: string, payload: unknown): void

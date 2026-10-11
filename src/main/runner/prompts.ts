@@ -242,12 +242,17 @@ export function requestSection(r: EditRequest, project: Project): string {
 }
 
 /** The prompt for one run: every open request, oldest first. */
-export function buildRunPrompt(requests: EditRequest[], project: Project, opts: { resumed: boolean }): string {
+export function buildRunPrompt(requests: EditRequest[], project: Project, opts: { resumed: boolean; small?: boolean }): string {
   const intro = opts.resumed
     ? 'New work from the owner in this project. Call get_requests and get_checklist first.'
     : 'You are connected to the video editor app through the "ave" MCP tools. Call get_requests, get_project and get_checklist first.'
   const inFlight = project.checklist.find((c) => c.status === 'in_progress')
-  const resumeNote = inFlight ? `\nThe checklist shows "${inFlight.label}" in progress: continue from there and do not redo finished stages.` : ''
+  const resumeNote = opts.small
+    ? '\nThis is a fresh session for the requests below only: get_project has the handoff notes from the edit so far. Do not work on ' +
+      'unfinished checklist stages; the app runs those separately.'
+    : inFlight
+      ? `\nThe checklist shows "${inFlight.label}" in progress: continue from there and do not redo finished stages.`
+      : ''
   const body = requests.map((r) => requestSection(r, project)).join('\n\n')
   const theme = project.videoTheme
     ? `\nVideo theme: "${project.videoTheme.name}". Edit to a similar pace and style as its reference videos. Call get_video_theme before ` +

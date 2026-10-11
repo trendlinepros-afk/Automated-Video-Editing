@@ -235,6 +235,23 @@ describe('runner', () => {
     expect(store.project.claudeSessionId).not.toBe('sess_old')
   })
 
+  it('starts small requests in a fresh session and keeps the editing session for the edit', async () => {
+    store.mutate('session', 'app', (d) => {
+      d.project.claudeSessionId = 'sess_edit'
+      d.project.checklist[0].status = 'in_progress'
+    }, { noHistory: true })
+    requests = [{ id: 'req_2', kind: 'chat', status: 'queued', createdAt: new Date().toISOString(), text: 'Make 1:10 punchier', context: {} }]
+    const runner = createRunnerService(makeCtx('ok'))
+    runner.kick()
+    await waitIdle(runner)
+    const args = calls()[0]
+    expect(args).not.toContain('--resume')
+    const prompt = args.find((a) => a.includes('Open requests'))!
+    expect(prompt).toMatch(/fresh session for the requests below only/)
+    expect(prompt).not.toMatch(/continue from there/)
+    expect(store.project.claudeSessionId).toBe('sess_edit') // the next stage of the edit still continues the editing session
+  })
+
   it('reports a missing command as waiting, not as a crash', async () => {
     const ctx = makeCtx('ok')
     ctx.settings.get().runner.command = join(dir, 'no-such-claude')

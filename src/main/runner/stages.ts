@@ -15,6 +15,15 @@ import { CHECKLIST_STAGES, type EditRequest, type Project, type RequestKind } fr
 
 export const STAGED_KINDS: RequestKind[] = ['start_edit', 'resume']
 
+/**
+ * A run for small requests only (chat, re-edits, fixes, thumbnails…): it starts a fresh Claude session that reads the
+ * project and handoff notes, instead of reloading the whole editing conversation for every step, and it leaves the
+ * editing session alone for the next stage of the edit.
+ */
+export function isSmallRun(plan: RunPlan): boolean {
+  return plan.requests.length > 0 && plan.requests.every((r) => !STAGED_KINDS.includes(r.kind) && r.kind !== 'continue_intro')
+}
+
 export interface RunPlan {
   requests: EditRequest[]
   section: ModelSection

@@ -19,7 +19,7 @@ export const API_METHODS = [
   'project.versions.compareFrames',
   'project.exportVideo', 'project.cancelExport', 'project.exportLog', 'project.exportPack', 'project.saveToLibrary',
   'thumbnails.generate', 'thumbnails.regenerate', 'thumbnails.choose', 'thumbnails.exportImage',
-  'voice.check', 'voice.generate', 'voice.sample',
+  'voice.check', 'voice.generate', 'voice.sample', 'voice.budget', 'voice.answerApproval',
   'thumbnails.recreate', 'thumbnails.edit', 'thumbnails.faceSwap', 'thumbnails.score', 'thumbnails.titles', 'thumbnails.grabBase', 'thumbnails.clearBase', 'thumbnails.requestDraft',
   'preview.state', 'preview.showBefore',
   'claude.state', 'claude.stop', 'claude.resume', 'claude.estimate',
@@ -45,5 +45,6 @@ export const API_EVENTS = {
   'claude.onOutput': 'claude:output',
   'themes.onProgress': 'themes:progress',
   'project.onCheckProgress': 'exportcheck:progress',
-  'shorts.onState': 'shorts:state'
+  'shorts.onState': 'shorts:state',
+  'voice.onApproval': 'voice:approval'
 } as const

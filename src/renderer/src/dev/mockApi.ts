@@ -712,7 +712,15 @@ export function installMockApi(): void {
       sample: async () => {
         await sleep(600)
         return 'C:\\mock\\voice-sample.mp3'
-      }
+      },
+      budget: async () => ({ usedSeconds: 72, limitSeconds: settings.voice.maxSecondsPerVideo ?? 120 }),
+      onApproval: (cb) => {
+        // With ?voiceask in the address, shows the question once so the popup can be seen.
+        if (!location.search.includes('voiceask')) return () => undefined
+        const t = setTimeout(() => cb({ id: 'vapr1', seconds: 34, usedSeconds: 104, limitSeconds: 120, text: 'Sixty-five dollars for a drift car with a real gyro. Let me show you what that gyro actually does.' }), 3000)
+        return () => clearTimeout(t)
+      },
+      answerApproval: async () => undefined
     },
     pikzels: {
       list: async () => pikzels,

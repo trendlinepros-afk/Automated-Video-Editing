@@ -314,7 +314,9 @@ function VoiceoverDialog({ time, onClose }: { time: number; onClose: () => void 
   const [text, setText] = useState('')
   const [status, setStatus] = useState<VoiceStatus | null>(null)
   const [busy, setBusy] = useState(false)
+  const [budget, setBudget] = useState<{ usedSeconds: number; limitSeconds: number } | null>(null)
   useEffect(() => {
+    window.api.voice.budget().then(setBudget, () => undefined)
     window.api.voice
       .check()
       .then(setStatus)
@@ -372,6 +374,12 @@ function VoiceoverDialog({ time, onClose }: { time: number; onClose: () => void 
         In your voice: {voiceName} · {model} · {text.length.toLocaleString()} characters
         {left != null && ` · ${left.toLocaleString()} left this month`}
       </div>
+      {budget && (
+        <div className="small faint">
+          Voiceover in this video: {fmt(budget.usedSeconds)} of {fmt(budget.limitSeconds)} Claude may use without asking. Lines you add here
+          count toward it.
+        </div>
+      )}
       {!status ? (
         <span className="small faint">Checking ElevenLabs…</span>
       ) : (

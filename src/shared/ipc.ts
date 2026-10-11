@@ -208,6 +208,22 @@ export interface VoiceStatus {
   resetsAt?: string
 }
 
+export interface VoiceBudget {
+  usedSeconds: number
+  limitSeconds: number
+}
+
+/** Claude wants a voiceover line that takes the video over its voiceover limit. */
+export interface VoiceApproval {
+  id: string
+  /** Estimated length of the new line. */
+  seconds: number
+  usedSeconds: number
+  limitSeconds: number
+  /** What the line says (without audio tags). */
+  text: string
+}
+
 export interface VoiceoverRequest {
   /** What to say. On eleven_v3/v4, audio tags like [excited] or [laughs] shape the delivery. */
   text: string
@@ -486,6 +502,11 @@ export interface Api {
     generate(req: VoiceoverRequest): Promise<VoiceoverResult>
     /** A short test line in the voice (an mp3 file to play); costs its characters. */
     sample(text?: string): Promise<string>
+    /** Voiceover seconds in the open project and the limit Claude may use without asking. */
+    budget(): Promise<VoiceBudget>
+    /** Claude asks to go over the voiceover limit (null: the question is gone, answered or timed out). */
+    onApproval(cb: (a: VoiceApproval | null) => void): () => void
+    answerApproval(id: string, allow: boolean): Promise<void>
   }
   pikzels: {
     list(): Promise<Pikzonality[]>

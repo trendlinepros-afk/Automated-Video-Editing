@@ -78,8 +78,10 @@ export const SettingsSchema = z.looseObject({
     voiceName: z.string().default('Adam V3 Pro'),
     voiceId: z.string().default(''),
     /** eleven_v3 and eleven_v4 understand audio tags such as [excited]; the others speak them as words, so the app removes them. */
-    model: z.string().default('eleven_v3')
-  }).default({ voiceName: 'Adam V3 Pro', voiceId: '', model: 'eleven_v3' }),
+    model: z.string().default('eleven_v3'),
+    /** Voiceover Claude may add to one video without asking; past it, the owner approves each line. */
+    maxSecondsPerVideo: z.number().min(0).default(120)
+  }).default({ voiceName: 'Adam V3 Pro', voiceId: '', model: 'eleven_v3', maxSecondsPerVideo: 120 }),
   /** Claude model per part of the edit, and what runs have cost on this PC. */
   claude: z.looseObject({
     /** Section id -> model id ('' = Claude Code's default). Missing sections use the recommended model. */

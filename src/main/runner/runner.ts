@@ -555,6 +555,8 @@ export function createRunnerService(ctx: AppContext, deps: RunnerDeps = {}): Run
     if (plan.model && !args.includes('--model')) args.push('--model', plan.model)
     const cmd = resolveCommand(settings.command, args, platform)
     const { ANTHROPIC_API_KEY: _drop, ...env } = process.env // Claude Code uses its own sign-in, never a key from the app
+    // A tool call can wait for the owner (approving more voiceover), up to 10 minutes: give tool calls longer than that.
+    env.MCP_TOOL_TIMEOUT ??= '1200000'
     let proc: ChildProcess
     const run = {
       store,

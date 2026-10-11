@@ -4,6 +4,7 @@ import { editor } from './state/editor'
 import { useStore } from './state/store'
 import { ContextMenu, Toasts } from './components/Overlays'
 import { LibraryFolderPrompt, MoveAssetsPrompt } from './components/LibraryFolder'
+import { VoiceApprovalPrompt } from './components/VoiceApproval'
 import { UpdateDialog } from './components/Updates'
 import { SetupScreen } from './screens/SetupScreen'
 import { HomeScreen } from './screens/HomeScreen'
@@ -64,6 +65,7 @@ export function App() {
       <UpdateDialog />
       <LibraryFolderPrompt />
       <MoveAssetsPrompt />
+      <VoiceApprovalPrompt />
       <ContextMenu />
       <Toasts />
     </div>

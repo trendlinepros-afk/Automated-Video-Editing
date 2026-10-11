@@ -412,6 +412,8 @@ export const ProjectSchema = z.looseObject({
   /** Shorts made from this video (see shorts.ts). */
   shorts: z.array(ShortSchema).optional(),
   videoTheme: z.looseObject({ id: z.string(), name: z.string() }).nullable().optional(),
+  /** Voiceover seconds the owner approved for this video beyond the limit in Settings (absent: the limit applies). */
+  voiceAllowanceSeconds: z.number().optional(),
   scope: z.looseObject({
     mode: z.enum(['whole', 'intro']).default('whole'),
     introMaxSeconds: num.positive().nullable().default(null),

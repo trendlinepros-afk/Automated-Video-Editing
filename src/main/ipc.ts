@@ -150,6 +150,8 @@ export function registerIpc(ctx: AppContext, getWindow: () => BrowserWindow | nu
     'voice.check': () => ctx.voice.check(),
     'voice.generate': (req: VoiceoverRequest) => ctx.voice.generate({ ...req, source: 'user' }),
     'voice.sample': (text?: string) => ctx.voice.sample(text),
+    'voice.budget': () => ctx.voice.budget(),
+    'voice.answerApproval': (id: string, allow: boolean) => ctx.voice.answerApproval(id, !!allow),
     'settings.openAppLog': () => {
       if (existsSync(paths.appLog)) shell.showItemInFolder(paths.appLog)
       else void shell.openPath(join(paths.data, 'logs'))

@@ -41,8 +41,10 @@ interface Call {
   body?: any
 }
 
-function makeCtx(key: string | null = KEY): AppContext {
+function makeCtx(key: string | null = KEY, opts: { autoScore?: boolean } = {}): AppContext {
   settings = SettingsSchema.parse({})
+  // Most tests count exact calls and spend: automatic scoring is tested on its own.
+  settings.pikzels.autoScore = opts.autoScore ?? false
   return {
     appLog: new ActivityLog(join(dir, 'app.log')),
     settings: { get: () => settings, update: (p: object) => (settings = SettingsSchema.parse({ ...settings, ...p })) },
@@ -509,5 +511,31 @@ describe('Pikzels rejecting the base picture', () => {
     expect(store.project.thumbnails.items.at(-1)!.error).toBe('Pikzels rejected the request: The request is invalid: support_image_base64 must be a data URI (VALIDATION_ERROR).')
     expect(fieldProblems({ details: { prompt: ['is too long'] } })).toBe('prompt is too long')
     expect(fieldProblems({ code: 'X' })).toBe('')
+  })
+})
+
+describe('automatic thumbnail scores', () => {
+  it('scores each new thumbnail against the first title, and not when turned off', async () => {
+    store.mutate('titles', 'user', (d) => void (d.project.publish.titles = ['Is this the best micro RC drift car?']))
+    const { fn, calls } = fakeFetch()
+    await createPikzelsService(makeCtx(KEY, { autoScore: true }), { fetch: fn, sleep: async () => {} }).generate({ prompts: ['A', 'B'], source: 'user' })
+    const scores = calls.filter((c) => c.url.endsWith(PIKZELS_API.thumbnailScore))
+    expect(scores).toHaveLength(2)
+    expect(scores[0].body.title).toBe('Is this the best micro RC drift car?')
+    const made = store.project.thumbnails.items.filter((t) => t.status === 'done')
+    expect(made.map((t) => t.score?.main)).toEqual([8.2, 8.2])
+    expect(store.project.thumbnails.spend?.byAction['score']).toBeCloseTo(0.06)
+
+    const off = fakeFetch()
+    await createPikzelsService(makeCtx(KEY, { autoScore: false }), { fetch: off.fn, sleep: async () => {} }).generate({ prompts: ['C'], source: 'user' })
+    expect(off.calls.filter((c) => c.url.endsWith(PIKZELS_API.thumbnailScore))).toHaveLength(0)
+  })
+
+  it('keeps the thumbnail when the score fails', async () => {
+    const { fn } = fakeFetch({ routes: { [PIKZELS_API.thumbnailScore]: () => ({ status: 500, json: { error: { code: 'oops', message: 'down' } } }) } })
+    await createPikzelsService(makeCtx(KEY, { autoScore: true }), { fetch: fn, sleep: async () => {} }).generate({ prompts: ['D'], source: 'user' })
+    const t = store.project.thumbnails.items.at(-1)!
+    expect(t.status).toBe('done')
+    expect(t.score).toBeUndefined()
   })
 })

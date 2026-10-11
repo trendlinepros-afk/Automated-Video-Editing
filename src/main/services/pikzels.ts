@@ -432,6 +432,14 @@ export function createPikzelsService(ctx: AppContext, deps: PikzelsDeps = {}): P
       updateThumb(store, record.id, { status: 'failed', error: message, ...(e.requestId ? { requestId: e.requestId } : {}) })
       store.log.write('thumbnail', `${actionName(job.action)} failed: ${message}`, { ...logData, requestId: e.requestId ?? null, errorCode: e.code ?? null, httpStatus: e.status, costUsd: 0 })
     }
+    // Every new image is scored right away (unless turned off), so the options can be compared at a glance.
+    if (thumbOf(store, record.id).status === 'done' && ctx.settings.get().pikzels?.autoScore !== false) {
+      try {
+        await score(record.id)
+      } catch (err) {
+        store.log.write('thumbnail', `Automatic score skipped: ${(err as Error).message}`, { thumbnailId: record.id })
+      }
+    }
     return thumbOf(store, record.id)
   }
 

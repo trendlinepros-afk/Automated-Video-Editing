@@ -31,6 +31,23 @@ export function LibraryScreen() {
     return () => clearTimeout(t)
   }, [load, query])
 
+  // Your own sounds and music (Epidemic Sound downloads, say): files of 30 s and longer go in as music.
+  const addFiles = async () => {
+    const paths = await call(() =>
+      window.api.app.pickFiles({ title: 'Add sound effects or music to the library', filters: [{ name: 'Sound files', extensions: ['wav', 'mp3', 'aiff', 'aif', 'flac', 'ogg', 'm4a'] }], multi: true })
+    )
+    if (!paths?.length) return
+    const r = await call(() => window.api.library.importFiles(paths, { type: 'auto', scope: scope && scope !== 'shared' ? scope : 'shared' }), 'Could not add the files')
+    if (!r) return
+    const sounds = r.added.filter((a) => a.type === 'sound').length
+    const music = r.added.length - sounds
+    toast(
+      `Added ${sounds} sound effect${sounds === 1 ? '' : 's'}${music ? ` and ${music} music track${music === 1 ? '' : 's'}` : ''} to the library.` +
+        (r.skipped.length ? ` Skipped: ${r.skipped.join(', ')}.` : '')
+    )
+    void load()
+  }
+
   const patch = async (a: LibraryAsset, p: Partial<LibraryAsset>) => {
     const updated = await call(() => window.api.library.update(a.id, p), 'Could not change the asset')
     if (updated) setAssets((list) => list?.map((x) => (x.id === a.id ? { ...updated, dir: updated.dir ?? a.dir } : x)) ?? null)
@@ -77,6 +94,9 @@ export function LibraryScreen() {
                 </option>
               ))}
             </select>
+            <button className="btn" title="Add your own sound effects and music, e.g. Epidemic Sound downloads" onClick={() => void addFiles()}>
+              Add files…
+            </button>
             <button className="btn ghost" title="Open the library folder" onClick={() => void window.api.app.openPath(libraryFolder)}>
               <Icon name="folder" size={14} />
             </button>

@@ -531,6 +531,8 @@ export function installMockApi(): void {
       introVersions: async () => ({ versions: [{ id: 'v_i1', name: 'Intro 1', createdAt: now() }], currentId: null }),
       useIntro: async () => undefined,
       setVideoTheme: async (id) => void commit((d) => void (d.project.videoTheme = id ? { id, name: themes.find((t) => t.id === id)?.name ?? '' } : null), 'user', 'Video theme'),
+      requestCleanVoice: async () => undefined,
+      useOriginalSound: async () => undefined,
       requestStabilize: async () => undefined,
       requestInsertClip: async () => undefined,
       requestShorts: async () => undefined,
@@ -656,6 +658,7 @@ export function installMockApi(): void {
       },
       remove: async (id) => void (library = library.filter((a) => a.id !== id)),
       placeInProject: async () => undefined,
+      importFiles: async (paths) => ({ added: [], skipped: paths.map((p) => `${p} (mock)`) }),
       changeFolder: async (dest: string) => {
         settings = { ...settings, libraryFolder: dest, libraryFolderConfirmed: true }
         return { moved: library.length, skipped: 0 }

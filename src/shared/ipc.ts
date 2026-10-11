@@ -405,6 +405,10 @@ export interface Api {
     requestShorts(opts: { count: number; recap: boolean; note?: string; redoId?: string }): Promise<void>
     /** Ask Claude to stabilize one A-roll segment or B-roll clip. */
     requestStabilize(opts: { itemId: string; direction?: string }): Promise<void>
+    /** Claude removes distracting noise under the voice of this clip's source (a cleaned copy of its sound). */
+    requestCleanVoice(opts: { itemId: string; time?: number; note?: string }): Promise<void>
+    /** Go back to the original sound of this clip's source. */
+    useOriginalSound(itemId: string): Promise<void>
     addNote(opts: { text: string; itemId?: string; range?: Range }): Promise<void>
     noteToRule(noteId: string): Promise<void>
     reviewRequest(requestId: string, decision: 'keep' | 'revert'): Promise<void>
@@ -472,6 +476,8 @@ export interface Api {
     placeInProject(id: string, time: number): Promise<void>
     /** Use another folder for the library, moving the assets there when move is true. */
     changeFolder(dest: string, move: boolean): Promise<{ moved: number; skipped: number }>
+    /** Add your own sound and music files (e.g. Epidemic Sound downloads); 'auto' files 30 s and longer as music. */
+    importFiles(paths: string[], opts?: { type?: 'auto' | 'sound' | 'music'; scope?: string }): Promise<{ added: LibraryAsset[]; skipped: string[] }>
   }
   /** Shorts made from the open project. */
   shorts: {

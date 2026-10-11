@@ -21,6 +21,7 @@ import {
   keyframesInput,
   projectRelative,
   slug,
+  errMessage,
   sourceById,
   toAnchor,
   transformInput,
@@ -265,6 +266,61 @@ export const placeTools = [
         ;(d.project.items.find((i) => i.id === args.id) as Record<string, unknown>).picture = picture
       })
       return warnings.length ? json({ item: itemView(env, args.id), warnings }) : addResult(env, args.id)
+    }
+  }),
+
+  defineTool({
+    name: 'set_clean_audio',
+    description:
+      "Play a cleaned copy of a source's sound (noise removed) in place of its original sound, everywhere that source is used. `file` " +
+      'is an audio or video file you made from the WHOLE source with exactly the same length and timing (a project path such as ' +
+      'media/clean/<name>.wav, or an absolute path, which is copied there). Pictures, cuts and the transcript stay as they are. ' +
+      'Pass remove: true to go back to the original sound.',
+    input: {
+      source_id: z.string(),
+      file: z.string().optional(),
+      note: z.string().optional().describe('One line on what you did, e.g. "highpass 80 Hz, afftdn nr 12 from a pause profile"'),
+      remove: z.boolean().optional()
+    },
+    run: async (args, env) => {
+      const doc = env.store.snapshotDoc()
+      const src = sourceById(doc, args.source_id)
+      if (args.remove) {
+        env.mutate(`Original sound for ${basename(src.path)}`, (d) => {
+          delete (d.project.sources.find((x) => x.id === src.id) as Record<string, unknown>).cleanAudio
+        })
+        return json({ sourceId: src.id, cleanAudio: null })
+      }
+      if (!args.file) throw new ToolError('Pass file (or remove: true).')
+      let rel = projectRelative(env.dir, args.file)
+      if (!rel) {
+        if (!isAbsolute(args.file) || !fileExists(args.file)) throw new ToolError(`File not found: ${args.file}`)
+        const destDir = join(env.dir, 'media', 'clean')
+        mkdirSync(destDir, { recursive: true })
+        const ext = extname(args.file).toLowerCase()
+        let name = `${slug(basename(args.file, ext))}${ext}`
+        for (let n = 2; existsSync(join(destDir, name)); n++) name = `${slug(basename(args.file, ext))}_${n}${ext}`
+        copyFileSync(args.file, join(destDir, name))
+        rel = `media/clean/${name}`
+      }
+      const abs = absInProject(env.dir, rel)
+      if (!fileExists(abs)) throw new ToolError(`File not found in the project: ${args.file}`)
+      let info: Awaited<ReturnType<ToolEnv['ctx']['engine']['probe']>>
+      try {
+        info = await env.ctx.engine.probe(abs)
+      } catch (err) {
+        throw new ToolError(`Could not read ${basename(abs)}: ${errMessage(err)}`)
+      }
+      if (!info.hasAudio && info.kind !== 'audio') throw new ToolError('That file has no sound.')
+      // Same length, or every cut would play the wrong moment.
+      if (src.duration && Math.abs(info.duration - src.duration) > 0.1) {
+        throw new ToolError(`The cleaned file is ${info.duration.toFixed(2)} s but the source is ${src.duration.toFixed(2)} s. Process the whole source without trimming or shifting it.`)
+      }
+      env.mutate(`Cleaned sound for ${basename(src.path)}`, (d) => {
+        const s = d.project.sources.find((x) => x.id === src.id)!
+        s.cleanAudio = { file: rel!, ...(args.note ? { note: args.note } : {}) }
+      })
+      return json({ sourceId: src.id, cleanAudio: { file: rel, note: args.note ?? null } })
     }
   }),
 

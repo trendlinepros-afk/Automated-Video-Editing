@@ -85,6 +85,7 @@ export function sectionForRequest(kind: RequestKind): ModelSection | null {
     case 'insert_clip':
       return 'reedit'
     case 'fix_audio':
+    case 'clean_voice':
       return 'fix_audio'
     case 'stabilize':
       return 'stabilize'

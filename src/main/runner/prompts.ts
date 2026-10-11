@@ -40,6 +40,13 @@ export const WORKFLOW = `How to work with the app (tools from the "ave" MCP serv
   video is shown best. Before request_thumbnails, pick that moment (check candidates with get_frame footage_only) and call
   save_thumbnail_draft with your best description and base_time; leave base_time out when get_project shows the owner grabbed
   one (thumbnails.base.by "user"). The base picture is sent with every thumbnail prompt.
+- Never use stock footage. When the video needs a shot that was not filmed (how a gyro works, inside a battery, a comparison),
+  draw it: an animated graphic or diagram in the channel's style, made for that moment.
+- Make sound effects yourself (synthesize them in Python, or shape and layer sounds with ffmpeg) to the exact length, timing and
+  character the moment needs. The owner's own sound files (tagged "owner file", e.g. Epidemic Sound) are in the library: use one
+  only when it would sound as good as what you would make, with no noticeable loss.
+- Distracting noise under the voice (hum, wind, motor whine, echo) can be cleaned locally: process the source's sound into a copy
+  of the same length and use set_clean_audio. Only when it clearly helps, and never at the cost of a thin or robotic voice.
 - Anything the tools cannot express, build with your own scripts (get_engine_info gives the Python and ffmpeg to use) and
   bring the finished file in with import_file.
 - Claude cannot hear the result: check audio by measurement (get_audio_energy, measure_loudness, transcribing snippets).`
@@ -206,6 +213,20 @@ export function requestSection(r: EditRequest, project: Project): string {
     case 'thumbnail_direction':
       lines.push(`New thumbnail direction from the owner: "${r.text}". Write new prompts that follow it and call request_thumbnails.`)
       break
+    case 'clean_voice': {
+      const c = (r.context ?? {}) as { sourceId?: string; itemId?: string }
+      lines.push(
+        `Clean up the sound of source ${c.sourceId ?? '(see the attached context)'}${r.range ? ` (the owner pointed at ${rangeText(r.range)})` : ''}: ` +
+          'remove what distracts from the voice (fan or AC hum, wind, motor whine, hiss, room echo) without making the voice thin, ' +
+          'watery or robotic. Measure first: find pauses with get_audio_energy and listen by measurement to what the noise is (its level ' +
+          'and where its energy sits). Process the WHOLE source into one file of exactly the same length and timing (e.g. ffmpeg: highpass ' +
+          'around 70-90 Hz, then afftdn with a noise profile from a pause or anlmdn, gentle settings; or a spectral gate in Python), never ' +
+          'trimming or shifting it. Compare a few seconds of speech before and after (energy and a transcription of each must match), then ' +
+          'call set_clean_audio with the file. If the noise cannot be reduced without hurting the voice, say so and leave it.'
+      )
+      if (r.text.trim()) lines.push(`Note from the owner: "${r.text.trim()}"`)
+      break
+    }
     case 'thumbnail_draft': {
       const c = (r.context ?? {}) as { persona?: string; style?: string; keepBase?: boolean }
       lines.push(

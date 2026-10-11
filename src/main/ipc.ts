@@ -23,6 +23,7 @@ import { themeSheets } from './services/videoThemes'
 import { buildDiagnostics } from './services/diagnostics'
 import { runExportCheck } from './services/exportCheck'
 import { moveLibrary } from './services/library'
+import { importLibraryFiles } from './services/libraryImport'
 import { fetchYouTubeThumbnails } from './services/youtube'
 import { clearBase, grabBase } from './services/thumbnailBase'
 import { writeThumbnailDraft } from './services/thumbnailDraft'
@@ -290,6 +291,28 @@ export function registerIpc(ctx: AppContext, getWindow: () => BrowserWindow | nu
     },
     'project.requestFixAudio': async (o: { segmentId?: string; itemId?: string; time: number }) => fixAudio(ctx, store(), o),
     'project.requestStabilize': (o: { itemId: string; direction?: string }) => requestStabilize(ctx, store(), o),
+    'project.requestCleanVoice': (o: { itemId: string; time?: number; note?: string }) => {
+      const s = store()
+      const item = s.project.items.find((i) => i.id === o.itemId)
+      const src = item && 'sourceId' in item && item.sourceId ? s.project.sources.find((x) => x.id === item.sourceId) : undefined
+      if (!src || !(src.hasAudio || src.kind === 'audio')) throw new Error('Only clips with sound from your footage can be cleaned up.')
+      const t = Number(o.time)
+      ctx.requests.enqueue({
+        kind: 'clean_voice',
+        text: (o.note ?? '').trim(),
+        ...(Number.isFinite(t) ? { range: { start: Math.max(0, t - 2), end: t + 2 } } : {}),
+        context: { sourceId: src.id, itemId: o.itemId, file: src.path, ...(src.cleanAudio ? { currentCleanFile: src.cleanAudio.file } : {}) }
+      })
+    },
+    'project.useOriginalSound': (itemId: string) => {
+      const s = store()
+      const item = s.project.items.find((i) => i.id === itemId)
+      const srcId = item && 'sourceId' in item ? item.sourceId : undefined
+      s.mutate('Use the original sound', 'user', (d) => {
+        const src = d.project.sources.find((x) => x.id === srcId)
+        if (src) delete (src as Record<string, unknown>).cleanAudio
+      })
+    },
     'project.requestInsertClip': async (o: { file: string; time: number; seconds: number; mode: 'insert' | 'overlay'; note?: string }) => {
       const s = store()
       if (!o.file || !existsSync(o.file)) throw new Error('That file could not be found.')
@@ -497,6 +520,7 @@ export function registerIpc(ctx: AppContext, getWindow: () => BrowserWindow | nu
     'claude.estimate': (kind: RequestKind, opts?: { scope?: 'whole' | 'intro' }) => estimate(ctx, ctx.projects.current()?.project ?? null, kind, opts),
 
     // ---------------------------------------------------------------- library
+    'library.importFiles': (paths: string[], opts?: { type?: 'auto' | 'sound' | 'music'; scope?: string }) => importLibraryFiles(ctx, paths ?? [], opts),
     'library.changeFolder': (dest: string, move: boolean) => {
       const from = ctx.settings.get().libraryFolder
       if (!dest) throw new Error('Choose a folder.')

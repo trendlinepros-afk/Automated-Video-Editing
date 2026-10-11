@@ -213,7 +213,9 @@ export const SourceSchema = z.looseObject({
   hasAudio: z.boolean().default(false),
   origin: z.enum(['footage', 'music', 'other']).default('footage'),
   size: z.number().optional(),
-  mtimeMs: z.number().optional()
+  mtimeMs: z.number().optional(),
+  /** A cleaned copy of this source's sound (noise removed), same length and timing; played in place of the original sound. */
+  cleanAudio: z.looseObject({ file: z.string().min(1), note: z.string().optional() }).optional()
 })
 export type Source = z.infer<typeof SourceSchema>
 
@@ -242,6 +244,7 @@ export const REQUEST_KINDS = [
   'publish_regen',
   'thumbnail_direction',
   'thumbnail_draft',
+  'clean_voice',
   'resume'
 ] as const
 export type RequestKind = (typeof REQUEST_KINDS)[number]

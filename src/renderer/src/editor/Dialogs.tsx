@@ -1,9 +1,10 @@
-/** The editor's dialogs: Export, Export log, Re-edit section, Inspiration, Save to library, Leave a note, Compare versions. */
+/** The editor's dialogs: Export, Export log, Re-edit section, Inspiration, Save to library, Leave a note, Compare versions, Add clip, Voiceover. */
 import type { VideoTheme } from '@shared/videoTheme'
 import { blocking, type ExportCheckResult } from '@shared/exportCheck'
 import { useEffect, useRef, useState } from 'react'
 import type { ExportPreset, Range } from '@shared/project'
-import { call, toast } from '../state/app'
+import type { VoiceStatus } from '@shared/ipc'
+import { app, call, openSettings, toast } from '../state/app'
 import { editor, openDialog, applyOp, setRange, setTab, type Dialog } from '../state/editor'
 import { seek } from '../state/player'
 import { currentDerived, useDerived } from '../state/derived'
@@ -14,6 +15,7 @@ import { CAPTION_EXPORT_LABELS, PresetEditor } from '../components/PresetEditor'
 import { errorMessage, fmt, fmtRange, itemLabel, mediaUrl } from '../util'
 import { listenReminderDismissed } from './Preview'
 import { EstimateNote, useEstimate } from './EstimateNote'
+import { charactersLeft, voiceTagsWork } from '../voice'
 
 export function EditorDialogs() {
   const dialog = useStore(editor, (s) => s.dialog)
@@ -36,6 +38,8 @@ export function EditorDialogs() {
       return <CompareDialog a={dialog.a} b={dialog.b} onClose={close} />
     case 'insertClip':
       return <InsertClipDialog time={dialog.time} file={dialog.file} onClose={close} />
+    case 'voiceover':
+      return <VoiceoverDialog time={dialog.time} onClose={close} />
   }
 }
 
@@ -300,6 +304,93 @@ function ReeditDialog({ onClose }: { onClose: () => void }) {
         placeholder="Direction (optional), e.g. tighter, and add a graphic for the price. Win+H to speak."
       />
       <span className="hint">Claude changes only this range. If it gets shorter or longer, everything after it moves to stay in sync. You get Before and After with Keep and Revert.</span>
+    </Modal>
+  )
+}
+
+/** "Add voiceover here": a line in the owner's ElevenLabs voice, put on the Voiceover track at this time. */
+function VoiceoverDialog({ time, onClose }: { time: number; onClose: () => void }) {
+  const voice = useStore(app, (s) => s.settings?.voice)
+  const [text, setText] = useState('')
+  const [status, setStatus] = useState<VoiceStatus | null>(null)
+  const [busy, setBusy] = useState(false)
+  useEffect(() => {
+    window.api.voice
+      .check()
+      .then(setStatus)
+      .catch((e) => setStatus({ ok: false, message: errorMessage(e), voiceName: voice?.voiceName ?? '', model: voice?.model ?? '' }))
+    // Checked once when the dialog opens.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+  const model = status?.model || voice?.model || 'eleven_v3'
+  const voiceName = status?.voiceName || voice?.voiceName || 'Adam V3 Pro'
+  const left = charactersLeft(status)
+  const ready = !!status?.ok
+  const send = async () => {
+    if (!text.trim() || busy || !ready) return
+    setBusy(true)
+    try {
+      const r = await window.api.voice.generate({ text: text.trim(), time })
+      onClose()
+      toast(`Voiceover added (${r.duration.toFixed(1)} s).${r.warning ? ` ${r.warning}` : ''}`)
+    } catch (e) {
+      toast(`Could not make the voiceover: ${errorMessage(e)}`, { kind: 'error' })
+      setBusy(false)
+    }
+  }
+  return (
+    <Modal
+      title={`Voiceover at ${fmt(time)}`}
+      onClose={onClose}
+      footer={
+        <>
+          <span className="spacer" />
+          <button className="btn" onClick={onClose}>
+            Cancel
+          </button>
+          <button className="btn primary" disabled={!text.trim() || busy || !ready} onClick={() => void send()}>
+            {busy ? 'Generating…' : 'Generate voiceover'}
+          </button>
+        </>
+      }
+    >
+      <label className="small">What should you say?</label>
+      <textarea
+        autoFocus
+        rows={5}
+        value={text}
+        onChange={(e) => setText(e.target.value)}
+        onKeyDown={(e) => e.key === 'Enter' && (e.ctrlKey || e.metaKey) && void send()}
+        placeholder="e.g. [excited] Sixty-five dollars… for THIS? [laughs] Let's find out."
+      />
+      <span className="hint">
+        {voiceTagsWork(model)
+          ? 'Tips: [excited] [laughs] [whispers] [pause] shape how it’s said. CAPS for emphasis, … for a pause.'
+          : 'Tags in [brackets] are removed for this model. Use … for pauses.'}
+      </span>
+      <div className="small muted">
+        In your voice: {voiceName} · {model} · {text.length.toLocaleString()} characters
+        {left != null && ` · ${left.toLocaleString()} left this month`}
+      </div>
+      {!status ? (
+        <span className="small faint">Checking ElevenLabs…</span>
+      ) : (
+        !status.ok && (
+          <div className="small warn">
+            {status.message ?? 'ElevenLabs is not ready.'}{' '}
+            <a
+              href="#"
+              onClick={(e) => {
+                e.preventDefault()
+                onClose()
+                openSettings('general')
+              }}
+            >
+              Settings
+            </a>
+          </div>
+        )
+      )}
     </Modal>
   )
 }

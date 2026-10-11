@@ -1,6 +1,6 @@
 /** Settings: keys, folders, music folders, Claude connection, profiles, suggested rules, About. */
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import type { MusicTrack, RunnerState, Suggestion } from '@shared/ipc'
+import type { MusicTrack, RunnerState, Suggestion, VoiceStatus } from '@shared/ipc'
 import { CORRECTION_KINDS, SettingsSchema } from '@shared/settings'
 import { app, call, profileById, refreshProfiles, refreshSettings, toast, updateSettings, type SettingsSection } from '../state/app'
 import { useStore } from '../state/store'
@@ -12,7 +12,8 @@ import { ProfilesSection } from '../settings/ProfilesSection'
 import { ModelsSection } from '../settings/ModelsSection'
 import { changeLibraryFolder } from '../components/LibraryFolder'
 import { VideoThemesSection } from '../settings/VideoThemesSection'
-import { fmt } from '../util'
+import { fmt, mediaUrl } from '../util'
+import { VOICE_MODELS, voiceStatusLine } from '../voice'
 import { PriceEditor } from '../panels/ThumbnailsPanelCosts'
 
 const SECTIONS: [SettingsSection, string][] = [
@@ -156,6 +157,7 @@ function General() {
         )}
       </div>
       <PriceEditor />
+      <ElevenLabs />
       <FolderRow
         label="Asset library folder"
         hint="Every graphic, animation, song and sound effect Claude makes is saved here. Any drive works, including a synced one. Changing it asks whether to move the saved assets too."
@@ -195,6 +197,125 @@ function General() {
         </div>
       </div>
     </>
+  )
+}
+
+/** ElevenLabs: the key, the owner's voice (by name) and the model every voiceover uses. */
+function ElevenLabs() {
+  const voice = useStore(app, (s) => s.settings!.voice)
+  const [hasKey, setHasKey] = useState<boolean | null>(null)
+  const [key, setKey] = useState('')
+  const [editingKey, setEditingKey] = useState(false)
+  const [name, setName] = useState(voice.voiceName)
+  const [status, setStatus] = useState<VoiceStatus | null>(null)
+  const [checking, setChecking] = useState(false)
+  const [playing, setPlaying] = useState(false)
+  const check = useCallback(async () => {
+    setChecking(true)
+    const s = await call(() => window.api.voice.check(), 'Could not check ElevenLabs')
+    setChecking(false)
+    setStatus(s ?? null)
+  }, [])
+  useEffect(() => {
+    void call(() => window.api.settings.hasElevenLabsKey()).then((k) => {
+      setHasKey(!!k)
+      if (k) void check()
+    })
+  }, [check])
+  const saveKey = async () => {
+    await call(() => window.api.settings.setElevenLabsKey(key.trim()))
+    setKey('')
+    setEditingKey(false)
+    setHasKey(true)
+    toast('ElevenLabs key saved with Windows credential protection.')
+    void check()
+  }
+  // A new name clears the remembered id so the voice is looked up again.
+  const saveName = async () => {
+    const n = name.trim()
+    if (!n || n === voice.voiceName) return setName(voice.voiceName)
+    await updateSettings({ voice: { ...voice, voiceName: n, voiceId: '' } })
+    if (hasKey) void check()
+  }
+  const playSample = async () => {
+    setPlaying(true)
+    const file = await call(() => window.api.voice.sample(), 'Could not make the test line')
+    if (file) {
+      const audio = new Audio(mediaUrl(file))
+      audio.onended = () => setPlaying(false)
+      audio.onerror = () => {
+        setPlaying(false)
+        toast('Could not play the test line.', { kind: 'error' })
+      }
+      await audio.play().catch(() => setPlaying(false))
+    } else setPlaying(false)
+  }
+  return (
+    <div className="section col">
+      <h3>ElevenLabs voiceovers</h3>
+      <span className="hint">From elevenlabs.io → Profile → API keys. Stored encrypted on this PC.</span>
+      {hasKey === null ? null : hasKey && !editingKey ? (
+        <div className="row">
+          <code className="grow">••••••••••••••••</code>
+          <button className="btn" onClick={() => setEditingKey(true)}>
+            Replace
+          </button>
+          <button
+            className="btn ghost danger"
+            onClick={async () => {
+              await call(() => window.api.settings.setElevenLabsKey(null))
+              setHasKey(false)
+              setStatus(null)
+              toast('ElevenLabs key removed.')
+            }}
+          >
+            Clear
+          </button>
+        </div>
+      ) : (
+        <div className="row">
+          <input type="password" className="grow" placeholder="Paste your ElevenLabs API key" value={key} onChange={(e) => setKey(e.target.value)} autoComplete="off" />
+          <button className="btn primary" disabled={!key.trim()} onClick={saveKey}>
+            Save key
+          </button>
+          {editingKey && (
+            <button className="btn ghost" onClick={() => setEditingKey(false)}>
+              Cancel
+            </button>
+          )}
+        </div>
+      )}
+      <div className="field-row">
+        <label className="label">Voice</label>
+        <input
+          type="text"
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          onBlur={() => void saveName()}
+          onKeyDown={(e) => e.key === 'Enter' && (e.target as HTMLInputElement).blur()}
+        />
+      </div>
+      <span className="hint">Every voiceover uses this voice. Name exactly as in your ElevenLabs Voices list.</span>
+      <div className="field-row">
+        <label className="label">Model</label>
+        <select value={voice.model} onChange={(e) => void updateSettings({ voice: { ...voice, model: e.target.value } })}>
+          {VOICE_MODELS.map(([id, label]) => (
+            <option key={id} value={id}>
+              {label}
+            </option>
+          ))}
+        </select>
+      </div>
+      <div className="row">
+        <button className="btn" disabled={!hasKey || checking} onClick={() => void check()}>
+          {checking ? 'Checking…' : 'Check'}
+        </button>
+        <button className="btn" disabled={!hasKey || playing} onClick={() => void playSample()}>
+          <Icon name="play" size={14} /> {playing ? 'Playing…' : 'Play a test line'}
+        </button>
+      </div>
+      {status && <div className={`small ${status.ok ? 'ok' : 'warn'}`}>{voiceStatusLine(status)}</div>}
+    </div>
   )
 }
 

@@ -299,7 +299,7 @@ function Ruler({ zoom, t0, t1, width }: { zoom: number; t0: number; t1: number; 
         className="tl-ruler-body"
         onPointerDown={onDown}
         onContextMenu={(e) => timeMenu(e, timeAt(e, e.currentTarget, zoom))}
-        title="Click to move the playhead. Drag to select a section. Right-click to send the time to the chat or add a clip here."
+        title="Click to move the playhead. Drag to select a section. Right-click to send the time to the chat, or add a clip or a voiceover here."
       >
         {range && <div className="tl-ruler-range" style={{ left: range.start * zoom, width: (range.end - range.start) * zoom }} />}
         {range && (

@@ -14,6 +14,7 @@ import { changeLibraryFolder } from '../components/LibraryFolder'
 import { VideoThemesSection } from '../settings/VideoThemesSection'
 import { fmt, mediaUrl } from '../util'
 import { VOICE_MODELS, voiceStatusLine } from '../voice'
+import { YouTubeChannelSection } from '../settings/YouTubeChannelSection'
 import { PriceEditor } from '../panels/ThumbnailsPanelCosts'
 
 const SECTIONS: [SettingsSection, string][] = [
@@ -158,6 +159,7 @@ function General() {
       </div>
       <PriceEditor />
       <ElevenLabs />
+      <YouTubeChannelSection />
       <FolderRow
         label="Asset library folder"
         hint="Every graphic, animation, song and sound effect Claude makes is saved here. Any drive works, including a synced one. Changing it asks whether to move the saved assets too."

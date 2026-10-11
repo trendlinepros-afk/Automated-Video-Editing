@@ -68,6 +68,16 @@ export const SettingsSchema = z.looseObject({
     /** All-time Pikzels spend on this PC (successful calls only). */
     spend: PikzelsSpendSchema.default({ total: 0, byAction: {} })
   }).default({ model: 'pkz_4_5', pikzonalities: [], prices: {}, spend: { total: 0, byAction: {} } }),
+  /**
+   * Voiceovers made with ElevenLabs. Always the owner's own voice, found by name (its id is remembered, and found
+   * again by name if the voice is recreated). No voice settings are sent: the voice's own settings at ElevenLabs apply.
+   */
+  voice: z.looseObject({
+    voiceName: z.string().default('Adam V3 Pro'),
+    voiceId: z.string().default(''),
+    /** eleven_v3 and eleven_v4 understand audio tags such as [excited]; the others speak them as words, so the app removes them. */
+    model: z.string().default('eleven_v3')
+  }).default({ voiceName: 'Adam V3 Pro', voiceId: '', model: 'eleven_v3' }),
   /** Claude model per part of the edit, and what runs have cost on this PC. */
   claude: z.looseObject({
     /** Section id -> model id ('' = Claude Code's default). Missing sections use the recommended model. */

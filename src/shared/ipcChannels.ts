@@ -12,22 +12,23 @@ export const API_METHODS = [
   'music.list', 'music.rescan', 'music.addFolder', 'music.removeFolder',
   'projects.recent', 'projects.create', 'projects.open', 'projects.locate', 'projects.removeRecent', 'projects.close',
   'project.get', 'project.apply', 'project.undo', 'project.redo', 'project.relinkSource', 'project.startEdit',
-  'project.sendChat', 'project.requestReedit', 'project.requestFixAudio', 'project.requestStabilize', 'project.requestInsertClip', 'project.requestShorts', 'project.exportCheck', 'project.addNote', 'project.noteToRule',
+  'project.sendChat', 'project.requestReedit', 'project.requestFixAudio', 'project.requestStabilize', 'project.requestCleanVoice', 'project.useOriginalSound', 'project.requestInsertClip', 'project.requestShorts', 'project.exportCheck', 'project.addNote', 'project.noteToRule',
   'project.reviewRequest', 'project.introDecision', 'project.introVersions', 'project.useIntro', 'project.setVideoTheme', 'project.regeneratePublish', 'project.seamAudio', 'project.waveform',
   'project.frameAt',
   'project.versions.list', 'project.versions.save', 'project.versions.restore', 'project.versions.remove',
   'project.versions.compareFrames',
   'project.exportVideo', 'project.cancelExport', 'project.exportLog', 'project.exportPack', 'project.saveToLibrary',
   'thumbnails.generate', 'thumbnails.regenerate', 'thumbnails.choose', 'thumbnails.exportImage',
-  'voice.check', 'voice.generate', 'voice.sample',
+  'voice.check', 'voice.generate', 'voice.sample', 'voice.budget', 'voice.answerApproval',
   'thumbnails.recreate', 'thumbnails.edit', 'thumbnails.faceSwap', 'thumbnails.score', 'thumbnails.titles', 'thumbnails.grabBase', 'thumbnails.clearBase', 'thumbnails.requestDraft',
   'preview.state', 'preview.showBefore',
   'claude.state', 'claude.stop', 'claude.resume', 'claude.estimate',
-  'library.list', 'library.changeFolder', 'library.update', 'library.duplicate', 'library.remove', 'library.placeInProject',
+  'library.list', 'library.changeFolder', 'library.importFiles', 'library.update', 'library.duplicate', 'library.remove', 'library.placeInProject',
   'pikzels.list', 'pikzels.create', 'pikzels.refresh', 'pikzels.updateInstructions', 'pikzels.remove',
   'pikzels.rename', 'pikzels.pricing', 'pikzels.setPrices', 'pikzels.thumbnailsFromLink',
   'shorts.state', 'shorts.exportShort', 'shorts.exportAll', 'shorts.remove', 'shorts.refresh',
-  'themes.list', 'themes.analyze', 'themes.cancel', 'themes.update', 'themes.remove', 'themes.sheets'
+  'themes.list', 'themes.analyze', 'themes.cancel', 'themes.update', 'themes.remove', 'themes.sheets',
+  'youtube.status', 'youtube.setClient', 'youtube.connect', 'youtube.disconnect', 'youtube.insights'
 ] as const
 
 export type ApiMethod = (typeof API_METHODS)[number]
@@ -45,5 +46,6 @@ export const API_EVENTS = {
   'claude.onOutput': 'claude:output',
   'themes.onProgress': 'themes:progress',
   'project.onCheckProgress': 'exportcheck:progress',
-  'shorts.onState': 'shorts:state'
+  'shorts.onState': 'shorts:state',
+  'voice.onApproval': 'voice:approval'
 } as const

@@ -4,6 +4,7 @@
  */
 import type { VideoTheme, VideoThemeProgress } from './videoTheme'
 import type { ExportCheckResult } from './exportCheck'
+import type { ChannelRetention, YouTubeStatus } from './retention'
 import type {
   ExportPreset,
   RequestKind,
@@ -208,6 +209,22 @@ export interface VoiceStatus {
   resetsAt?: string
 }
 
+export interface VoiceBudget {
+  usedSeconds: number
+  limitSeconds: number
+}
+
+/** Claude wants a voiceover line that takes the video over its voiceover limit. */
+export interface VoiceApproval {
+  id: string
+  /** Estimated length of the new line. */
+  seconds: number
+  usedSeconds: number
+  limitSeconds: number
+  /** What the line says (without audio tags). */
+  text: string
+}
+
 export interface VoiceoverRequest {
   /** What to say. On eleven_v3/v4, audio tags like [excited] or [laughs] shape the delivery. */
   text: string
@@ -389,6 +406,10 @@ export interface Api {
     requestShorts(opts: { count: number; recap: boolean; note?: string; redoId?: string }): Promise<void>
     /** Ask Claude to stabilize one A-roll segment or B-roll clip. */
     requestStabilize(opts: { itemId: string; direction?: string }): Promise<void>
+    /** Claude removes distracting noise under the voice of this clip's source (a cleaned copy of its sound). */
+    requestCleanVoice(opts: { itemId: string; time?: number; note?: string }): Promise<void>
+    /** Go back to the original sound of this clip's source. */
+    useOriginalSound(itemId: string): Promise<void>
     addNote(opts: { text: string; itemId?: string; range?: Range }): Promise<void>
     noteToRule(noteId: string): Promise<void>
     reviewRequest(requestId: string, decision: 'keep' | 'revert'): Promise<void>
@@ -456,6 +477,8 @@ export interface Api {
     placeInProject(id: string, time: number): Promise<void>
     /** Use another folder for the library, moving the assets there when move is true. */
     changeFolder(dest: string, move: boolean): Promise<{ moved: number; skipped: number }>
+    /** Add your own sound and music files (e.g. Epidemic Sound downloads); 'auto' files 30 s and longer as music. */
+    importFiles(paths: string[], opts?: { type?: 'auto' | 'sound' | 'music'; scope?: string }): Promise<{ added: LibraryAsset[]; skipped: string[] }>
   }
   /** Shorts made from the open project. */
   shorts: {
@@ -486,6 +509,11 @@ export interface Api {
     generate(req: VoiceoverRequest): Promise<VoiceoverResult>
     /** A short test line in the voice (an mp3 file to play); costs its characters. */
     sample(text?: string): Promise<string>
+    /** Voiceover seconds in the open project and the limit Claude may use without asking. */
+    budget(): Promise<VoiceBudget>
+    /** Claude asks to go over the voiceover limit (null: the question is gone, answered or timed out). */
+    onApproval(cb: (a: VoiceApproval | null) => void): () => void
+    answerApproval(id: string, allow: boolean): Promise<void>
   }
   pikzels: {
     list(): Promise<Pikzonality[]>
@@ -499,6 +527,16 @@ export interface Api {
     pricing(): Promise<PikzelsPricing>
     /** Save price overrides (null = reset to the published prices). */
     setPrices(overrides: Record<string, number> | null): Promise<PikzelsPricing>
+  }
+  /** The owner's own YouTube channel, read-only: Google sign-in and audience retention insights. */
+  youtube: {
+    status(): Promise<YouTubeStatus>
+    /** Save the Google OAuth client; leave the secret undefined to keep the saved one. */
+    setClient(clientId: string, clientSecret?: string | null): Promise<YouTubeStatus>
+    /** Opens Google sign-in in the browser; resolves once connected (or fails after 5 minutes). */
+    connect(): Promise<YouTubeStatus>
+    disconnect(): Promise<YouTubeStatus>
+    insights(opts?: { videos?: number; refresh?: boolean }): Promise<ChannelRetention>
   }
 }
 

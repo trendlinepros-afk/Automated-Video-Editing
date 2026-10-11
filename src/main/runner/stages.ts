@@ -15,6 +15,15 @@ import { CHECKLIST_STAGES, type EditRequest, type Project, type RequestKind } fr
 
 export const STAGED_KINDS: RequestKind[] = ['start_edit', 'resume']
 
+/**
+ * A run for small requests only (chat, re-edits, fixes, thumbnails…): it starts a fresh Claude session that reads the
+ * project and handoff notes, instead of reloading the whole editing conversation for every step, and it leaves the
+ * editing session alone for the next stage of the edit.
+ */
+export function isSmallRun(plan: RunPlan): boolean {
+  return plan.requests.length > 0 && plan.requests.every((r) => !STAGED_KINDS.includes(r.kind) && r.kind !== 'continue_intro')
+}
+
 export interface RunPlan {
   requests: EditRequest[]
   section: ModelSection
@@ -73,7 +82,7 @@ export function planRun(open: EditRequest[], project: Project, models: Record<st
 const STAGE_LABEL = Object.fromEntries(CHECKLIST_STAGES) as Record<string, string>
 
 /** Added to the run prompt for a staged run. */
-export function stageInstructions(plan: RunPlan): string {
+export function stageInstructions(plan: RunPlan, opts: { proofread?: boolean } = {}): string {
   if (!plan.stages.length) return ''
   const names = plan.stages.map((s) => STAGE_LABEL[s] ?? s)
   const lines = [
@@ -86,8 +95,20 @@ export function stageInstructions(plan: RunPlan): string {
   ]
   if (plan.stages.includes('transcript')) {
     lines.push(
-      'Transcript: run faster-whisper with word timings and save its JSON output to a file, then call save_transcript with that file ' +
-        '(the file parameter) instead of sending the words one by one. It is the same transcript at a fraction of the cost.'
+      "Transcript: for each speech source, run the app's transcription script (get_engine_info gives its path as transcribeScript and the " +
+        'Python to run it with): <python> <transcribeScript> --audio <source file> --out <scratch>/<source id>.json --hint "<product, brand ' +
+        'and people names you expect>". It uses the speech model on the GPU with guards against invented words (voice detection, no ' +
+        'carried-over text, filler over silence dropped, loops cut back) and lists doubtful words in "flagged" and removed text in "dropped".'
+    )
+    lines.push(
+      opts.proofread === false
+        ? 'The owner turned proofreading off: save each file as it is with save_transcript (the file parameter), one source at a time.'
+        : 'Then PROOFREAD each file before saving it: you cannot hear the audio, so judge by context. Fix words the speech model misheard ' +
+            '(product names, numbers, prices, slang), remove words that cannot have been said (nonsense in a quiet or driving-only stretch, ' +
+            'usually among "flagged"), and put back anything in "dropped" that is clearly real speech. Keep every word timing as it is; ' +
+            'change only the text of a word, or delete words. When unsure about a flagged word, cut a snippet (extract_audio_snippet) and run ' +
+            'the script on it again with a better --hint. Write the corrected JSON and call save_transcript with that file (the file ' +
+            'parameter), one source at a time as each is done.'
     )
   }
   if (plan.stages.includes('captions')) {

@@ -3,6 +3,18 @@
 Each release's section becomes its GitHub release text and the notes shown in the app's update dialog.
 A release is blocked until the section for its version has notes.
 
+## 1.11.0
+
+- **Better transcripts.** The speech model on your PC now runs with guards against invented words (only real speech is transcribed, no carried-over text, filler like "Thank you." over silence dropped, loops cut back), and Claude proofreads the result: names, numbers, prices and anything said where nobody was talking. Proofreading runs on Sonnet 5.5 and can be turned off in Settings > Claude models.
+- **Footage index.** Every clip is analysed once on your PC (shots, sharpness, steadiness, motion, faces, colours, loudness, the best still of each shot), so Claude picks B-roll and moments from a list and a contact sheet instead of checking frames one by one. Faster and cheaper, with better picks.
+- **Your channel's retention (YouTube, read-only).** Connect your channel in Settings > General and Claude learns where your viewers stay and where they leave in your past videos. Setup steps are in Settings.
+- **Voiceover limit per video.** Claude adds voiceover freely up to 2 minutes per video (change it in Settings > ElevenLabs). A line that would go past it asks you first, showing how long it would be; say no and Claude finds another way.
+- **Small requests are much cheaper.** Chat changes, re-edits and fixes start a fresh Claude session with the edit's notes instead of reloading the whole editing conversation, and no longer pick up unfinished edit stages on the side.
+- **Your own sounds in the library.** Library > Add files… takes sound effects and music you downloaded (Epidemic Sound names are cleaned up). Claude still makes sounds to the exact length first and uses yours only when they are just as good.
+- **Clean up voice.** Right-click a clip > Clean up voice (noise): Claude removes hum, wind or motor noise under your voice on your PC. Use the original sound brings it back.
+- Claude never uses stock footage: shots you did not film become animated drawings.
+- Faces are detected again for Shorts framing (the face model downloads once on first use).
+
 ## 1.10.0
 
 - **Voiceovers in your own voice (ElevenLabs).** Add your ElevenLabs API key in Settings > General; every voiceover uses your voice "Adam V3 Pro" (change the name there if you ever rename it). Check shows the voice was found and how many characters are left this month, and Play a test line lets you hear it.

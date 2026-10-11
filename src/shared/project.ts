@@ -213,7 +213,9 @@ export const SourceSchema = z.looseObject({
   hasAudio: z.boolean().default(false),
   origin: z.enum(['footage', 'music', 'other']).default('footage'),
   size: z.number().optional(),
-  mtimeMs: z.number().optional()
+  mtimeMs: z.number().optional(),
+  /** A cleaned copy of this source's sound (noise removed), same length and timing; played in place of the original sound. */
+  cleanAudio: z.looseObject({ file: z.string().min(1), note: z.string().optional() }).optional()
 })
 export type Source = z.infer<typeof SourceSchema>
 
@@ -242,6 +244,7 @@ export const REQUEST_KINDS = [
   'publish_regen',
   'thumbnail_direction',
   'thumbnail_draft',
+  'clean_voice',
   'resume'
 ] as const
 export type RequestKind = (typeof REQUEST_KINDS)[number]
@@ -412,6 +415,8 @@ export const ProjectSchema = z.looseObject({
   /** Shorts made from this video (see shorts.ts). */
   shorts: z.array(ShortSchema).optional(),
   videoTheme: z.looseObject({ id: z.string(), name: z.string() }).nullable().optional(),
+  /** Voiceover seconds the owner approved for this video beyond the limit in Settings (absent: the limit applies). */
+  voiceAllowanceSeconds: z.number().optional(),
   scope: z.looseObject({
     mode: z.enum(['whole', 'intro']).default('whole'),
     introMaxSeconds: num.positive().nullable().default(null),

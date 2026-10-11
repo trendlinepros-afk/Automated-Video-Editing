@@ -18,7 +18,7 @@ import type { ProjectStore } from '../project/store'
 import { buildRunPrompt, buildSystemPrompt } from './prompts'
 import { saveNewAssetsToLibrary } from '../project/autoLibrary'
 import { recordRunCost } from './costs'
-import { doneStageCount, planRun, stageInstructions, type RunPlan } from './stages'
+import { doneStageCount, isSmallRun, planRun, stageInstructions, type RunPlan } from './stages'
 
 type OutputLine = { ts: string; text: string; kind: 'text' | 'tool' | 'error' | 'info' }
 
@@ -192,6 +192,8 @@ interface Run {
   store: ProjectStore
   projectId: string
   resumed: boolean
+  /** Small requests only: a fresh session whose id is not kept for the edit. */
+  small: boolean
   configFile: string
   startOpenIds: string[]
   sawInit: boolean
@@ -377,7 +379,7 @@ export function createRunnerService(ctx: AppContext, deps: RunnerDeps = {}): Run
   const handleEvent = (run: Run, ev: Record<string, any>) => {
     if (typeof ev.session_id === 'string' && ev.session_id && ev.session_id !== run.sessionId) {
       run.sessionId = ev.session_id
-      saveSessionId(run.store, ev.session_id, run.plan.model)
+      if (!run.small) saveSessionId(run.store, ev.session_id, run.plan.model)
       update({ sessionId: ev.session_id })
     }
     switch (ev.type) {
@@ -532,7 +534,9 @@ export function createRunnerService(ctx: AppContext, deps: RunnerDeps = {}): Run
     // checklist and handoff notes (cheaper than carrying the whole history over).
     // (A session saved before models were tracked has no model recorded: continue it.)
     const sameModel = project.claudeSessionModel === undefined || project.claudeSessionModel === plan.model
-    const sessionId = forceFresh || !sameModel ? undefined : project.claudeSessionId
+    // Small requests start fresh and leave the editing session for the next stage of the edit.
+    const small = isSmallRun(plan)
+    const sessionId = forceFresh || !sameModel || small ? undefined : project.claudeSessionId
     forceFresh = false
     const configDir = store.paths.cache
     mkdirSync(configDir, { recursive: true })
@@ -544,7 +548,7 @@ export function createRunnerService(ctx: AppContext, deps: RunnerDeps = {}): Run
       { mode: 0o600 }
     )
     const vars = {
-      prompt: [buildRunPrompt(open, project, { resumed: !!sessionId }), stageInstructions(plan)].filter(Boolean).join('\n\n'),
+      prompt: [buildRunPrompt(open, project, { resumed: !!sessionId, small }), stageInstructions(plan, { proofread: ctx.settings.get().transcription?.proofread !== false })].filter(Boolean).join('\n\n'),
       systemPrompt: buildSystemPrompt(ctx.profiles.get(project.profileId)),
       mcpConfig: configFile,
       allowedTools: settings.allowedTools,
@@ -555,6 +559,8 @@ export function createRunnerService(ctx: AppContext, deps: RunnerDeps = {}): Run
     if (plan.model && !args.includes('--model')) args.push('--model', plan.model)
     const cmd = resolveCommand(settings.command, args, platform)
     const { ANTHROPIC_API_KEY: _drop, ...env } = process.env // Claude Code uses its own sign-in, never a key from the app
+    // A tool call can wait for the owner (approving more voiceover), up to 10 minutes: give tool calls longer than that.
+    env.MCP_TOOL_TIMEOUT ??= '1200000'
     let proc: ChildProcess
     const run = {
       store,
@@ -568,6 +574,7 @@ export function createRunnerService(ctx: AppContext, deps: RunnerDeps = {}): Run
       stopping: false,
       command: settings.command,
       plan,
+      small,
       doneBefore: doneStageCount(project)
     } as unknown as Run
     try {

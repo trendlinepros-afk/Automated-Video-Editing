@@ -12,6 +12,7 @@ import {
   type ModelSection
 } from '@shared/claudeModels'
 import { app, updateSettings } from '../state/app'
+import { Toggle } from '../components/bits'
 import { useStore } from '../state/store'
 
 export function ModelsSection() {
@@ -32,9 +33,9 @@ export function ModelsSection() {
       <p className="muted" style={{ marginTop: 0 }}>
         Each part of an edit can use its own model. The recommended set uses Opus 5.5 for everything where judgment or taste shows in
         the video: cutting, B-roll, graphics and animations, music and sound, captions, self-check, thumbnails, titles and your
-        requests. The one exception is transcribing, which runs on Haiku 4.5: there Claude only starts faster-whisper on your GPU and
-        hands the app the file it wrote, so the transcript is word for word the same whichever model starts it. A cheaper model
-        anywhere else saves money but can cost quality, so it is your call.
+        requests. The one exception is transcribing, which runs on Sonnet 5.5: the speech model on your GPU hears the audio (Claude
+        cannot hear), and Claude proofreads its text, fixing names, numbers and words the speech model invented. Sonnet proofreads as
+        well as Opus. A cheaper model anywhere else saves money but can cost quality, so it is your call.
       </p>
 
       <div className="section col">
@@ -77,6 +78,11 @@ export function ModelsSection() {
             })}
           </tbody>
         </table>
+        <Toggle
+          checked={settings.transcription?.proofread !== false}
+          onChange={(v) => void updateSettings({ transcription: { ...(settings.transcription ?? {}), proofread: v } })}
+          label="Claude proofreads the transcript (off: the speech model's text is used as it is)"
+        />
         <span className="hint">
           Changes apply from the next Claude run. A part that runs on a different model from the one before starts a fresh Claude
           session that picks up from the progress checklist and handoff notes.

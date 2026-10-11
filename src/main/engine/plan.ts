@@ -97,7 +97,8 @@ export function buildPlan(doc: ProjectDoc, opts: PlanOptions): RenderPlan {
         id: s.id,
         trackId: s.trackId,
         role: 'voice',
-        path: src ? src.path : sourcePath(s.sourceId), // audio always from the original
+        // Sound from the original (or its cleaned copy), never from a processed picture.
+        path: src?.cleanAudio ? resolvePath(src.cleanAudio.file) : src ? src.path : sourcePath(s.sourceId),
         start: seg.start,
         end: seg.end,
         sourceIn: s.in,
@@ -149,7 +150,7 @@ export function buildPlan(doc: ProjectDoc, opts: PlanOptions): RenderPlan {
           id: item.id,
           trackId: item.trackId,
           role: 'broll',
-          path: src ? src.path : path,
+          path: src?.cleanAudio ? resolvePath(src.cleanAudio.file) : src ? src.path : path,
           start: r.start,
           end: r.end,
           sourceIn: item.in ?? 0,

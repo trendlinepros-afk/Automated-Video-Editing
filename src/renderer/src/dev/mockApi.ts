@@ -34,6 +34,7 @@ import {
 import { PIKZELS_PRICES_UPDATED, defaultPrices, effectivePrices } from '@shared/pikzelsPricing'
 import { ProfileSchema, SettingsSchema, type Pikzonality, type Profile, type Settings } from '@shared/settings'
 import { TimelineResolver } from '@shared/timeline'
+import { channelSummary, videoInsights, type RetentionPoint, type YouTubeStatus } from '@shared/retention'
 
 type Listener<T> = (v: T) => void
 
@@ -211,6 +212,7 @@ export function installMockApi(): void {
     updated: PIKZELS_PRICES_UPDATED,
     spend: { total: 4.21, byAction: { 'thumbnail:pkz_4_5': 3.38, score: 0.45, persona_training: 0.38 } }
   })
+  let yt: YouTubeStatus = { clientId: '', hasClientSecret: false, connected: false, connecting: false, channelTitle: '', videoCount: 0 }
   let pikzels: Pikzonality[] = [
     { id: 'pz1', kind: 'persona', name: 'Adam', status: 'completed', progress: 100, specialInstructions: '', createdAt: now(), sampleImage: placeholder('Adam', 30) },
     { id: 'pz2', kind: 'style', name: 'Bold RC', status: 'completed', progress: 100, specialInstructions: 'Always red text', createdAt: now() },
@@ -531,6 +533,8 @@ export function installMockApi(): void {
       introVersions: async () => ({ versions: [{ id: 'v_i1', name: 'Intro 1', createdAt: now() }], currentId: null }),
       useIntro: async () => undefined,
       setVideoTheme: async (id) => void commit((d) => void (d.project.videoTheme = id ? { id, name: themes.find((t) => t.id === id)?.name ?? '' } : null), 'user', 'Video theme'),
+      requestCleanVoice: async () => undefined,
+      useOriginalSound: async () => undefined,
       requestStabilize: async () => undefined,
       requestInsertClip: async () => undefined,
       requestShorts: async () => undefined,
@@ -656,6 +660,7 @@ export function installMockApi(): void {
       },
       remove: async (id) => void (library = library.filter((a) => a.id !== id)),
       placeInProject: async () => undefined,
+      importFiles: async (paths) => ({ added: [], skipped: paths.map((p) => `${p} (mock)`) }),
       changeFolder: async (dest: string) => {
         settings = { ...settings, libraryFolder: dest, libraryFolderConfirmed: true }
         return { moved: library.length, skipped: 0 }
@@ -712,7 +717,15 @@ export function installMockApi(): void {
       sample: async () => {
         await sleep(600)
         return 'C:\\mock\\voice-sample.mp3'
-      }
+      },
+      budget: async () => ({ usedSeconds: 72, limitSeconds: settings.voice.maxSecondsPerVideo ?? 120 }),
+      onApproval: (cb) => {
+        // With ?voiceask in the address, shows the question once so the popup can be seen.
+        if (!location.search.includes('voiceask')) return () => undefined
+        const t = setTimeout(() => cb({ id: 'vapr1', seconds: 34, usedSeconds: 104, limitSeconds: 120, text: 'Sixty-five dollars for a drift car with a real gyro. Let me show you what that gyro actually does.' }), 3000)
+        return () => clearTimeout(t)
+      },
+      answerApproval: async () => undefined
     },
     pikzels: {
       list: async () => pikzels,
@@ -736,6 +749,40 @@ export function installMockApi(): void {
       setPrices: async (o) => {
         priceOverrides = o ?? {}
         return mockPricing()
+      }
+    },
+    youtube: {
+      status: async () => ({ ...yt }),
+      setClient: async (clientId, secret) => {
+        yt = { ...yt, clientId, hasClientSecret: secret === undefined ? yt.hasClientSecret : !!secret }
+        return { ...yt }
+      },
+      connect: async () => {
+        await new Promise((r) => setTimeout(r, 600))
+        yt = { ...yt, connected: true, channelTitle: 'Wicked RC', videoCount: 42 }
+        return { ...yt }
+      },
+      disconnect: async () => {
+        yt = { ...yt, connected: false, channelTitle: '', videoCount: 0 }
+        return { ...yt }
+      },
+      insights: async () => {
+        const titles = ['Arrma Kraton 8S review', 'Traxxas X-Maxx bash day', 'Cheapest brushless truck?', 'Losi LMT long-term test', 'Best RC for kids 2026']
+        const videos = titles.map((title, i) => {
+          const duration = 600 + i * 90
+          const points: RetentionPoint[] = Array.from({ length: 100 }, (_, k) => {
+            const r = (k + 1) / 100
+            const intro = r < 0.04 ? r * 6 : 0.24 + (i % 2) * 0.03
+            const price = r > 0.3 + i * 0.02 ? 0.06 : 0
+            return { ratio: r, watch: Math.max(0.05, 1 - intro - price - r * 0.35), relative: 0.45 + i * 0.03 }
+          })
+          return videoInsights(
+            { id: `vid${i}`, title, publishedAt: now(), durationSec: duration, isShort: false, views: 20000 - i * 3000 },
+            points,
+            { views: 20000 - i * 3000, averageViewDurationSec: duration * (0.42 - i * 0.03), averageViewPct: 42 - i * 3 }
+          )
+        })
+        return { channel: 'Wicked RC', summary: channelSummary(videos, 4), videos, fetchedAt: now() }
       }
     }
   }

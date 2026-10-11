@@ -12,8 +12,8 @@
  */
 import { mkdirSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
-import type { VoiceStatus, VoiceoverRequest, VoiceoverResult } from '@shared/ipc'
-import type { Anchor, Item, Track } from '@shared/project'
+import type { VoiceApproval, VoiceBudget, VoiceStatus, VoiceoverRequest, VoiceoverResult } from '@shared/ipc'
+import type { Anchor, Item, Project, Track } from '@shared/project'
 import { TimelineResolver } from '@shared/timeline'
 import type { AppContext } from '../context'
 import { registerSecret } from '../log'
@@ -53,6 +53,29 @@ export function textForModel(text: string, model: string): string {
 
 /** The text without audio tags, for labels and logs. */
 export const spokenWords = (text: string) => text.replace(/\[[^\]\n]{1,40}\]/g, ' ').replace(/\s+/g, ' ').trim()
+
+// ---------------------------------------------------------------- the voiceover limit per video
+
+export const DEFAULT_VOICE_LIMIT_SECONDS = 120
+/** How long the owner has to answer before Claude is told to do without the line. */
+export const APPROVAL_TIMEOUT_MS = 10 * 60_000
+
+/** Seconds of voiceover in the project (every voiceover item on the timeline). */
+export function voiceSecondsUsed(project: Project): number {
+  return project.items.reduce((sum, i) => sum + (i.type === 'audio' && i.voiceover ? i.duration : 0), 0)
+}
+
+/** The limit for this video: Settings, or more if the owner approved more for it. */
+export function voiceLimitSeconds(project: Project, settingsLimit: number | undefined): number {
+  return Math.max(settingsLimit ?? DEFAULT_VOICE_LIMIT_SECONDS, project.voiceAllowanceSeconds ?? 0)
+}
+
+/** About how long a line takes to say: words at a relaxed talking pace, plus pauses. */
+export function estimateSeconds(text: string): number {
+  const words = spokenWords(text).split(' ').filter(Boolean).length
+  const pauses = (text.match(/\[(long )?pause\]/gi) ?? []).length * 0.7 + (text.match(/…|\.\.\./g) ?? []).length * 0.4
+  return Math.max(0.5, Math.round((words / 2.6 + pauses) * 10) / 10)
+}
 
 export class ElevenLabsError extends Error {
   constructor(
@@ -101,6 +124,14 @@ export interface VoiceService {
   speak(text: string, opts?: { model?: string; out: string }): Promise<{ file: string; model: string; characters: number; warning?: string }>
   generate(req: VoiceoverRequest & { source: 'user' | 'claude'; anchor?: Anchor }): Promise<VoiceoverResult>
   sample(text?: string): Promise<string>
+  budget(): VoiceBudget
+  /**
+   * Claude asks before a line takes the video past its voiceover limit: the owner sees how long it would be and
+   * allows or declines. Resolves true when allowed (the video's allowance grows to fit it), false when declined or
+   * not answered in time.
+   */
+  approveOverLimit(o: { seconds: number; text: string }): Promise<boolean>
+  answerApproval(id: string, allow: boolean): void
 }
 
 export function createVoiceService(ctx: AppContext, deps: VoiceDeps = {}): VoiceService {
@@ -200,8 +231,60 @@ export function createVoiceService(ctx: AppContext, deps: VoiceDeps = {}): Voice
     return { file: opts.out, model, characters: textForModel(text, model).length, ...(warning ? { warning } : {}) }
   }
 
+  // One question at a time; later ones wait their turn.
+  const pending: { approval: VoiceApproval; resolve: (allow: boolean) => void; timer?: ReturnType<typeof setTimeout> }[] = []
+  const showNext = () => {
+    const next = pending[0]
+    if (!next) return void ctx.send('voice:approval', null)
+    if (!next.timer) next.timer = setTimeout(() => settle(next.approval.id, false, 'no answer'), APPROVAL_TIMEOUT_MS)
+    ctx.send('voice:approval', next.approval)
+  }
+  const settle = (id: string, allow: boolean, why: string) => {
+    const at = pending.findIndex((p) => p.approval.id === id)
+    if (at < 0) return
+    const [p] = pending.splice(at, 1)
+    if (p.timer) clearTimeout(p.timer)
+    const store = ctx.projects.current()
+    if (allow && store) {
+      // Room for this line (with a little margin, since the real length differs from the estimate).
+      const want = Math.ceil((voiceSecondsUsed(store.project) + p.approval.seconds) * 1.1)
+      store.mutate('Allow more voiceover', 'user', (d) => {
+        d.project.voiceAllowanceSeconds = Math.max(d.project.voiceAllowanceSeconds ?? 0, want)
+      }, { bypassLock: true, noHistory: true })
+    }
+    log(`Voiceover over the limit ${allow ? 'allowed' : `declined (${why})`}`, { seconds: p.approval.seconds, used: p.approval.usedSeconds, limit: p.approval.limitSeconds })
+    p.resolve(allow)
+    showNext()
+  }
+
   return {
     hasKey: () => !!apiKey(),
+
+    budget() {
+      const store = ctx.projects.current()
+      if (!store) return { usedSeconds: 0, limitSeconds: settings().maxSecondsPerVideo ?? DEFAULT_VOICE_LIMIT_SECONDS }
+      return { usedSeconds: voiceSecondsUsed(store.project), limitSeconds: voiceLimitSeconds(store.project, settings().maxSecondsPerVideo) }
+    },
+
+    approveOverLimit(o) {
+      const store = ctx.projects.current()
+      if (!store) return Promise.resolve(false)
+      const approval: VoiceApproval = {
+        id: newId('vapr'),
+        seconds: o.seconds,
+        usedSeconds: Math.round(voiceSecondsUsed(store.project) * 10) / 10,
+        limitSeconds: voiceLimitSeconds(store.project, settings().maxSecondsPerVideo),
+        text: spokenWords(o.text)
+      }
+      return new Promise<boolean>((resolve) => {
+        pending.push({ approval, resolve })
+        if (pending.length === 1) showNext()
+      })
+    },
+
+    answerApproval(id, allow) {
+      settle(id, allow, 'the owner said no')
+    },
 
     async check() {
       const s = settings()

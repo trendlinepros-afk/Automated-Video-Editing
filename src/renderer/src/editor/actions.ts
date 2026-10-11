@@ -85,6 +85,18 @@ export function canStabilize(item: Item): boolean {
   return item.type === 'clip' && !!item.file && !/\.(png|jpe?g|webp|bmp|gif|tiff?)$/i.test(item.file)
 }
 
+/** Claude removes hum, wind or motor noise under the voice, for every clip from the same footage file. */
+export async function cleanVoice(item: Item, time: number): Promise<void> {
+  if (!canEdit(item.id)) return
+  try {
+    await window.api.project.requestCleanVoice({ itemId: item.id, time })
+  } catch (e) {
+    toast(`Could not send that: ${errorMessage(e)}`, { kind: 'error' })
+    return
+  }
+  toast('Claude will clean up the sound of this footage file (every clip from it). You can go back to the original sound any time.')
+}
+
 export async function stabilize(item: Item): Promise<void> {
   if (!canEdit(item.id)) return
   try {
@@ -182,6 +194,11 @@ export function itemMenu(e: ReactMouseEvent, item: Item, time: number): void {
   }
   if (canHaveAudio(item)) {
     entries.push({ label: 'Fix clipped audio', run: () => void fixAudio({ itemId: item.id, segmentId: item.type === 'segment' ? item.id : undefined, time }) })
+    const src = 'sourceId' in item && item.sourceId ? editor.get().snapshot?.doc.project.sources.find((s) => s.id === item.sourceId) : undefined
+    if (src && (src.hasAudio || src.kind === 'audio')) {
+      entries.push({ label: src.cleanAudio ? 'Clean up voice again' : 'Clean up voice (noise)', run: () => void cleanVoice(item, time) })
+      if (src.cleanAudio) entries.push({ label: 'Use the original sound', run: () => void call(() => window.api.project.useOriginalSound(item.id)) })
+    }
   }
   if (canSaveToLibrary(item)) entries.push({ label: 'Save to library…', run: () => openDialog({ kind: 'saveToLibrary', itemId: item.id }) })
   entries.push({ label: 'Leave a note for Claude…', run: () => openDialog({ kind: 'note', itemId: item.id }) })

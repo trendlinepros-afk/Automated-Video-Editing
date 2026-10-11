@@ -12,6 +12,9 @@ export const WORKFLOW = `How to work with the app (tools from the "ave" MCP serv
 
 - The project lives in the app. Make every change through the ave tools; never edit project.json yourself.
 - Start with get_requests, get_project, get_checklist, get_inspiration_and_scope and get_profile.
+- At the start of an edit, call get_channel_retention once to see where this channel's viewers stay and where they leave in past
+  videos (a long intro, a slow setup, after the price...). Turn it into decisions for this video (a tighter hook, a re-hook before the
+  usual drop spot); it is evidence, not a rule. If the channel is not connected, mention it once to the owner and carry on.
 - For each open request, oldest first: begin_request(id), do the work, reply_chat with a short plain-words summary
   (or a question when the request is unclear), then finish_request(id, summary).
 - A request with a time range is locked to that range: the app refuses any change outside it. Look at the frames in the
@@ -25,6 +28,8 @@ export const WORKFLOW = `How to work with the app (tools from the "ave" MCP serv
   time and call save_transcript for each as soon as it is done; when resuming, skip sources list_footage shows as transcribed.
   Keep your scratch files in the project's scratch folder (get_engine_info) so a new session can find and reuse them.
 - Anchor B-roll, graphics, effects, sound effects and chapters to transcript words, not fixed times.
+- To choose B-roll, thumbnail moments and highlights, search the footage index the app builds on its own (find_shots, get_footage_index)
+  and compare candidates in one look with get_shot_sheet; use get_frame only to confirm the final pick in place.
 - Captions on long-form videos are a tool, not wallpaper: caption the hook (about the first 3-6 seconds) and then only the
   moments where they pull attention back (a key number or price, a punchline or strong claim, the payoff, hard-to-hear speech, a
   re-hook). Choose them with set_caption_spans, usually 10-25 % of the video. Never caption a whole intro or the whole video unless
@@ -40,6 +45,13 @@ export const WORKFLOW = `How to work with the app (tools from the "ave" MCP serv
   video is shown best. Before request_thumbnails, pick that moment (check candidates with get_frame footage_only) and call
   save_thumbnail_draft with your best description and base_time; leave base_time out when get_project shows the owner grabbed
   one (thumbnails.base.by "user"). The base picture is sent with every thumbnail prompt.
+- Never use stock footage. When the video needs a shot that was not filmed (how a gyro works, inside a battery, a comparison),
+  draw it: an animated graphic or diagram in the channel's style, made for that moment.
+- Make sound effects yourself (synthesize them in Python, or shape and layer sounds with ffmpeg) to the exact length, timing and
+  character the moment needs. The owner's own sound files (tagged "owner file", e.g. Epidemic Sound) are in the library: use one
+  only when it would sound as good as what you would make, with no noticeable loss.
+- Distracting noise under the voice (hum, wind, motor whine, echo) can be cleaned locally: process the source's sound into a copy
+  of the same length and use set_clean_audio. Only when it clearly helps, and never at the cost of a thin or robotic voice.
 - Anything the tools cannot express, build with your own scripts (get_engine_info gives the Python and ffmpeg to use) and
   bring the finished file in with import_file.
 - Claude cannot hear the result: check audio by measurement (get_audio_energy, measure_loudness, transcribing snippets).`
@@ -206,6 +218,20 @@ export function requestSection(r: EditRequest, project: Project): string {
     case 'thumbnail_direction':
       lines.push(`New thumbnail direction from the owner: "${r.text}". Write new prompts that follow it and call request_thumbnails.`)
       break
+    case 'clean_voice': {
+      const c = (r.context ?? {}) as { sourceId?: string; itemId?: string }
+      lines.push(
+        `Clean up the sound of source ${c.sourceId ?? '(see the attached context)'}${r.range ? ` (the owner pointed at ${rangeText(r.range)})` : ''}: ` +
+          'remove what distracts from the voice (fan or AC hum, wind, motor whine, hiss, room echo) without making the voice thin, ' +
+          'watery or robotic. Measure first: find pauses with get_audio_energy and listen by measurement to what the noise is (its level ' +
+          'and where its energy sits). Process the WHOLE source into one file of exactly the same length and timing (e.g. ffmpeg: highpass ' +
+          'around 70-90 Hz, then afftdn with a noise profile from a pause or anlmdn, gentle settings; or a spectral gate in Python), never ' +
+          'trimming or shifting it. Compare a few seconds of speech before and after (energy and a transcription of each must match), then ' +
+          'call set_clean_audio with the file. If the noise cannot be reduced without hurting the voice, say so and leave it.'
+      )
+      if (r.text.trim()) lines.push(`Note from the owner: "${r.text.trim()}"`)
+      break
+    }
     case 'thumbnail_draft': {
       const c = (r.context ?? {}) as { persona?: string; style?: string; keepBase?: boolean }
       lines.push(
@@ -242,12 +268,17 @@ export function requestSection(r: EditRequest, project: Project): string {
 }
 
 /** The prompt for one run: every open request, oldest first. */
-export function buildRunPrompt(requests: EditRequest[], project: Project, opts: { resumed: boolean }): string {
+export function buildRunPrompt(requests: EditRequest[], project: Project, opts: { resumed: boolean; small?: boolean }): string {
   const intro = opts.resumed
     ? 'New work from the owner in this project. Call get_requests and get_checklist first.'
     : 'You are connected to the video editor app through the "ave" MCP tools. Call get_requests, get_project and get_checklist first.'
   const inFlight = project.checklist.find((c) => c.status === 'in_progress')
-  const resumeNote = inFlight ? `\nThe checklist shows "${inFlight.label}" in progress: continue from there and do not redo finished stages.` : ''
+  const resumeNote = opts.small
+    ? '\nThis is a fresh session for the requests below only: get_project has the handoff notes from the edit so far. Do not work on ' +
+      'unfinished checklist stages; the app runs those separately.'
+    : inFlight
+      ? `\nThe checklist shows "${inFlight.label}" in progress: continue from there and do not redo finished stages.`
+      : ''
   const body = requests.map((r) => requestSection(r, project)).join('\n\n')
   const theme = project.videoTheme
     ? `\nVideo theme: "${project.videoTheme.name}". Edit to a similar pace and style as its reference videos. Call get_video_theme before ` +

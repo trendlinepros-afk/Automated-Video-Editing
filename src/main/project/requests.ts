@@ -26,6 +26,7 @@ export const REQUEST_LABELS: Record<RequestKind, string> = {
   publish_regen: 'publishing pack update',
   thumbnail_direction: 'thumbnail direction',
   thumbnail_draft: 'thumbnail description',
+  clean_voice: 'voice clean-up',
   resume: 'resume'
 }
 

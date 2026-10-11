@@ -42,13 +42,34 @@ def frames(ffmpeg: str, path: str, start: float, dur: float) -> tuple[np.ndarray
     return data[: n * W * h].reshape(n, h, W), W, h
 
 
-def detector():
+def detector(model: str | None = None):
+    """A function giving the face boxes (x, y, w, h) in a grey frame, or None without a detector.
+
+    The Haar cascade when OpenCV has it (OpenCV 4); OpenCV 5 dropped it, so then the YuNet model file (--face-model).
+    """
     try:
         import cv2
-        c = cv2.CascadeClassifier(os.path.join(cv2.data.haarcascades, 'haarcascade_frontalface_default.xml'))
-        return None if c.empty() else c
     except Exception:  # noqa: BLE001
         return None
+    if hasattr(cv2, 'CascadeClassifier') and hasattr(cv2, 'data'):
+        c = cv2.CascadeClassifier(os.path.join(cv2.data.haarcascades, 'haarcascade_frontalface_default.xml'))
+        if not c.empty():
+            def haar(f: np.ndarray) -> list:
+                h = f.shape[0]
+                return list(c.detectMultiScale(f, scaleFactor=1.15, minNeighbors=5, minSize=(max(12, h // 12), max(12, h // 12))))
+            return haar
+    if model and os.path.exists(model) and hasattr(cv2, 'FaceDetectorYN'):
+        try:
+            det = cv2.FaceDetectorYN.create(model, '', (320, 320), 0.7, 0.3, 50)
+        except Exception:  # noqa: BLE001
+            return None
+
+        def yunet(f: np.ndarray) -> list:
+            det.setInputSize((f.shape[1], f.shape[0]))
+            _, found = det.detect(cv2.cvtColor(f, cv2.COLOR_GRAY2BGR))
+            return [] if found is None else [tuple(int(v) for v in r[:4]) for r in found]
+        return yunet
+    return None
 
 
 def subject_path(fr: np.ndarray, w: int, h: int, faces) -> tuple[list[tuple[float, float]], str]:
@@ -58,7 +79,7 @@ def subject_path(fr: np.ndarray, w: int, h: int, faces) -> tuple[list[tuple[floa
     for f in fr:
         point = None
         if faces is not None:
-            found = faces.detectMultiScale(f, scaleFactor=1.15, minNeighbors=5, minSize=(max(12, h // 12), max(12, h // 12)))
+            found = faces(f)
             if len(found):
                 x, y, fw, fh = max(found, key=lambda r: r[2] * r[3])
                 point = ((x + fw / 2) / w, (y + fh / 2) / h)
@@ -95,10 +116,11 @@ def main() -> None:
     p = argparse.ArgumentParser()
     p.add_argument('--ffmpeg', default='ffmpeg')
     p.add_argument('--segments', required=True)
+    p.add_argument('--face-model', default=None, help='YuNet .onnx (needed with OpenCV 5, which has no Haar cascades)')
     a = p.parse_args()
     try:
         segs = json.load(open(a.segments, encoding='utf-8'))
-        faces = detector()
+        faces = detector(a.face_model)
         result = []
         for i, s in enumerate(segs):
             emit('progress', message=f'Finding the subject ({i + 1} of {len(segs)})', done=i, total=len(segs))

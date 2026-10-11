@@ -68,6 +68,8 @@ export const SettingsSchema = z.looseObject({
     /** All-time Pikzels spend on this PC (successful calls only). */
     spend: PikzelsSpendSchema.default({ total: 0, byAction: {} })
   }).default({ model: 'pkz_4_5', pikzonalities: [], prices: {}, spend: { total: 0, byAction: {} } }),
+  /** Transcribing: the speech model on this PC hears the audio; Claude proofreads its text unless turned off. */
+  transcription: z.looseObject({ proofread: z.boolean().default(true) }).default({ proofread: true }),
   /**
    * Voiceovers made with ElevenLabs. Always the owner's own voice, found by name (its id is remembered, and found
    * again by name if the voice is recreated). No voice settings are sent: the voice's own settings at ElevenLabs apply.
@@ -76,8 +78,10 @@ export const SettingsSchema = z.looseObject({
     voiceName: z.string().default('Adam V3 Pro'),
     voiceId: z.string().default(''),
     /** eleven_v3 and eleven_v4 understand audio tags such as [excited]; the others speak them as words, so the app removes them. */
-    model: z.string().default('eleven_v3')
-  }).default({ voiceName: 'Adam V3 Pro', voiceId: '', model: 'eleven_v3' }),
+    model: z.string().default('eleven_v3'),
+    /** Voiceover Claude may add to one video without asking; past it, the owner approves each line. */
+    maxSecondsPerVideo: z.number().min(0).default(120)
+  }).default({ voiceName: 'Adam V3 Pro', voiceId: '', model: 'eleven_v3', maxSecondsPerVideo: 120 }),
   /** Claude model per part of the edit, and what runs have cost on this PC. */
   claude: z.looseObject({
     /** Section id -> model id ('' = Claude Code's default). Missing sections use the recommended model. */
@@ -87,6 +91,13 @@ export const SettingsSchema = z.looseObject({
     /** All-time Claude cost on this PC as reported by Claude Code (API-equivalent USD). */
     totalUsd: z.number().default(0)
   }).default({ models: {}, stats: {}, totalUsd: 0 }),
+  /** The owner's own YouTube channel, read-only (audience retention for Claude). The client secret and sign-in are in the secrets store. */
+  youtube: z.looseObject({
+    clientId: z.string().default(''),
+    channelId: z.string().default(''),
+    channelTitle: z.string().default(''),
+    videoCount: z.number().default(0)
+  }).default({ clientId: '', channelId: '', channelTitle: '', videoCount: 0 }),
   setupDone: z.boolean().default(false),
   previewHeight: z.number().int().default(540),
   previewFps: z.number().default(30)

@@ -3,14 +3,14 @@
  *
  * The app runs an edit as stages; consecutive stages on the same model run as one Claude Code session, and a
  * change of model starts a new session that picks up from the progress checklist and handoff notes. Defaults use
- * Opus everywhere quality can show, and a cheaper model only for transcribing, where the model makes no difference.
+ * Opus everywhere quality can show, and Sonnet for proofreading the transcript, where Opus adds nothing.
  */
 import type { RequestKind, StageId } from './project'
 
 export const CLAUDE_MODELS = [
   { id: 'claude-opus-5-5', label: 'Opus 5.5', note: 'Best judgment. Cuts, timing, open-ended requests.' },
   { id: 'claude-sonnet-5-5', label: 'Sonnet 5.5', note: 'Half the price of Opus; less taste in creative work.' },
-  { id: 'claude-haiku-4-5', label: 'Haiku 4.5', note: 'Fastest and cheapest. Only for running a program, like transcribing.' },
+  { id: 'claude-haiku-4-5', label: 'Haiku 4.5', note: 'Fastest and cheapest. Only for running a program.' },
   { id: '', label: 'Claude Code default', note: 'Whatever model Claude Code is set to use.' }
 ] as const
 
@@ -27,7 +27,7 @@ export const MODEL_PRICES_UPDATED = '2026-09-25'
 
 /** Parts of the work that can each have their own model. */
 export const MODEL_SECTIONS = [
-  { id: 'transcript', label: 'Transcribing', detail: 'Runs faster-whisper on your GPU and hands the transcript file to the app. No judgment needed.', stage: true },
+  { id: 'transcript', label: 'Transcribing', detail: 'The speech model on your GPU hears the audio; Claude proofreads the text (names, numbers, invented words).', stage: true },
   { id: 'cuts', label: 'Cutting', detail: 'Chooses takes, removes dead space, writes the edit decision list and the plan for graphics and sound.', stage: true },
   { id: 'broll', label: 'B-roll', detail: 'Chooses and times cutaways against the words.', stage: true },
   { id: 'graphics', label: 'Graphics', detail: 'Writes the graphic code files and places them from the plan made while cutting.', stage: true },
@@ -47,11 +47,11 @@ export type ModelSection = (typeof MODEL_SECTIONS)[number]['id']
 
 /**
  * Recommended: Opus 5.5 for every part where judgment or taste shows in the video, including graphics, music,
- * captions, thumbnails and titles. The only exception is transcribing: there Claude just runs faster-whisper on
- * the GPU and hands the app the file it wrote, so the transcript is the same whichever model starts it.
+ * captions, thumbnails and titles. The exception is transcribing: the speech model on the GPU hears the audio and
+ * Claude proofreads its text, which Sonnet does as well as Opus at half the price.
  */
 export const RECOMMENDED_MODELS: Record<ModelSection, ClaudeModelId> = {
-  transcript: 'claude-haiku-4-5',
+  transcript: 'claude-sonnet-5-5',
   cuts: 'claude-opus-5-5',
   broll: 'claude-opus-5-5',
   graphics: 'claude-opus-5-5',
@@ -85,6 +85,7 @@ export function sectionForRequest(kind: RequestKind): ModelSection | null {
     case 'insert_clip':
       return 'reedit'
     case 'fix_audio':
+    case 'clean_voice':
       return 'fix_audio'
     case 'stabilize':
       return 'stabilize'

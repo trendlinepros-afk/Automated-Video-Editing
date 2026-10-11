@@ -46,6 +46,8 @@ export interface RuntimeManifest {
   ffmpeg: PinnedDownload
   /** yt-dlp, downloaded the first time a video theme is made from a YouTube link. */
   ytdlp?: PinnedDownload & { version: string }
+  /** The YuNet face detector (OpenCV model zoo), downloaded the first time footage is indexed or a Short is framed. */
+  faceModel?: PinnedDownload & { version: string }
   [k: string]: unknown
 }
 
@@ -673,6 +675,36 @@ export function createEnvironmentService(ctx: AppContext): EnvironmentService {
     return exe
   }
 
+  /**
+   * The face detector model for the footage index and Shorts framing (OpenCV 5 no longer ships one). Downloaded once,
+   * pinned and checked like ffmpeg. Null when it cannot be had: faces are then simply not checked.
+   */
+  let faceModelJob: Promise<string | null> | null = null
+  const faceModel = async (): Promise<string | null> => {
+    if (process.env.AVE_FACE_MODEL) return process.env.AVE_FACE_MODEL
+    const m = manifest()
+    if (!m.faceModel?.url) return null
+    const dir = join(paths.toolsDir, 'models')
+    const file = join(dir, 'face_detection_yunet_2023mar.onnx')
+    if (existsSync(file)) return file
+    faceModelJob ??= (async () => {
+      const tmp = `${file}.download-${randomBytes(3).toString('hex')}`
+      try {
+        mkdirSync(dir, { recursive: true })
+        await downloadPinned(m.faceModel!, tmp, () => undefined)
+        renameSync(tmp, file)
+        return file
+      } catch (err) {
+        ctx.appLog.write('error', 'The face detector model could not be downloaded; faces are not checked', { error: String((err as Error)?.message ?? err) })
+        return null
+      } finally {
+        rmSync(tmp, { force: true })
+        faceModelJob = null
+      }
+    })()
+    return faceModelJob
+  }
+
   /** The style analysis script (not part of the versioned render engine: it changes nothing in projects). */
   const analysisScript = (): string => join(bundledEngine(), 'analysis', 'style.py')
 
@@ -684,6 +716,7 @@ export function createEnvironmentService(ctx: AppContext): EnvironmentService {
     ffprobe,
     engineDir,
     ytdlp,
+    faceModel,
     analysisScript,
     hasGpu: async () => (await gpu()).ok
   }

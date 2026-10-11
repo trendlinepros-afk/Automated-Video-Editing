@@ -14,6 +14,7 @@ import { changeLibraryFolder } from '../components/LibraryFolder'
 import { VideoThemesSection } from '../settings/VideoThemesSection'
 import { fmt, mediaUrl } from '../util'
 import { VOICE_MODELS, voiceStatusLine } from '../voice'
+import { YouTubeChannelSection } from '../settings/YouTubeChannelSection'
 import { PriceEditor } from '../panels/ThumbnailsPanelCosts'
 
 const SECTIONS: [SettingsSection, string][] = [
@@ -158,6 +159,7 @@ function General() {
       </div>
       <PriceEditor />
       <ElevenLabs />
+      <YouTubeChannelSection />
       <FolderRow
         label="Asset library folder"
         hint="Every graphic, animation, song and sound effect Claude makes is saved here. Any drive works, including a synced one. Changing it asks whether to move the saved assets too."
@@ -306,6 +308,23 @@ function ElevenLabs() {
           ))}
         </select>
       </div>
+      <div className="field-row">
+        <label className="label">Limit per video</label>
+        <select
+          value={voice.maxSecondsPerVideo ?? 120}
+          onChange={(e) => void updateSettings({ voice: { ...voice, maxSecondsPerVideo: Number(e.target.value) } })}
+        >
+          {[0, 30, 60, 120, 180, 300, 600].map((sec) => (
+            <option key={sec} value={sec}>
+              {sec === 0 ? 'Always ask' : sec < 60 ? `${sec} seconds` : `${sec / 60} minute${sec === 60 ? '' : 's'}`}
+            </option>
+          ))}
+        </select>
+      </div>
+      <span className="hint">
+        Claude adds voiceover freely up to this much per video. A line that would go past it pops up a question with how long it would be;
+        if you say no, Claude finds another way.
+      </span>
       <div className="row">
         <button className="btn" disabled={!hasKey || checking} onClick={() => void check()}>
           {checking ? 'Checking…' : 'Check'}

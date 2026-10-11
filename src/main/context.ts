@@ -18,10 +18,13 @@
  *   runner/runner.ts       -> RunnerService
  *   services/library.ts    -> LibraryService
  *   services/pikzels.ts    -> PikzelsService
+ *   services/youtubeAnalytics.ts -> YouTubeAnalyticsService (the owner's channel retention, read-only)
  *   updater.ts             -> UpdaterService
  */
 import type { VideoThemesService } from './services/videoThemes'
+import type { YouTubeAnalyticsService } from './services/youtubeAnalytics'
 import type { ShortsService } from './shorts/service'
+import type { FootageIndexService } from './services/footageIndex'
 import type {
   ExportPreset,
   ProjectDoc,
@@ -71,8 +74,8 @@ export interface ProfileService {
 
 export interface SecretsService {
   /** Encrypted with Windows credential protection (Electron safeStorage). Never logged. */
-  get(name: 'pikzels' | 'elevenlabs' | 'mcpToken' | 'githubToken'): string | null
-  set(name: 'pikzels' | 'elevenlabs' | 'mcpToken' | 'githubToken', value: string | null): void
+  get(name: 'pikzels' | 'elevenlabs' | 'mcpToken' | 'githubToken' | 'googleClientSecret' | 'googleRefreshToken'): string | null
+  set(name: 'pikzels' | 'elevenlabs' | 'mcpToken' | 'githubToken' | 'googleClientSecret' | 'googleRefreshToken', value: string | null): void
 }
 
 export interface RecentService {
@@ -141,6 +144,8 @@ export interface EnvironmentService {
   engineDir(version: string): string
   /** yt-dlp, downloaded on first use. */
   ytdlp(onPercent?: (pct: number) => void): Promise<string>
+  /** The face detector model file, downloaded on first use; null when unavailable (faces are then not checked). */
+  faceModel(): Promise<string | null>
   /** engine/analysis/style.py from the app's own files. */
   analysisScript(): string
   hasGpu(): Promise<boolean>
@@ -300,8 +305,11 @@ export interface AppContext {
   library: LibraryService
   themes: VideoThemesService
   shorts: ShortsService
+  /** services/footageIndex.ts: shots of every video source, measured once per project. */
+  footage: FootageIndexService
   pikzels: PikzelsService
   voice: VoiceService
+  youtube: YouTubeAnalyticsService
   updater: UpdaterService
   /** Send an event to the window (no-op when no window is open). */
   send(channel: string, payload: unknown): void

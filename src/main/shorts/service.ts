@@ -70,7 +70,8 @@ export function createShortsService(ctx: AppContext): ShortsService {
     let result: { points: { t: number; x: number; y: number }[] }[] | null = null
     let error = ''
     const script = ctx.env.analysisScript().replace(/style\.py$/, 'reframe.py')
-    await spawnLines(ctx.env.python(), [script, '--ffmpeg', ctx.env.ffmpeg(), '--segments', file], {
+    const face = await Promise.resolve(ctx.env.faceModel?.()).catch(() => null)
+    await spawnLines(ctx.env.python(), [script, '--ffmpeg', ctx.env.ffmpeg(), '--segments', file, ...(face ? ['--face-model', face] : [])], {
       env: { ...process.env, PYTHONUNBUFFERED: '1', PYTHONIOENCODING: 'utf-8' },
       onLine: (line) => {
         try {

@@ -1,8 +1,8 @@
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { buildPlan } from '../src/main/engine/plan'
-import { ELEVENLABS_API, createVoiceService, plainVoiceError, textForModel } from '../src/main/services/elevenlabs'
+import { APPROVAL_TIMEOUT_MS, ELEVENLABS_API, createVoiceService, estimateSeconds, plainVoiceError, textForModel, voiceSecondsUsed } from '../src/main/services/elevenlabs'
 import { cleanupTemps, fakeContext, makeProject } from './helpers/project'
 
 afterEach(cleanupTemps)
@@ -124,5 +124,61 @@ describe('ElevenLabs voiceovers', () => {
     const status = await createVoiceService(ctx, { fetch: fakeEleven().fn }).check()
     expect(status).toMatchObject({ ok: true, voiceId: 'ZhsORgwxhA7q6YKjJ9lg', model: 'eleven_v3', tier: 'creator', charactersUsed: 1200, characterLimit: 100000 })
     expect(status.resetsAt).toBe(new Date(1793000000 * 1000).toISOString())
+  })
+})
+
+describe('voiceover limit per video', () => {
+  it('estimates how long a line takes to say', () => {
+    expect(estimateSeconds('[excited] Sixty-five dollars for THIS? Let us find out.')).toBe(3.1) // 8 words
+    expect(estimateSeconds('[pause] Okay… go')).toBe(1.9) // 2 words + pause + ellipsis
+  })
+
+  it('asks the owner past the limit, grows the allowance when allowed, and says no when declined or unanswered', async () => {
+    vi.useFakeTimers()
+    try {
+      const { store, ctx } = setup()
+      const sent: { channel: string; payload: any }[] = []
+      ctx.send = (channel: string, payload: unknown) => sent.push({ channel, payload })
+      const voice = createVoiceService(ctx, { fetch: fakeEleven().fn })
+      // 110 s of voiceover already in the video.
+      store.mutate('vo', 'user', (d) => void d.project.items.push({ id: 'vo1', trackId: 'sfx', type: 'audio', createdBy: 'claude', anchor: { kind: 'time', time: 0 }, duration: 110, file: 'a.mp3', in: 0, volume: 0, fadeIn: 0, fadeOut: 0, duck: false, loop: false, voiceover: true } as any))
+      expect(voice.budget()).toEqual({ usedSeconds: 110, limitSeconds: 120 })
+
+      const allowed = voice.approveOverLimit({ seconds: 20, text: '[curious] What does the gyro do?' })
+      const ask = sent.at(-1)!
+      expect(ask.channel).toBe('voice:approval')
+      expect(ask.payload).toMatchObject({ seconds: 20, usedSeconds: 110, limitSeconds: 120, text: 'What does the gyro do?' })
+      voice.answerApproval(ask.payload.id, true)
+      expect(await allowed).toBe(true)
+      expect(store.project.voiceAllowanceSeconds).toBe(Math.ceil(130 * 1.1))
+      expect(sent.at(-1)).toEqual({ channel: 'voice:approval', payload: null })
+
+      const declined = voice.approveOverLimit({ seconds: 60, text: 'A long one' })
+      voice.answerApproval(sent.at(-1)!.payload.id, false)
+      expect(await declined).toBe(false)
+      expect(store.project.voiceAllowanceSeconds).toBe(143)
+
+      // Nobody answers: after 10 minutes it counts as no.
+      const unanswered = voice.approveOverLimit({ seconds: 60, text: 'Anyone there?' })
+      vi.advanceTimersByTime(APPROVAL_TIMEOUT_MS + 1)
+      expect(await unanswered).toBe(false)
+      expect(voiceSecondsUsed(store.project)).toBe(110)
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('asks one question at a time', async () => {
+    const { ctx } = setup()
+    const sent: any[] = []
+    ctx.send = (_c: string, p: unknown) => sent.push(p)
+    const voice = createVoiceService(ctx, { fetch: fakeEleven().fn })
+    const a = voice.approveOverLimit({ seconds: 200, text: 'first' })
+    const b = voice.approveOverLimit({ seconds: 200, text: 'second' })
+    expect(sent.filter(Boolean).map((p) => p.text)).toEqual(['first'])
+    voice.answerApproval(sent.at(-1).id, false)
+    expect(sent.at(-1).text).toBe('second') // the next question shows once the first is answered
+    voice.answerApproval(sent.at(-1).id, true)
+    expect([await a, await b]).toEqual([false, true])
   })
 })

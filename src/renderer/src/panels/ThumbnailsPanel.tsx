@@ -9,7 +9,7 @@ import type { PikzelsPricing } from '@shared/ipc'
 import { PIKZELS_MODELS, PIKZELS_MODEL_LABELS, formatUsd, supportsPikzonality } from '@shared/pikzelsPricing'
 import type { Thumbnail } from '@shared/project'
 import type { Pikzonality } from '@shared/settings'
-import { app, call, go, openSettings, toast } from '../state/app'
+import { app, call, go, openSettings, toast, updateSettings } from '../state/app'
 import { applyOp, editor } from '../state/editor'
 import { seek } from '../state/player'
 import { useStore } from '../state/store'
@@ -36,6 +36,7 @@ export function ThumbnailsPanel() {
   const [tool, setTool] = useState<ToolName | null>(null)
   const [targetId, setTargetId] = useState<string | null>(null)
   const [pricing, reloadPricing] = usePikzelsPricing(th.spend?.total)
+  const autoScore = useStore(app, (s) => s.settings?.pikzels.autoScore !== false)
   const target = th.items.find((t) => t.id === targetId) ?? null
   const pikzOk = supportsPikzonality(model)
   const openTool = (name: ToolName, id?: string) => {
@@ -212,6 +213,14 @@ export function ThumbnailsPanel() {
           disabled={ro}
           onChange={(v) => patch({ useMyDirection: v, direction: prompt })}
           label="Use my direction: Claude follows this text when it writes thumbnail prompts"
+        />
+        <Toggle
+          checked={autoScore}
+          onChange={(v) => {
+            const pikzels = app.get().settings?.pikzels
+            if (pikzels) void updateSettings({ pikzels: { ...pikzels, autoScore: v } })
+          }}
+          label={`Score every new thumbnail automatically${costLabel(pricing, 'score') ? ` (${costLabel(pricing, 'score').replace(/^\s*·\s*/, '')} each)` : ''}`}
         />
       </div>
 

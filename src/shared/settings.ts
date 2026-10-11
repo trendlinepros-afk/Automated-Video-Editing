@@ -66,8 +66,10 @@ export const SettingsSchema = z.looseObject({
     /** The owner's price overrides (USD per call), keyed as in shared/pikzelsPricing.ts. */
     prices: z.record(z.string(), z.number()).default({}),
     /** All-time Pikzels spend on this PC (successful calls only). */
-    spend: PikzelsSpendSchema.default({ total: 0, byAction: {} })
-  }).default({ model: 'pkz_4_5', pikzonalities: [], prices: {}, spend: { total: 0, byAction: {} } }),
+    spend: PikzelsSpendSchema.default({ total: 0, byAction: {} }),
+    /** Score every new thumbnail as soon as it is made (about 3 cents each), against the first title option. */
+    autoScore: z.boolean().default(true)
+  }).default({ model: 'pkz_4_5', pikzonalities: [], prices: {}, spend: { total: 0, byAction: {} }, autoScore: true }),
   /** Transcribing: the speech model on this PC hears the audio; Claude proofreads its text unless turned off. */
   transcription: z.looseObject({ proofread: z.boolean().default(true) }).default({ proofread: true }),
   /**

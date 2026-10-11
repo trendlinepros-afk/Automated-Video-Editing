@@ -3,6 +3,10 @@
 Each release's section becomes its GitHub release text and the notes shown in the app's update dialog.
 A release is blocked until the section for its version has notes.
 
+## 1.11.1
+
+- **Thumbnails are scored automatically.** Every new thumbnail is scored by Pikzels against your first title option as soon as it is made (about 3 cents each), so the options can be compared at a glance and Claude uses the score and suggestion to write better prompts. Turn it off with the switch in the Thumbnails tab.
+
 ## 1.11.0
 
 - **Better transcripts.** The speech model on your PC now runs with guards against invented words (only real speech is transcribed, no carried-over text, filler like "Thank you." over silence dropped, loops cut back), and Claude proofreads the result: names, numbers, prices and anything said where nobody was talking. Proofreading runs on Sonnet 5.5 and can be turned off in Settings > Claude models.

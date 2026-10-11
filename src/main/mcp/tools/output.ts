@@ -16,7 +16,7 @@ export const PROMPT_WARN_CHARS = 750
 const THUMBNAIL_WAIT_MS = 240_000
 
 /** Last known state of each export job, per app. */
-const thumbView = (t: Thumbnail) => ({ id: t.id, kind: t.kind, status: t.status, file: t.file, error: t.error, warning: t.warning, cost: t.cost, requestId: t.requestId })
+const thumbView = (t: Thumbnail) => ({ id: t.id, kind: t.kind, status: t.status, file: t.file, error: t.error, warning: t.warning, cost: t.cost, requestId: t.requestId, ...(t.score ? { score: t.score.main, suggestion: t.score.suggestion } : {}) })
 
 const jobStates = new WeakMap<AppContext, Map<string, RenderJobState>>()
 
@@ -38,7 +38,9 @@ export const outputTools = [
       'Generate thumbnail options through Pikzels, one prompt per option (1 to 3; the project count is in get_profile thumbnailDefaults). ' +
       "Write each prompt from the video's transcript and content, following the channel's thumbnail direction. The project's persona and " +
       'style are added by the app. reference_time attaches a frame of the video at that timeline time as a reference image. Keep prompts ' +
-      `under ${PROMPT_WARN_CHARS} characters; links are removed. Images are downloaded into thumbnails/ and shown in the Thumbnails tab.`,
+      `under ${PROMPT_WARN_CHARS} characters; links are removed. Images are downloaded into thumbnails/ and shown in the Thumbnails tab. ` +
+      'Each new image is scored by Pikzels automatically (score and suggestion are in the result) unless the owner turned that off; ' +
+      'use them to improve the next prompt, and do not call score_thumbnail again for these.',
     input: {
       prompts: z.array(z.string().min(1)).min(1).max(3),
       reference_time: z.number().min(0).optional(),
@@ -57,7 +59,7 @@ export const outputTools = [
       await Promise.race([job, new Promise<void>((res) => setTimeout(() => { timedOut = true; res() }, THUMBNAIL_WAIT_MS).unref?.())])
       const made = env.store.project.thumbnails.items
         .filter((t) => t.createdAt >= since && t.source === 'claude')
-        .map((t) => ({ id: t.id, status: t.status, file: t.file, error: t.error, requestId: t.requestId }))
+        .map((t) => ({ id: t.id, status: t.status, file: t.file, error: t.error, requestId: t.requestId, ...(t.score ? { score: t.score.main, suggestion: t.score.suggestion } : {}) }))
       return json({
         thumbnails: made,
         ...(timedOut ? { note: 'Still generating; the images will appear in the Thumbnails tab.' } : {}),

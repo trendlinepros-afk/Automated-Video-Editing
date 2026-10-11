@@ -24,6 +24,7 @@
 import type { VideoThemesService } from './services/videoThemes'
 import type { YouTubeAnalyticsService } from './services/youtubeAnalytics'
 import type { ShortsService } from './shorts/service'
+import type { FootageIndexService } from './services/footageIndex'
 import type {
   ExportPreset,
   ProjectDoc,
@@ -302,6 +303,8 @@ export interface AppContext {
   library: LibraryService
   themes: VideoThemesService
   shorts: ShortsService
+  /** services/footageIndex.ts: shots of every video source, measured once per project. */
+  footage: FootageIndexService
   pikzels: PikzelsService
   voice: VoiceService
   youtube: YouTubeAnalyticsService

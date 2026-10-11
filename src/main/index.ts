@@ -26,6 +26,7 @@ import { createCorrectionsService } from './services/corrections'
 import { DEFAULT_LIBRARY_FOLDER_NAME, createLibraryService } from './services/library'
 import { createVideoThemesService } from './services/videoThemes'
 import { createShortsService } from './shorts/service'
+import { createFootageIndexService } from './services/footageIndex'
 import { createMusicService } from './services/music'
 import { createPikzelsService } from './services/pikzels'
 import { createVoiceService } from './services/elevenlabs'
@@ -132,6 +133,7 @@ function buildContext(log: ActivityLog): AppContext {
   c.library = createLibraryService(c)
   c.themes = createVideoThemesService(c)
   c.shorts = createShortsService(c)
+  c.footage = createFootageIndexService(c)
   c.pikzels = createPikzelsService(c)
   c.voice = createVoiceService(c)
   c.youtube = createYouTubeAnalyticsService(c, { openExternal: (url) => shell.openExternal(url) })
@@ -283,6 +285,8 @@ async function start(): Promise<void> {
   protocol.handle(MEDIA_PROTOCOL, (req) => serveMedia(req))
   registerIpc(c, () => mainWindow)
   forwardEvents(c)
+  // The footage index follows the open project and analyses new footage in the background.
+  c.footage.start()
 
   // Claude can connect from the moment the app is up.
   try {

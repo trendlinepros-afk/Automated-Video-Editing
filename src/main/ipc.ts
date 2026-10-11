@@ -7,7 +7,7 @@ import { copyFileSync, existsSync, mkdirSync } from 'node:fs'
 import { basename, extname, isAbsolute, join } from 'node:path'
 import { APP_NAME, MCP_SERVER_NAME } from '@shared/appInfo'
 import { API_METHODS, type ApiMethod } from '@shared/ipcChannels'
-import type { EditThumbnailRequest, FaceSwapRequest, LibraryAsset, ProjectSnapshot, RecreateRequest, ThumbnailRequest, TitlesRequest, UserOp } from '@shared/ipc'
+import type { EditThumbnailRequest, FaceSwapRequest, LibraryAsset, ProjectSnapshot, RecreateRequest, ThumbnailRequest, TitlesRequest, UserOp, VoiceoverRequest } from '@shared/ipc'
 import type { ExportPreset, Item, Range, RequestKind, TrackKind } from '@shared/project'
 import type { Profile, Settings } from '@shared/settings'
 import { TimelineResolver, findTimeRange, formatTime, placeSegments } from '@shared/timeline'
@@ -140,6 +140,16 @@ export function registerIpc(ctx: AppContext, getWindow: () => BrowserWindow | nu
     'settings.update': (patch: Partial<Settings>) => ctx.settings.update(patch),
     'settings.setPikzelsKey': (key: string | null) => ctx.secrets.set('pikzels', key),
     'settings.hasPikzelsKey': () => !!ctx.secrets.get('pikzels'),
+    'settings.setElevenLabsKey': (key: string | null) => {
+      ctx.secrets.set('elevenlabs', key)
+      // A new key may belong to another account: find the voice by name again.
+      const v = ctx.settings.get().voice
+      if (v?.voiceId) ctx.settings.update({ voice: { ...v, voiceId: '' } })
+    },
+    'settings.hasElevenLabsKey': () => !!ctx.secrets.get('elevenlabs'),
+    'voice.check': () => ctx.voice.check(),
+    'voice.generate': (req: VoiceoverRequest) => ctx.voice.generate({ ...req, source: 'user' }),
+    'voice.sample': (text?: string) => ctx.voice.sample(text),
     'settings.openAppLog': () => {
       if (existsSync(paths.appLog)) shell.showItemInFolder(paths.appLog)
       else void shell.openPath(join(paths.data, 'logs'))

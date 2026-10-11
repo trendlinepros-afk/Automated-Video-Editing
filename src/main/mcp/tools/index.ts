@@ -7,6 +7,7 @@ import { outputTools } from './output'
 import { placeTools } from './place'
 import { readTools } from './read'
 import { shortsTools } from './shorts'
+import { voiceTools } from './voice'
 import { musicTools, progressTools, reviewTools } from './review'
 
 export const ALL_TOOLS: ToolDef[] = [
@@ -16,6 +17,7 @@ export const ALL_TOOLS: ToolDef[] = [
   ...placeTools,
   ...graphicsTools,
   ...musicTools,
+  ...voiceTools,
   ...reviewTools,
   ...progressTools,
   ...outputTools,

@@ -197,7 +197,7 @@ export function buildPlan(doc: ProjectDoc, opts: PlanOptions): RenderPlan {
       audio.push({
         id: item.id,
         trackId: item.trackId,
-        role: track.kind === 'music' ? 'music' : track.kind === 'aroll' ? 'voice' : 'sfx',
+        role: track.kind === 'music' ? 'music' : track.kind === 'aroll' || item.voiceover ? 'voice' : 'sfx',
         path,
         start: r.start,
         end: r.end,

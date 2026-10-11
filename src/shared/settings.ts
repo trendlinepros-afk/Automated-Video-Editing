@@ -68,6 +68,8 @@ export const SettingsSchema = z.looseObject({
     /** All-time Pikzels spend on this PC (successful calls only). */
     spend: PikzelsSpendSchema.default({ total: 0, byAction: {} })
   }).default({ model: 'pkz_4_5', pikzonalities: [], prices: {}, spend: { total: 0, byAction: {} } }),
+  /** Transcribing: the speech model on this PC hears the audio; Claude proofreads its text unless turned off. */
+  transcription: z.looseObject({ proofread: z.boolean().default(true) }).default({ proofread: true }),
   /**
    * Voiceovers made with ElevenLabs. Always the owner's own voice, found by name (its id is remembered, and found
    * again by name if the voice is recreated). No voice settings are sent: the voice's own settings at ElevenLabs apply.

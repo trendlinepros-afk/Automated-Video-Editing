@@ -544,7 +544,7 @@ export function createRunnerService(ctx: AppContext, deps: RunnerDeps = {}): Run
       { mode: 0o600 }
     )
     const vars = {
-      prompt: [buildRunPrompt(open, project, { resumed: !!sessionId }), stageInstructions(plan)].filter(Boolean).join('\n\n'),
+      prompt: [buildRunPrompt(open, project, { resumed: !!sessionId }), stageInstructions(plan, { proofread: ctx.settings.get().transcription?.proofread !== false })].filter(Boolean).join('\n\n'),
       systemPrompt: buildSystemPrompt(ctx.profiles.get(project.profileId)),
       mcpConfig: configFile,
       allowedTools: settings.allowedTools,

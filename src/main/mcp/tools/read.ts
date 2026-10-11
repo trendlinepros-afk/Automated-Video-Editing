@@ -1,6 +1,6 @@
 /** Read tools: understand the project and the channel. */
 import { existsSync, readdirSync } from 'node:fs'
-import { extname, join } from 'node:path'
+import { dirname, extname, join } from 'node:path'
 import { z } from 'zod'
 import { ENGINE_VERSION, PROJECT_FORMAT_VERSION } from '@shared/appInfo'
 import { DEFAULT_EDITING_RULES } from '@shared/rules'
@@ -296,7 +296,7 @@ export const readTools = [
     name: 'get_engine_info',
     description:
       "Paths of the app's managed Python environment (with faster-whisper, PyTorch CUDA, NumPy, SciPy, Pillow, OpenCV), ffmpeg/ffprobe " +
-      '(NVIDIA encoder) and the render engine folder. Use this Python to transcribe with faster-whisper on the GPU and to run your own ' +
+      '(NVIDIA encoder) and the render engine folder. Use this Python to transcribe with transcribeScript (the speech model on the GPU, with guards against invented words) and to run your own ' +
       'scripts in the same environment the renderer uses. Put scratch files in the project cache folder.',
     input: {},
     needsProject: false,
@@ -314,6 +314,7 @@ export const readTools = [
         ffmpeg: safe(() => env.ctx.env.ffmpeg()),
         ffprobe: safe(() => env.ctx.env.ffprobe()),
         engineDir: safe(() => env.ctx.env.engineDir(engineVersion)),
+        transcribeScript: safe(() => join(dirname(env.ctx.env.analysisScript()), 'transcribe.py')),
         engineVersion,
         engineModule: 'ave_engine (run with: <python> -m ave_engine --help, with the engine dir as the working directory or on PYTHONPATH)',
         projectFormatVersion: PROJECT_FORMAT_VERSION,

@@ -30,7 +30,7 @@ describe('planning runs per model', () => {
     const p = store.project
     const first = planRun([req('start_edit')], p, {})!
     expect(first).toMatchObject({ section: 'transcript', model: RECOMMENDED_MODELS.transcript, stages: ['transcript'] })
-    expect(stageInstructions(first)).toMatch(/save_transcript with that file/)
+    expect(stageInstructions(first)).toMatch(/save_transcript with that file/); expect(stageInstructions(first)).toMatch(/PROOFREAD/); expect(stageInstructions(first, { proofread: false })).not.toMatch(/PROOFREAD/)
 
     store.mutate('t', 'app', (d) => {
       d.project.checklist.find((c) => c.id === 'transcript')!.status = 'done'
@@ -49,7 +49,7 @@ describe('planning runs per model', () => {
   })
 
   it('recommends Opus everywhere except transcribing', () => {
-    for (const [section, model] of Object.entries(RECOMMENDED_MODELS)) expect([section, model]).toEqual([section, section === 'transcript' ? 'claude-haiku-4-5' : 'claude-opus-5-5'])
+    for (const [section, model] of Object.entries(RECOMMENDED_MODELS)) expect([section, model]).toEqual([section, section === 'transcript' ? 'claude-sonnet-5-5' : 'claude-opus-5-5'])
   })
 
   it('follows the owner\'s model choices and runs other requests by their own section', () => {

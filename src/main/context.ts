@@ -22,6 +22,7 @@
  */
 import type { VideoThemesService } from './services/videoThemes'
 import type { ShortsService } from './shorts/service'
+import type { FootageIndexService } from './services/footageIndex'
 import type {
   ExportPreset,
   ProjectDoc,
@@ -299,6 +300,8 @@ export interface AppContext {
   library: LibraryService
   themes: VideoThemesService
   shorts: ShortsService
+  /** services/footageIndex.ts: shots of every video source, measured once per project. */
+  footage: FootageIndexService
   pikzels: PikzelsService
   updater: UpdaterService
   /** Send an event to the window (no-op when no window is open). */

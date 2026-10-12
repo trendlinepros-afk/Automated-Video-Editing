@@ -3,6 +3,10 @@
 Each release's section becomes its GitHub release text and the notes shown in the app's update dialog.
 A release is blocked until the section for its version has notes.
 
+## 1.11.2
+
+- **Volume control for the preview**, next to the full-screen button: click the speaker to mute, drag the slider (or scroll over it) for the level. It is remembered on this PC and does not change your exports.
+
 ## 1.11.1
 
 - **Thumbnails are scored automatically.** Every new thumbnail is scored by Pikzels against your first title option as soon as it is made (about 3 cents each), so the options can be compared at a glance and Claude uses the score and suggestion to write better prompts. Turn it off with the switch in the Thumbnails tab.

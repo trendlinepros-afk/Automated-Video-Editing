@@ -6,7 +6,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { editor, review, showBefore } from '../state/editor'
 import { useDerived } from '../state/derived'
-import { attachVideo, seek, stepFrames, toggle, videoReloaded } from '../state/player'
+import { attachVideo, playerVolume, seek, setVolume, stepFrames, toggle, toggleMute, videoReloaded } from '../state/player'
 import { useStore } from '../state/store'
 import { Icon } from '../components/Icon'
 import { fmt, fmtRange, mediaUrl } from '../util'
@@ -141,9 +141,33 @@ function Transport({ onFullscreen }: { onFullscreen: () => void }) {
         {playing && rate !== 1 ? ` · ${rate > 0 ? '' : '◀ '}${Math.abs(rate)}×` : ''}
       </span>
       <input type="range" min={0} max={Math.max(duration, 0.01)} step={0.01} value={Math.min(playhead, duration)} onChange={(e) => seek(parseFloat(e.target.value))} />
+      <VolumeControl />
       <button className="btn ghost icon" onClick={onFullscreen} title="Full screen (double-click the video)">
         <Icon name="full" />
       </button>
+    </div>
+  )
+}
+
+/** Preview loudness on this PC: a mute button and a slider (the export is not affected). */
+function VolumeControl() {
+  const { volume, muted } = useStore(playerVolume, (s) => s)
+  const level = muted ? 0 : volume
+  return (
+    <div className="volume" onWheel={(e) => setVolume(volume + (e.deltaY < 0 ? 0.05 : -0.05))}>
+      <button className="btn ghost icon" onClick={toggleMute} title={level === 0 ? 'Unmute the preview' : 'Mute the preview'}>
+        <Icon name={level === 0 ? 'volumeOff' : level < 0.5 ? 'volumeLow' : 'volume'} />
+      </button>
+      <input
+        type="range"
+        min={0}
+        max={1}
+        step={0.01}
+        value={level}
+        onChange={(e) => setVolume(parseFloat(e.target.value))}
+        title={`Preview volume ${Math.round(level * 100)} %`}
+        aria-label="Preview volume"
+      />
     </div>
   )
 }

@@ -5,6 +5,7 @@
  */
 import { editor } from './editor'
 import { currentDerived } from './derived'
+import { createStore } from './store'
 
 let video: HTMLVideoElement | null = null
 let raf = 0
@@ -20,10 +21,56 @@ function fps(): number {
   return currentDerived()?.fps ?? 30
 }
 
+// ---------------------------------------------------------------- preview volume
+
+const VOLUME_KEY = 'ave.previewVolume'
+
+function savedVolume(): { volume: number; muted: boolean } {
+  try {
+    const v = JSON.parse(localStorage.getItem(VOLUME_KEY) ?? 'null') as { volume?: number; muted?: boolean } | null
+    if (v && typeof v.volume === 'number') return { volume: Math.min(1, Math.max(0, v.volume)), muted: !!v.muted }
+  } catch {
+    /* no saved level: full volume */
+  }
+  return { volume: 1, muted: false }
+}
+
+/** How loud the preview plays on this PC (remembered between sessions). Exports are never affected. */
+export const playerVolume = createStore(savedVolume())
+
+function applyVolume(): void {
+  if (!video) return
+  const { volume, muted } = playerVolume.get()
+  video.volume = volume
+  video.muted = muted || volume === 0
+}
+
+function storeVolume(next: { volume: number; muted: boolean }): void {
+  playerVolume.set(next)
+  applyVolume()
+  try {
+    localStorage.setItem(VOLUME_KEY, JSON.stringify(next))
+  } catch {
+    /* kept for this session only */
+  }
+}
+
+export function setVolume(volume: number): void {
+  const v = Math.min(1, Math.max(0, volume))
+  storeVolume({ volume: v, muted: v === 0 })
+}
+
+export function toggleMute(): void {
+  const { volume, muted } = playerVolume.get()
+  // Unmuting from 0 comes back at a sensible level.
+  storeVolume(muted || volume === 0 ? { volume: volume || 0.6, muted: false } : { volume, muted: true })
+}
+
 export function attachVideo(v: HTMLVideoElement | null): void {
   video = v
   if (v) {
     v.playbackRate = Math.max(0.25, Math.abs(editor.get().rate))
+    applyVolume()
   }
 }
 

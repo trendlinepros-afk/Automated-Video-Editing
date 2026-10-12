@@ -224,6 +224,8 @@ h4 { font-size: 12px; color: var(--text-2); text-transform: uppercase; letter-sp
 .preview-controls { flex: none; display: flex; align-items: center; gap: 6px; padding: 6px 10px; background: var(--bg-1); border-top: 1px solid var(--line); }
 .preview-controls .time { font-family: var(--mono); font-size: 12px; color: var(--text-2); min-width: 150px; text-align: center; }
 .preview-controls input[type='range'] { flex: 1; }
+.preview-controls .volume { display: flex; align-items: center; gap: 2px; flex: none; }
+.preview-controls .volume input[type='range'] { flex: none; width: 80px; }
 .preview-empty { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; background: var(--bg); }
 .review-bar { display: flex; align-items: center; gap: 8px; padding: 6px 10px; background: var(--bg-2); border-top: 1px solid var(--line); font-size: 12px; }
 .reminder { display: flex; align-items: center; gap: 8px; padding: 5px 10px; background: var(--bg-1); border-top: 1px solid var(--line); font-size: 12px; color: var(--text-2); }

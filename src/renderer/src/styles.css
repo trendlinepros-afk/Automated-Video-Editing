@@ -203,7 +203,19 @@ h4 { font-size: 12px; color: var(--text-2); text-transform: uppercase; letter-sp
 .proj-card.missing .frame { filter: grayscale(1); }
 
 /* ---------- Editor ---------- */
-.editor { display: grid; grid-template-columns: minmax(0, 1fr); grid-template-rows: var(--topbar-h) auto minmax(200px, 1fr) 6px var(--tl-h, 300px); height: 100%; }
+.editor { display: grid; grid-template-columns: minmax(0, 1fr); grid-template-rows: var(--topbar-h) auto auto minmax(200px, 1fr) 6px var(--tl-h, 300px); height: 100%; }
+.editor.paged { grid-template-rows: var(--topbar-h) auto auto minmax(0, 1fr); }
+/* The editor's pages: Instructions, Editing, Thumbnails, Title, desc, tags */
+.workspace-tabs { display: flex; gap: 2px; padding: 0 10px; background: var(--bg-1); border-bottom: 1px solid var(--line); }
+.workspace-tabs button { display: flex; align-items: center; gap: 6px; border: 0; background: none; color: var(--text-2); height: 34px; padding: 0 12px; cursor: pointer; border-bottom: 2px solid transparent; font-size: 13px; }
+.workspace-tabs button:hover { color: var(--text); }
+.workspace-tabs button.on { color: var(--text); border-bottom-color: var(--accent); }
+.workspace-tabs .step { display: inline-flex; align-items: center; justify-content: center; width: 18px; height: 18px; border-radius: 50%; background: var(--bg-3); font-size: 11px; color: var(--text-2); }
+.workspace-tabs button.on .step { background: var(--accent); color: #fff; }
+.workspace { display: flex; flex-direction: column; min-height: 0; overflow: hidden; }
+.workspace-body { flex: 1; min-height: 0; overflow: auto; padding: 20px 24px; }
+.workspace-body .page { max-width: 1100px; margin: 0 auto; display: flex; flex-direction: column; gap: 16px; }
+.flow-footer { flex: none; display: flex; align-items: center; gap: 10px; padding: 10px 16px; border-top: 1px solid var(--line); background: var(--bg-1); }
 .editor-main { display: grid; grid-template-columns: minmax(0, 1fr) 6px var(--side-w, 400px); min-height: 0; min-width: 0; }
 .splitter-x { cursor: col-resize; background: var(--bg); }
 .splitter-x:hover, .splitter-y:hover { background: var(--accent-soft); }

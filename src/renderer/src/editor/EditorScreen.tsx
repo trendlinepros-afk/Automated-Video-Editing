@@ -11,6 +11,10 @@ import { EditorDialogs } from './Dialogs'
 import { EditorTopBar } from './EditorTopBar'
 import { Preview } from './Preview'
 import { useEditorKeys } from './keyboard'
+import { WorkspaceTabs } from '../workspaces/WorkspaceTabs'
+import { InstructionsWorkspace } from '../workspaces/InstructionsWorkspace'
+import { ThumbnailsWorkspace } from '../workspaces/ThumbnailsWorkspace'
+import { PublishWorkspace } from '../workspaces/PublishWorkspace'
 import { IMAGE_EXTS, VIDEO_EXTS, AUDIO_EXTS, basename, clamp } from '../util'
 
 function stored(key: string, fallback: number): number {
@@ -32,6 +36,7 @@ function store(key: string, v: number): void {
 
 export function EditorScreen() {
   const snap = useStore(editor, (s) => s.snapshot)
+  const workspace = useStore(editor, (s) => s.workspace)
   const projectId = snap?.doc.project.id
   const [sideW, setSideW] = useState(() => stored('ave.sideWidth', 400))
   const [tlH, setTlH] = useState(() => stored('ave.timelineHeight', 300))
@@ -65,16 +70,27 @@ export function EditorScreen() {
   }
 
   return (
-    <div className="editor" style={{ ['--tl-h' as string]: `${tlH}px` }}>
+    <div className={`editor${workspace === 'edit' ? '' : ' paged'}`} style={{ ['--tl-h' as string]: `${tlH}px` }}>
       <EditorTopBar />
+      <WorkspaceTabs />
       <Banners />
-      <div className="editor-main" style={{ ['--side-w' as string]: `${sideW}px` }}>
-        <Preview />
-        <div className="splitter-x" onPointerDown={(e) => dragSplit(e, 'x')} />
-        <SidePanel />
-      </div>
-      <div className="splitter-y" onPointerDown={(e) => dragSplit(e, 'y')} />
-      <Timeline />
+      {workspace === 'edit' ? (
+        <>
+          <div className="editor-main" style={{ ['--side-w' as string]: `${sideW}px` }}>
+            <Preview />
+            <div className="splitter-x" onPointerDown={(e) => dragSplit(e, 'x')} />
+            <SidePanel />
+          </div>
+          <div className="splitter-y" onPointerDown={(e) => dragSplit(e, 'y')} />
+          <Timeline />
+        </>
+      ) : workspace === 'instructions' ? (
+        <InstructionsWorkspace />
+      ) : workspace === 'thumbnails' ? (
+        <ThumbnailsWorkspace />
+      ) : (
+        <PublishWorkspace />
+      )}
       <EditorDialogs />
     </div>
   )

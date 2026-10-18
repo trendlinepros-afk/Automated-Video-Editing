@@ -9,6 +9,14 @@ import { createStore } from './store'
 import { call, toast } from './app'
 
 export type SideTab = 'chat' | 'inspector' | 'transcript' | 'thumbnails' | 'publish' | 'shorts' | 'versions' | 'notes'
+/** The editor's pages, in the order of the flow: instructions, the edit, thumbnails, then title, description and tags. */
+export type Workspace = 'instructions' | 'edit' | 'thumbnails' | 'publish'
+export const WORKSPACES: [Workspace, string][] = [
+  ['instructions', 'Instructions'],
+  ['edit', 'Editing'],
+  ['thumbnails', 'Thumbnails'],
+  ['publish', 'Title, desc, tags']
+]
 
 export interface OutputLine {
   ts: string
@@ -52,6 +60,8 @@ export interface EditorState {
   /** Text to put in the chat box ("Send time to chat"); n changes each time. */
   chatDraft: { text: string; n: number } | null
   tab: SideTab
+  /** The page showing (tabs at the top of the editor). */
+  workspace: Workspace
   /** Item ids Claude just added or changed (they pulse briefly). */
   pulses: ReadonlySet<string>
   /** The request whose Before is showing in the preview. */
@@ -79,6 +89,7 @@ export const editor = createStore<EditorState>({
   chatRange: null,
   chatDraft: null,
   tab: 'chat',
+  workspace: 'edit',
   pulses: new Set(),
   beforeRequestId: null,
   dialog: null,
@@ -157,8 +168,14 @@ export function openSnapshot(snapshot: ProjectSnapshot | null): void {
     dialog: null,
     zoom: 0,
     pulses: new Set(),
-    tab: snapshot && snapshot.doc.project.status === 'ready_for_review' ? 'chat' : editor.get().tab
+    tab: snapshot && snapshot.doc.project.status === 'ready_for_review' ? 'chat' : editor.get().tab,
+    // A new project starts on its instructions; anything already edited opens on the edit.
+    workspace: snapshot && snapshot.doc.project.status === 'new' ? 'instructions' : 'edit'
   })
+}
+
+export function setWorkspace(workspace: Workspace): void {
+  editor.set({ workspace })
 }
 
 /** Applies one of your tweaks. Returns false (and says why) if the app refused it. */

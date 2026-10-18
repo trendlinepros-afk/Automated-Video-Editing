@@ -206,9 +206,9 @@ h4 { font-size: 12px; color: var(--text-2); text-transform: uppercase; letter-sp
 .editor { display: grid; grid-template-columns: minmax(0, 1fr); grid-template-rows: var(--topbar-h) auto auto minmax(200px, 1fr) 6px var(--tl-h, 300px); height: 100%; }
 .editor.paged { grid-template-rows: var(--topbar-h) auto auto minmax(0, 1fr); }
 /* The editor's pages: Instructions, Editing, Thumbnails, Title, desc, tags */
-.workspace-tabs { display: flex; gap: 2px; padding: 0 10px; background: var(--bg-1); border-bottom: 1px solid var(--line); }
-.workspace-tabs button { display: flex; align-items: center; gap: 6px; border: 0; background: none; color: var(--text-2); height: 34px; padding: 0 12px; cursor: pointer; border-bottom: 2px solid transparent; font-size: 13px; }
-.workspace-tabs button:hover { color: var(--text); }
+.workspace-tabs { display: flex; align-items: center; gap: 2px; padding: 0 10px; background: var(--bg-1); border-bottom: 1px solid var(--line); }
+.workspace-tabs button:not(.next) { display: flex; align-items: center; gap: 6px; border: 0; background: none; color: var(--text-2); height: 34px; padding: 0 12px; cursor: pointer; border-bottom: 2px solid transparent; font-size: 13px; }
+.workspace-tabs button:not(.next):hover { color: var(--text); }
 .workspace-tabs button.on { color: var(--text); border-bottom-color: var(--accent); }
 .workspace-tabs .step { display: inline-flex; align-items: center; justify-content: center; width: 18px; height: 18px; border-radius: 50%; background: var(--bg-3); font-size: 11px; color: var(--text-2); }
 .workspace-tabs button.on .step { background: var(--accent); color: #fff; }
@@ -448,3 +448,4 @@ body.scrubbing, body.scrubbing * { cursor: ew-resize !important; user-select: no
 .chip-button { border: 1px solid var(--line); background: var(--bg-2); color: var(--text-2); border-radius: 999px; padding: 3px 10px; font-size: 12px; cursor: pointer; }
 .chip-button:hover:not(:disabled) { color: var(--text); border-color: var(--accent); }
 .chip-button:disabled { opacity: 0.5; cursor: default; }
+.claude-status b { white-space: nowrap; }

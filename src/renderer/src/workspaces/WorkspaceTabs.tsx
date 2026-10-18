@@ -12,6 +12,20 @@ export function WorkspaceTabs() {
           {label}
         </button>
       ))}
+      <span className="spacer" />
+      <EditNext />
     </div>
+  )
+}
+
+/** In the Editing tab, once the edit is ready: on to the thumbnails (the flow's next step), top right. */
+function EditNext() {
+  const workspace = useStore(editor, (s) => s.workspace)
+  const status = useStore(editor, (s) => s.snapshot!.doc.project.status)
+  if (workspace !== 'edit' || (status !== 'ready_for_review' && status !== 'exported')) return null
+  return (
+    <button className="btn small primary next" onClick={() => setWorkspace('thumbnails')} title="Happy with the edit? Make the thumbnails next">
+      Next: Thumbnails →
+    </button>
   )
 }

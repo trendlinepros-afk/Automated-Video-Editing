@@ -26,7 +26,7 @@ import { moveLibrary } from './services/library'
 import { importLibraryFiles } from './services/libraryImport'
 import { writeFinishFiles } from './services/finishExport'
 import { fetchYouTubeThumbnails } from './services/youtube'
-import { clearBase, grabBase } from './services/thumbnailBase'
+import { clearBase, grabBase, useImageAsBase } from './services/thumbnailBase'
 import { writeThumbnailDraft } from './services/thumbnailDraft'
 import { writePublishDraft } from './services/publishDraft'
 
@@ -485,6 +485,7 @@ export function registerIpc(ctx: AppContext, getWindow: () => BrowserWindow | nu
     'thumbnails.titles': (req: TitlesRequest) => ctx.pikzels.titles({ ...req, source: 'user' }),
     'thumbnails.grabBase': async (time: number) => void (await grabBase(ctx, store(), Number(time) || 0, 'user')),
     'thumbnails.clearBase': () => clearBase(store()),
+    'thumbnails.useImageAsBase': async (path: string) => void (await useImageAsBase(ctx, store(), String(path ?? ''))),
     'thumbnails.requestDraft': async () => {
       const s = store()
       if (!s.project.items.some((i) => i.type === 'segment')) throw new Error('There is no edit yet to write a thumbnail for.')

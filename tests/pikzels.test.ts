@@ -3,7 +3,7 @@ import { existsSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSy
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
-import { ProjectSettingsSchema } from '@shared/project'
+import { ProjectSchema, ProjectSettingsSchema } from '@shared/project'
 import { SettingsSchema } from '@shared/settings'
 import type { AppContext } from '../src/main/context'
 import { ActivityLog } from '../src/main/log'
@@ -11,7 +11,7 @@ import { ProjectStore } from '../src/main/project/store'
 import { FEATURE_CHANGED, PIKZELS_API, createPikzelsService, fieldProblems, plainError, stripLinks } from '../src/main/services/pikzels'
 import { createSecretsService, createSettingsService } from '../src/main/services/settings'
 import { initPaths, paths } from '../src/main/paths'
-import { clearBase, grabBase } from '../src/main/services/thumbnailBase'
+import { clearBase, grabBase, useImageAsBase } from '../src/main/services/thumbnailBase'
 
 const KEY = 'pkz_live_secretkey_0123456789'
 
@@ -478,6 +478,44 @@ describe('Thumbnail base picture', () => {
     store.mutate('t', 'user', (d) => void (d.project.thumbnails.format = '9:16'))
     const b = await grabBase(makeCtx(), store, 1, 'claude')
     expect(jpegSize(readFileSync(join(store.dir, b.file)))).toEqual({ width: 720, height: 1280 })
+  })
+})
+
+describe('Your own picture as the base', () => {
+  it('copies an uploaded image, crops it to the thumbnail format and sends it with every prompt', async () => {
+    const ctx = makeCtx()
+    // A square blank template: cropped around the centre to 16:9, the original left alone.
+    const src = join(dir, 'blank template.png')
+    execFileSync('ffmpeg', ['-hide_banner', '-loglevel', 'error', '-y', '-f', 'lavfi', '-i', 'color=c=red:size=900x900', '-frames:v', '1', src])
+    const before = readFileSync(src)
+    const grabbed = await grabBase(ctx, store, 3, 'claude')
+    const b = await useImageAsBase(ctx, store, src)
+    expect(frames).toHaveLength(1)
+    expect(store.project.thumbnails.base).toMatchObject({ file: b.file, time: 0, by: 'user', image: 'blank template.png' })
+    expect(jpegSize(readFileSync(join(store.dir, b.file)))).toEqual({ width: 1280, height: 720 })
+    expect(readFileSync(src).equals(before)).toBe(true)
+    // The frame it replaced is removed.
+    expect(existsSync(join(store.dir, grabbed.file))).toBe(false)
+
+    const { fn, calls } = fakeFetch()
+    await createPikzelsService(ctx, { fetch: fn, sleep: async () => {} }).generate({ prompts: ['On the template'], source: 'user' })
+    expect(calls.find((c) => c.url.endsWith(PIKZELS_API.thumbnailFromText))!.body.support_image_base64).toBe(readFileSync(join(store.dir, b.file)).toString('base64'))
+
+    // The project still loads with an uploaded base, and older bases without `image` stay valid.
+    expect(ProjectSchema.parse(JSON.parse(JSON.stringify(store.project))).thumbnails.base?.image).toBe('blank template.png')
+    const old = JSON.parse(JSON.stringify(store.project))
+    delete old.thumbnails.base.image
+    expect(ProjectSchema.parse(old).thumbnails.base).toMatchObject({ file: b.file, time: 0 })
+  })
+
+  it('says so when the image is missing or not a picture', async () => {
+    const ctx = makeCtx()
+    await expect(useImageAsBase(ctx, store, join(dir, 'nope.png'))).rejects.toThrow(/not found/)
+    const bad = join(dir, 'notes.png')
+    writeFileSync(bad, 'not an image')
+    await expect(useImageAsBase(ctx, store, bad)).rejects.toThrow(/could not be saved/)
+    expect(store.project.thumbnails.base).toBeUndefined()
+    expect(readdirSync(store.paths.thumbnails).filter((f) => f.includes('.part.'))).toEqual([])
   })
 })
 

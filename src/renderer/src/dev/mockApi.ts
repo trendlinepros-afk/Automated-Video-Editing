@@ -387,7 +387,7 @@ export function installMockApi(): void {
       showItemInFolder: async () => undefined,
       openExternal: async (url) => void window.open(url, '_blank'),
       pickFolder: async () => 'C:\\Users\\Adam\\Videos\\New footage',
-      pickFiles: async (o) => (o.multi ? ['a.jpg', 'b.jpg', 'c.jpg'] : ['C:\\Users\\Adam\\file.wav']),
+      pickFiles: async (o) => (o.multi ? ['a.jpg', 'b.jpg', 'c.jpg'] : o.filters?.some((f) => f.extensions.includes('png')) ? ['C:\\Users\\Adam\\blank-thumbnail.png'] : ['C:\\Users\\Adam\\file.wav']),
       saveFile: async () => 'C:\\Users\\Adam\\out.png',
       fileUrl: (path) => placeholder(path.split(/[\\/]/).pop() ?? '', 200),
       copyText: async (t) => navigator.clipboard?.writeText(t).catch(() => undefined),
@@ -596,7 +596,21 @@ export function installMockApi(): void {
       saveToLibrary: async (_id, meta) => ({ ...library[0], id: `a${Date.now()}`, name: meta.name })
     },
     thumbnails: {
-      generate: async () => undefined,
+      generate: async (req) => {
+        // A batch that arrives a moment later, scored like automatic scoring does.
+        const batchId = `b${Date.now()}`
+        const ids = Array.from({ length: req.count }, (_, i) => `${batchId}-${i}`)
+        commit((d) => {
+          for (const id of ids) d.project.thumbnails.items.push({ id, prompt: req.prompt, createdAt: now(), source: 'user', status: 'pending', batchId, kind: 'text', format: '16:9' })
+        }, 'user', 'Generate thumbnails')
+        await new Promise((r) => setTimeout(r, 1500))
+        commit((d) => {
+          ids.forEach((id, i) => {
+            const t = d.project.thumbnails.items.find((x) => x.id === id)
+            if (t) Object.assign(t, { status: 'done', file: placeholder(`New ${i + 1}`, 120 + i * 50), cost: 0.13, score: { main: [8.1, 6.7, 7.4][i] ?? 7, subscores: { clarity: 8, emotion: 7 }, suggestion: 'Make the text bigger.', at: now() } })
+          })
+        }, 'app', 'Thumbnails ready')
+      },
       regenerate: async () => undefined,
       choose: async (id) => void commit((d) => void (d.project.thumbnails.chosenId = id), 'user', 'Choose thumbnail'),
       exportImage: async () => 'C:\\Users\\Adam\\thumb.png',
@@ -614,6 +628,8 @@ export function installMockApi(): void {
       grabBase: async (time) =>
         void commit((d) => void (d.project.thumbnails.base = { file: placeholder(`Frame ${time.toFixed(1)}s`, 160), time, by: 'user', at: now() }), 'user', 'Base picture'),
       clearBase: async () => void commit((d) => void delete d.project.thumbnails.base, 'user', 'Clear base picture'),
+      useImageAsBase: async (path) =>
+        void commit((d) => void (d.project.thumbnails.base = { file: placeholder('Your template', 30), time: 0, by: 'user', at: now(), image: path.split(/[\\/]/).pop() }), 'user', 'Base picture'),
       requestDraft: async () => {
         // One quick call: the description and the base frame Claude picked arrive when it returns.
         await new Promise((r) => setTimeout(r, 1500))

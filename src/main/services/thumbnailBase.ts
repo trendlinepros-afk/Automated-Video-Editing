@@ -33,23 +33,32 @@ export async function cleanFrame(ctx: AppContext, store: ProjectStore, time: num
   // Inside the video: the last frame at most.
   const t = duration > 0 ? Math.min(Math.max(0, time), Math.max(0, duration - 1 / (doc.project.output.fps || 30))) : Math.max(0, time)
   const fmt = format ?? (doc.project.thumbnails.format as ThumbnailFormat) ?? '16:9'
-  mkdirSync(join(out, '..'), { recursive: true })
   // Full output width (at least 1920) from the original footage, not the preview proxies.
   const width = Math.min(3840, Math.max(1920, doc.project.output.width || 1920))
   const png = await ctx.engine.frame(doc, store.dir, t, { width, footageOnly: true, out: out.replace(/\.[a-z]+$/i, '') + '.full.png' })
+  try {
+    await fitImage(ctx, store, png, out, fmt)
+  } finally {
+    rmSync(png, { force: true })
+  }
+  return out
+}
+
+/** Crops and scales any picture to the thumbnail format and saves it as a JPEG at out. */
+export async function fitImage(ctx: AppContext, store: ProjectStore, input: string, out: string, format: ThumbnailFormat): Promise<string> {
+  mkdirSync(join(out, '..'), { recursive: true })
   const tmp = out.replace(/\.jpg$/i, '.part.jpg')
   const ffmpeg = ctx.env.ffmpeg()
-  const args = ['-hide_banner', '-y', '-i', png, '-vf', fitFilter(fmt), '-frames:v', '1', '-q:v', '2', tmp]
+  const args = ['-hide_banner', '-y', '-i', input, '-vf', fitFilter(format), '-frames:v', '1', '-q:v', '2', tmp]
   try {
     const r = await spawnLines(ffmpeg, args, {})
     if (r.code !== 0 || !existsSync(tmp)) {
-      store.log.write('thumbnail', 'Could not size the frame for the thumbnail', { command: formatCommand(ffmpeg, args), errorOutput: r.stderr.slice(-2000) })
-      throw new Error('The frame could not be saved for the thumbnail. See the log for details.')
+      store.log.write('thumbnail', 'Could not size the picture for the thumbnail', { command: formatCommand(ffmpeg, args), errorOutput: r.stderr.slice(-2000) })
+      throw new Error('The picture could not be saved for the thumbnail. See the log for details.')
     }
     renameSync(tmp, out)
   } finally {
     rmSync(tmp, { force: true })
-    rmSync(png, { force: true })
   }
   return out
 }
@@ -72,6 +81,31 @@ export async function grabBase(ctx: AppContext, store: ProjectStore, time: numbe
   if (old && old !== file && basename(old).startsWith('base-')) rmSync(join(store.dir, old), { force: true })
   store.log.write('thumbnail', `Base picture for thumbnails: the frame at ${time.toFixed(2)} s`, { by, file })
   return { file, time }
+}
+
+/**
+ * Uses a picture of the owner's (a blank thumbnail template, a photo, anything) as the base picture: a copy, cropped
+ * and scaled to the thumbnail format like a grabbed frame, so the original file is never touched.
+ */
+export async function useImageAsBase(ctx: AppContext, store: ProjectStore, path: string): Promise<{ file: string }> {
+  if (!path || !existsSync(path)) throw new Error(`Image not found: ${path}`)
+  const name = `base-${Date.now().toString(36)}.jpg`
+  const abs = join(store.paths.thumbnails, name)
+  const fmt = (store.project.thumbnails.format as ThumbnailFormat) ?? '16:9'
+  await fitImage(ctx, store, path, abs, fmt)
+  const old = store.project.thumbnails.base?.file
+  const file = `thumbnails/${name}`
+  store.mutate(
+    'Thumbnail base picture',
+    'user',
+    (d) => {
+      d.project.thumbnails.base = { file, time: 0, by: 'user', at: new Date().toISOString(), image: basename(path) }
+    },
+    { bypassLock: true, noHistory: true }
+  )
+  if (old && old !== file && basename(old).startsWith('base-')) rmSync(join(store.dir, old), { force: true })
+  store.log.write('thumbnail', `Base picture for thumbnails: the image ${basename(path)}`, { by: 'user', file })
+  return { file }
 }
 
 export function clearBase(store: ProjectStore): void {

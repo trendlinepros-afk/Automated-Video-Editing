@@ -463,6 +463,8 @@ export interface Api {
     /** Use a clean frame of the footage at this timeline time (no captions, graphics or effects) as the base picture. */
     grabBase(time: number): Promise<void>
     clearBase(): Promise<void>
+    /** Use your own picture (a blank thumbnail template, a photo) as the base picture, cropped to the thumbnail format. */
+    useImageAsBase(path: string): Promise<void>
     /** Ask Claude to write the description and pick the base frame (fills thumbnails.draft and thumbnails.base). */
     requestDraft(): Promise<void>
   }

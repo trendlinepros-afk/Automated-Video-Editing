@@ -457,8 +457,9 @@ export const ProjectSchema = z.looseObject({
     /**
      * The base picture for new thumbnails: a clean frame of the footage (no captions, graphics or effects), sized for
      * the thumbnail format. Sent to Pikzels with every prompt so the real subject of the video is in the thumbnail.
+     * `image`: the name of the owner's own picture it was made from instead (time is 0 then); absent for a frame.
      */
-    base: z.looseObject({ file: z.string(), time: num, by: z.enum(['user', 'claude']), at: z.string() }).optional(),
+    base: z.looseObject({ file: z.string(), time: num, by: z.enum(['user', 'claude']), at: z.string(), image: z.string().optional() }).optional(),
     /** Claude's suggested description for the prompt box (the owner can change or delete it). */
     draft: z.looseObject({ text: z.string(), at: z.string() }).optional(),
     /** Pikzels spend on this project (successful calls only). Absent until the first paid call, so older projects open unchanged. */

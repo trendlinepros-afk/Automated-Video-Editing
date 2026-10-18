@@ -627,6 +627,41 @@ export function installMockApi(): void {
         return out
       }
     },
+    publish: {
+      generate: async (opts) => {
+        // One quick Claude call: everything arrives together after a moment.
+        await new Promise((r) => setTimeout(r, 1500))
+        const only = opts?.only
+        const n = (doc.project.publish.generated ? 1 : 0) + Math.floor(Math.random() * 3)
+        const sets = [
+          { search: '4S LiPo Battery Torture Test: How Hot Does It Get?', clickbait: 'I Pushed This LiPo Until It Almost Exploded', mix: 'LiPo Torture Test: This $40 Battery Got Scary Hot' },
+          { search: 'Cheap 4S LiPo vs Full Throttle: Heat Test on a Traxxas', clickbait: 'This Battery Should NOT Have Survived', mix: 'Testing a $40 LiPo to Its Limit (It Got Too Hot)' },
+          { search: 'How Hot Can a 4S LiPo Get? RC Car Battery Test', clickbait: 'My LiPo Hit 70°C and I Kept Going', mix: '4S LiPo Heat Test: I Ran It Until It Puffed' }
+        ]
+        const titles = sets[n % sets.length]
+        const description =
+          'How hot does a cheap 4S LiPo get when you run it flat out? I put a $40 battery through a full-throttle torture test in my Traxxas to find out.\n' +
+          'RC LiPo heat test, puffing and safe temperatures, explained.\n\n' +
+          'I charge it, bash it, check the temperature after every run and keep going until it gets scary. You will see what happens to the voltage, ' +
+          'when it starts to puff, and the one charging mistake that makes it worse.\n\n' +
+          'If you run LiPos in your RC car, watch this before your next pack.'
+        const tags = ['4s lipo', 'lipo battery test', 'lipo torture test', 'rc lipo heat', 'lipo puffing', 'traxxas battery', 'rc car battery', 'lipo safety', 'cheap lipo', 'rc bashing', 'rc car', 'rc cars']
+        const out = { titles: !only || only === 'titles' ? titles : undefined, description: !only || only === 'description' ? description : undefined, tags: !only || only === 'tags' ? tags : undefined }
+        commit((d) => {
+          const pub = d.project.publish
+          if (out.titles) {
+            const chosen = pub.generated?.chosen ?? 'mix'
+            pub.generated = { ...out.titles, chosen, at: now() }
+            const order = [out.titles[chosen], ...(['search', 'clickbait', 'mix'] as const).filter((k) => k !== chosen).map((k) => out.titles![k]), ...pub.titles]
+            pub.titles = order.filter((t, i) => order.indexOf(t) === i).slice(0, 6)
+          }
+          if (out.description && (only === 'description' || !pub.description.trim())) pub.description = out.description
+          if (out.tags && (only === 'tags' || !pub.tags.length)) pub.tags = out.tags
+          pub.updatedAt = now()
+        }, 'claude', 'Titles, description and tags from Claude')
+        return out
+      }
+    },
     preview: {
       state: async () => preview,
       onState: ev.preview.on,

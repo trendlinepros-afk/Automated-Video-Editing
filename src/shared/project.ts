@@ -469,7 +469,19 @@ export const ProjectSchema = z.looseObject({
     description: z.string().default(''),
     chapters: z.array(ChapterSchema).default([]),
     tags: z.array(z.string()).default([]),
-    updatedAt: z.string().optional()
+    updatedAt: z.string().optional(),
+    /** What the owner told the Title, desc, tags page: titles they like (up to 3) and what the video is about. */
+    brief: z.looseObject({ examples: z.array(z.string()).default([]), about: z.string().default('') }).optional(),
+    /** The three titles Claude wrote on that page, and which one the owner uses (it is also titles[0]). */
+    generated: z
+      .looseObject({
+        search: z.string().default(''),
+        clickbait: z.string().default(''),
+        mix: z.string().default(''),
+        chosen: z.enum(['search', 'clickbait', 'mix']).optional(),
+        at: z.string()
+      })
+      .optional()
   }),
   /** While Claude re-edits a section, everything outside this range is locked. */
   lock: z.looseObject({ requestId: z.string(), range: RangeSchema }).nullable().default(null),

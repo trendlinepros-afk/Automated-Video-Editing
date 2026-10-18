@@ -25,6 +25,8 @@ interface ToolProps {
   setTarget: (id: string | null) => void
   disabled: boolean
   onDone: () => void
+  /** An image file to start on instead of a thumbnail (the base picture, say). */
+  initialFile?: string | null
 }
 
 async function pickImage(title: string): Promise<string | null> {
@@ -74,7 +76,7 @@ function TargetPicker({ target, thumbs, setTarget, dir, allowFile, file, setFile
               {t.prompt.slice(0, 50)}
             </option>
           ))}
-        {file && <option value="__file">{basename(file)}</option>}
+        {file && <option value="__file">{basename(file).startsWith('base-') ? 'The base picture' : basename(file)}</option>}
         {allowFile && <option value="__pick">An image file…</option>}
       </select>
     </div>
@@ -82,8 +84,8 @@ function TargetPicker({ target, thumbs, setTarget, dir, allowFile, file, setFile
 }
 
 export function RecreateTool(p: ToolProps) {
-  const [from, setFrom] = useState<'thumbnail' | 'file' | 'frame' | 'youtube'>('frame')
-  const [file, setFile] = useState<string | null>(null)
+  const [from, setFrom] = useState<'thumbnail' | 'file' | 'frame' | 'youtube'>(p.initialFile ? 'file' : 'frame')
+  const [file, setFile] = useState<string | null>(p.initialFile ?? null)
   const [url, setUrl] = useState('')
   const [prompt, setPrompt] = useState('')
   const [weight, setWeight] = useState<'low' | 'medium' | 'high'>('medium')
@@ -113,6 +115,7 @@ export function RecreateTool(p: ToolProps) {
       {from === 'thumbnail' && <TargetPicker {...p} />}
       {from === 'file' && (
         <div className="row">
+          {file && <img src={mediaUrl(file)} alt="" style={{ width: 96, borderRadius: 4 }} />}
           <button className="btn small" onClick={() => void pickImage('Choose an image to recreate').then(setFile)}>
             Choose image
           </button>
@@ -225,7 +228,7 @@ function MaskPainter({ src, onMask }: { src: string; onMask: (b64: string | null
 }
 
 export function EditTool(p: ToolProps) {
-  const [file, setFile] = useState<string | null>(null)
+  const [file, setFile] = useState<string | null>(p.initialFile ?? null)
   const [prompt, setPrompt] = useState('')
   const [mask, setMask] = useState<string | null>(null)
   const [support, setSupport] = useState<string | null>(null)
@@ -262,7 +265,7 @@ export function EditTool(p: ToolProps) {
 }
 
 export function FaceSwapTool(p: ToolProps) {
-  const [file, setFile] = useState<string | null>(null)
+  const [file, setFile] = useState<string | null>(p.initialFile ?? null)
   const [face, setFace] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
   const go = async () => {

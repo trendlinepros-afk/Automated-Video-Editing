@@ -20,7 +20,7 @@ export const API_METHODS = [
   'project.exportVideo', 'project.cancelExport', 'project.exportLog', 'project.exportPack', 'project.saveToLibrary',
   'thumbnails.generate', 'thumbnails.regenerate', 'thumbnails.choose', 'thumbnails.exportImage',
   'voice.check', 'voice.generate', 'voice.sample', 'voice.budget', 'voice.answerApproval',
-  'thumbnails.recreate', 'thumbnails.edit', 'thumbnails.faceSwap', 'thumbnails.score', 'thumbnails.titles', 'thumbnails.grabBase', 'thumbnails.clearBase', 'thumbnails.requestDraft',
+  'thumbnails.recreate', 'thumbnails.edit', 'thumbnails.faceSwap', 'thumbnails.score', 'thumbnails.titles', 'thumbnails.grabBase', 'thumbnails.clearBase', 'thumbnails.requestDraft', 'thumbnails.useImageAsBase',
   'preview.state', 'preview.showBefore',
   'claude.state', 'claude.stop', 'claude.resume', 'claude.estimate',
   'library.list', 'library.changeFolder', 'library.importFiles', 'library.update', 'library.duplicate', 'library.remove', 'library.placeInProject',

@@ -3,6 +3,17 @@
 Each release's section becomes its GitHub release text and the notes shown in the app's update dialog.
 A release is blocked until the section for its version has notes.
 
+## 1.12.0
+
+- **The editor is now four steps, as tabs at the top: Instructions, Editing, Thumbnails, and Title, desc, tags.** A new project opens on Instructions; each step has a Next button that takes you to the next one, and the last one is **Finish And Export**. You can open any tab at any time, also while Claude is still editing. Projects you already have open on the Editing tab, exactly as before.
+- **Instructions**: write freely about the direction of the video, specific things you want done and things Claude should know (quick-add ideas included), pick the video theme and whole video or just the intro first. Saved as you type.
+- **Editing**: Start edit uses your instructions. Once the edit is ready, **Next: Thumbnails** sits at the top right.
+- **Thumbnails** as a full page: pick a frame in a small player or upload a blank thumbnail or any picture as the base, write or let Claude write the description, and make up to 3 options side by side (scored automatically). The Thumbnails tab in the side panel still works too.
+- **Title, desc, tags**: give up to 3 titles you like and what the video is about, and Claude writes three titles (one for YouTube search, one clickbait, one mix of both), a description and tags in one quick call. Everything is editable, with Copy buttons.
+- **Finish And Export**: runs the check before export, then puts the video, your thumbnails (the picked one first) and a text file with the title, description, chapters and tags into the project's Export folder.
+- Backups are only made when a project actually changed since its last backup, so opening a project many times no longer fills the backups folder with identical copies.
+- Timeline keyboard shortcuts only act in the Editing tab, so typing or pressing Delete on another page never changes the timeline.
+
 ## 1.11.2
 
 - **Volume control for the preview**, next to the full-screen button: click the speaker to mute, drag the slider (or scroll over it) for the level. It is remembered on this PC and does not change your exports.

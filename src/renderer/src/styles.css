@@ -487,6 +487,7 @@ body.scrubbing, body.scrubbing * { cursor: ew-resize !important; user-select: no
   .pub-grid { grid-template-columns: 300px minmax(0, 1fr); }
   .pub-title { grid-template-columns: minmax(0, 1fr) 48px 140px auto; grid-template-areas: 'kind count use more' 'text text text text'; }
   .pub-title-kind { flex-direction: row; align-items: baseline; gap: 8px; }
+}
 
 /* Thumbnails page: base picture on the left, description, options and tools on the right */
 .thumbs-page { max-width: 1440px; margin: 0 auto; display: grid; grid-template-columns: clamp(320px, 28vw, 420px) minmax(0, 1fr); gap: 16px; align-items: start; }

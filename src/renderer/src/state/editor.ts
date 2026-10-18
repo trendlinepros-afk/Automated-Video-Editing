@@ -32,7 +32,7 @@ export interface SeamSel {
 }
 
 export type Dialog =
-  | { kind: 'export' }
+  | { kind: 'export'; finish?: boolean }
   | { kind: 'exportLog' }
   | { kind: 'reedit' }
   | { kind: 'inspiration' }

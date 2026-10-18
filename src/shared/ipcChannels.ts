@@ -17,7 +17,7 @@ export const API_METHODS = [
   'project.frameAt',
   'project.versions.list', 'project.versions.save', 'project.versions.restore', 'project.versions.remove',
   'project.versions.compareFrames',
-  'project.exportVideo', 'project.cancelExport', 'project.exportLog', 'project.exportPack', 'project.saveToLibrary',
+  'project.exportVideo', 'project.finishAndExport', 'project.cancelExport', 'project.exportLog', 'project.exportPack', 'project.saveToLibrary',
   'thumbnails.generate', 'thumbnails.regenerate', 'thumbnails.choose', 'thumbnails.exportImage',
   'voice.check', 'voice.generate', 'voice.sample', 'voice.budget', 'voice.answerApproval',
   'thumbnails.recreate', 'thumbnails.edit', 'thumbnails.faceSwap', 'thumbnails.score', 'thumbnails.titles', 'thumbnails.grabBase', 'thumbnails.clearBase', 'thumbnails.requestDraft',

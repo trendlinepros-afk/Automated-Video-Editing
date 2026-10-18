@@ -577,6 +577,7 @@ export function installMockApi(): void {
         remove: async (id) => void versions.splice(versions.findIndex((v) => v.id === id), 1),
         compareFrames: async (a, b, t) => ({ a: placeholder(`${a} @ ${t.toFixed(1)}s`, 120), b: placeholder(`${b} @ ${t.toFixed(1)}s`, 300) })
       },
+      finishAndExport: async () => ({ dir: 'C:\\Videos\\LiPo battery torture test\\Export', files: [], jobId: 'job_finish' }),
       exportVideo: async () => {
         const id = `j${Date.now()}`
         void (async () => {

@@ -24,6 +24,7 @@ import { buildDiagnostics } from './services/diagnostics'
 import { runExportCheck } from './services/exportCheck'
 import { moveLibrary } from './services/library'
 import { importLibraryFiles } from './services/libraryImport'
+import { writeFinishFiles } from './services/finishExport'
 import { fetchYouTubeThumbnails } from './services/youtube'
 import { clearBase, grabBase } from './services/thumbnailBase'
 import { writeThumbnailDraft } from './services/thumbnailDraft'
@@ -436,6 +437,14 @@ export function registerIpc(ctx: AppContext, getWindow: () => BrowserWindow | nu
       const outDir = ctx.settings.get().defaultExportsFolder || undefined
       s.log.write('export', `Export requested${where}`, { preset: o.preset, quick: o.quick, captions: o.captions })
       return ctx.renders.start({ range: o.range, preset: o.preset, quick: o.quick, captions: o.captions, ...(outDir ? { outDir } : {}) })
+    },
+    'project.finishAndExport': async (o: { preset: ExportPreset; captions: 'burn' | 'srt' | 'both' | 'none' }) => {
+      const s = store()
+      const { dir, files } = writeFinishFiles(s)
+      ctx.versions.save('Before export (Finish)', { auto: true, reason: 'export' })
+      s.log.write('export', 'Finish And Export requested', { preset: o.preset, captions: o.captions, dir })
+      const jobId = await ctx.renders.start({ preset: o.preset, quick: false, captions: o.captions, outDir: dir })
+      return { dir, files, jobId }
     },
     'project.cancelExport': () => ctx.renders.cancel(),
     'project.exportLog': (filter: 'all' | 'last_session') => {

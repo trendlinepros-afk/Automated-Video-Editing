@@ -430,6 +430,8 @@ export interface Api {
       compareFrames(aId: string, bId: string, time: number): Promise<{ a: string | null; b: string | null }>
     }
     exportVideo(opts: { range?: Range; preset: ExportPreset; quick: boolean; captions: 'burn' | 'srt' | 'both' | 'none' }): Promise<string>
+    /** Finish And Export: the video, thumbnails and a title/description/tags text file into the project's Export folder. */
+    finishAndExport(opts: { preset: ExportPreset; captions: 'burn' | 'srt' | 'both' | 'none' }): Promise<{ dir: string; files: string[]; jobId: string }>
     /** The check before export: timeline problems, then the picture and sound of the preview. */
     exportCheck(range?: Range): Promise<ExportCheckResult>
     onCheckProgress(cb: (message: string) => void): () => void

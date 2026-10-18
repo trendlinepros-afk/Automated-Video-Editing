@@ -285,6 +285,15 @@ export interface TitlesRequest {
   thumbnailId?: string
 }
 
+export type PublishPart = 'titles' | 'description' | 'tags'
+
+/** What Claude wrote on the Title, desc, tags page (only the asked-for part is filled when `only` was given). */
+export interface PublishDraft {
+  titles?: { search: string; clickbait: string; mix: string }
+  description?: string
+  tags?: string[]
+}
+
 export interface ThumbnailScore {
   main: number
   subscores: Record<string, unknown>
@@ -456,6 +465,14 @@ export interface Api {
     clearBase(): Promise<void>
     /** Ask Claude to write the description and pick the base frame (fills thumbnails.draft and thumbnails.base). */
     requestDraft(): Promise<void>
+  }
+  publish: {
+    /**
+     * One quick Claude call (not a queued editing request) for the Title, desc, tags page. Saves the result: the three
+     * titles in publish.generated (the chosen one, Mix by default, becomes titles[0]); the description and tags when
+     * they were empty or when that part is the one asked for. `only` regenerates just that part.
+     */
+    generate(opts?: { only?: PublishPart; direction?: string }): Promise<PublishDraft>
   }
   preview: {
     state(): Promise<PreviewState>

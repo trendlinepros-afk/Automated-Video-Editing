@@ -21,6 +21,7 @@ export const API_METHODS = [
   'thumbnails.generate', 'thumbnails.regenerate', 'thumbnails.choose', 'thumbnails.exportImage',
   'voice.check', 'voice.generate', 'voice.sample', 'voice.budget', 'voice.answerApproval',
   'thumbnails.recreate', 'thumbnails.edit', 'thumbnails.faceSwap', 'thumbnails.score', 'thumbnails.titles', 'thumbnails.grabBase', 'thumbnails.clearBase', 'thumbnails.requestDraft',
+  'publish.generate',
   'preview.state', 'preview.showBefore',
   'claude.state', 'claude.stop', 'claude.resume', 'claude.estimate',
   'library.list', 'library.changeFolder', 'library.importFiles', 'library.update', 'library.duplicate', 'library.remove', 'library.placeInProject',

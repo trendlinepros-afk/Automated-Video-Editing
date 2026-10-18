@@ -23,7 +23,7 @@ export function EditorDialogs() {
   const close = () => openDialog(null)
   switch (dialog.kind) {
     case 'export':
-      return <ExportDialog onClose={close} />
+      return <ExportDialog onClose={close} finish={!!dialog.finish} />
     case 'exportLog':
       return <ExportLogDialog onClose={close} />
     case 'reedit':
@@ -43,9 +43,14 @@ export function EditorDialogs() {
   }
 }
 
-function ExportDialog({ onClose }: { onClose: () => void }) {
+/**
+ * Export, or (finish) Finish And Export: the whole video plus the thumbnails and a title/description/tags text file,
+ * all into the project's Export folder. Both run the check before export first.
+ */
+function ExportDialog({ onClose, finish = false }: { onClose: () => void; finish?: boolean }) {
   const project = useStore(editor, (s) => s.snapshot!.doc.project)
-  const range = useStore(editor, (s) => s.range)
+  const projectDir = useStore(editor, (s) => s.snapshot!.path)
+  const range = useStore(editor, (s) => (finish ? null : s.range))
   const job = useStore(editor, (s) => s.job)
   const [what, setWhat] = useState<'whole' | 'section'>(range ? 'section' : 'whole')
   const [preset, setPreset] = useState<ExportPreset>(project.settings.exportPreset)
@@ -59,6 +64,14 @@ function ExportDialog({ onClose }: { onClose: () => void }) {
 
   const doExport = async (note?: string) => {
     try {
+      if (finish) {
+        const r = await window.api.project.finishAndExport({ preset, captions })
+        onClose()
+        toast(`${note ? `${note} ` : ''}Thumbnails and the title, description and tags file are in the Export folder; the video is rendering into it now (progress in the top bar).`, {
+          actions: [{ label: 'Show folder', run: () => void window.api.app.openPath(r.dir) }]
+        })
+        return
+      }
       await window.api.project.exportVideo({ range: exportRange, preset, quick, captions })
       onClose()
       toast(`${note ? `${note} ` : ''}Exporting. Progress shows in the top bar; you can keep working.`)
@@ -165,9 +178,11 @@ function ExportDialog({ onClose }: { onClose: () => void }) {
       </Modal>
     )
   }
+  const doneThumbs = project.thumbnails.items.filter((t) => t.status === 'done').length
+  const title = project.publish.titles[0]
   return (
     <Modal
-      title="Export"
+      title={finish ? 'Finish And Export' : 'Export'}
       onClose={onClose}
       footer={
         <>
@@ -175,12 +190,25 @@ function ExportDialog({ onClose }: { onClose: () => void }) {
             Cancel
           </button>
           <button className="btn primary" disabled={busy} onClick={start}>
-            {busy ? 'An export is running' : 'Export'}
+            {busy ? 'An export is running' : finish ? 'Finish And Export' : 'Export'}
           </button>
         </>
       }
     >
-      <div className="field">
+      {finish && (
+        <div className="col small" style={{ gap: 4 }}>
+          <div className="muted">Everything for the upload goes into one folder of the project:</div>
+          <div className="mono tiny selectable">{projectDir}\Export</div>
+          <div>• The video, rendered with the format below</div>
+          <div className={doneThumbs ? '' : 'warn'}>
+            • {doneThumbs ? `${Math.min(3, doneThumbs)} thumbnail${Math.min(3, doneThumbs) > 1 ? 's' : ''} (the one you picked first)` : 'No thumbnails yet (make them in the Thumbnails tab)'}
+          </div>
+          <div className={title ? '' : 'warn'}>
+            • A text file with {title ? <>the title “{title}”</> : 'no title yet'}, the description{project.publish.chapters.length ? ', chapters' : ''} and {project.publish.tags.length} tags
+          </div>
+        </div>
+      )}
+      <div className="field" style={finish ? { display: 'none' } : undefined}>
         <label>What</label>
         <div className="seg" style={{ width: 'fit-content' }}>
           <button className={what === 'whole' ? 'on' : ''} onClick={() => setWhat('whole')}>
@@ -195,7 +223,7 @@ function ExportDialog({ onClose }: { onClose: () => void }) {
       <div className="field">
         <label>Format</label>
         <PresetEditor value={preset} onChange={setPreset} disabled={quick} />
-        <Toggle checked={quick} onChange={setQuick} label="Quick low-resolution export for a fast check" />
+        {!finish && <Toggle checked={quick} onChange={setQuick} label="Quick low-resolution export for a fast check" />}
       </div>
       <div className="field">
         <label>Captions</label>
@@ -207,7 +235,7 @@ function ExportDialog({ onClose }: { onClose: () => void }) {
           ))}
         </select>
       </div>
-      <span className="hint">Files go to the project's exports folder, named with the project, the range and the time. Rendering uses your graphics card, not Claude.</span>
+      {!finish && <span className="hint">Files go to the project's exports folder, named with the project, the range and the time. Rendering uses your graphics card, not Claude.</span>}
       {!listenReminderDismissed(project.id) && <div className="banner info" style={{ borderRadius: 6 }}>Claude cannot hear the result. Listen through once before you export.</div>}
     </Modal>
   )

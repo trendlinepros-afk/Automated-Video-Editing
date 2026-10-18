@@ -457,8 +457,9 @@ export const ProjectSchema = z.looseObject({
     /**
      * The base picture for new thumbnails: a clean frame of the footage (no captions, graphics or effects), sized for
      * the thumbnail format. Sent to Pikzels with every prompt so the real subject of the video is in the thumbnail.
+     * `image`: the name of the owner's own picture it was made from instead (time is 0 then); absent for a frame.
      */
-    base: z.looseObject({ file: z.string(), time: num, by: z.enum(['user', 'claude']), at: z.string() }).optional(),
+    base: z.looseObject({ file: z.string(), time: num, by: z.enum(['user', 'claude']), at: z.string(), image: z.string().optional() }).optional(),
     /** Claude's suggested description for the prompt box (the owner can change or delete it). */
     draft: z.looseObject({ text: z.string(), at: z.string() }).optional(),
     /** Pikzels spend on this project (successful calls only). Absent until the first paid call, so older projects open unchanged. */
@@ -469,7 +470,19 @@ export const ProjectSchema = z.looseObject({
     description: z.string().default(''),
     chapters: z.array(ChapterSchema).default([]),
     tags: z.array(z.string()).default([]),
-    updatedAt: z.string().optional()
+    updatedAt: z.string().optional(),
+    /** What the owner told the Title, desc, tags page: titles they like (up to 3) and what the video is about. */
+    brief: z.looseObject({ examples: z.array(z.string()).default([]), about: z.string().default('') }).optional(),
+    /** The three titles Claude wrote on that page, and which one the owner uses (it is also titles[0]). */
+    generated: z
+      .looseObject({
+        search: z.string().default(''),
+        clickbait: z.string().default(''),
+        mix: z.string().default(''),
+        chosen: z.enum(['search', 'clickbait', 'mix']).optional(),
+        at: z.string()
+      })
+      .optional()
   }),
   /** While Claude re-edits a section, everything outside this range is locked. */
   lock: z.looseObject({ requestId: z.string(), range: RangeSchema }).nullable().default(null),

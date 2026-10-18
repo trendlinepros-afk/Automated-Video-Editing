@@ -7,7 +7,7 @@ import { copyFileSync, existsSync, mkdirSync } from 'node:fs'
 import { basename, extname, isAbsolute, join } from 'node:path'
 import { APP_NAME, MCP_SERVER_NAME } from '@shared/appInfo'
 import { API_METHODS, type ApiMethod } from '@shared/ipcChannels'
-import type { EditThumbnailRequest, FaceSwapRequest, LibraryAsset, ProjectSnapshot, RecreateRequest, ThumbnailRequest, TitlesRequest, UserOp, VoiceoverRequest } from '@shared/ipc'
+import type { EditThumbnailRequest, FaceSwapRequest, LibraryAsset, ProjectSnapshot, PublishDraft, PublishPart, RecreateRequest, ThumbnailRequest, TitlesRequest, UserOp, VoiceoverRequest } from '@shared/ipc'
 import type { ExportPreset, Item, Range, RequestKind, TrackKind } from '@shared/project'
 import type { Profile, Settings } from '@shared/settings'
 import { TimelineResolver, findTimeRange, formatTime, placeSegments } from '@shared/timeline'
@@ -24,12 +24,16 @@ import { buildDiagnostics } from './services/diagnostics'
 import { runExportCheck } from './services/exportCheck'
 import { moveLibrary } from './services/library'
 import { importLibraryFiles } from './services/libraryImport'
+import { writeFinishFiles } from './services/finishExport'
 import { fetchYouTubeThumbnails } from './services/youtube'
-import { clearBase, grabBase } from './services/thumbnailBase'
+import { clearBase, grabBase, useImageAsBase } from './services/thumbnailBase'
 import { writeThumbnailDraft } from './services/thumbnailDraft'
+import { writePublishDraft } from './services/publishDraft'
 
 /** The quick thumbnail draft in flight (one at a time). */
 let draftJob: Promise<unknown> | null = null
+/** The quick title, description and tags call in flight (one at a time). */
+let publishJob: Promise<PublishDraft> | null = null
 import { estimate } from './runner/costs'
 
 type Handler = (...args: any[]) => unknown
@@ -437,6 +441,14 @@ export function registerIpc(ctx: AppContext, getWindow: () => BrowserWindow | nu
       s.log.write('export', `Export requested${where}`, { preset: o.preset, quick: o.quick, captions: o.captions })
       return ctx.renders.start({ range: o.range, preset: o.preset, quick: o.quick, captions: o.captions, ...(outDir ? { outDir } : {}) })
     },
+    'project.finishAndExport': async (o: { preset: ExportPreset; captions: 'burn' | 'srt' | 'both' | 'none' }) => {
+      const s = store()
+      const { dir, files } = writeFinishFiles(s)
+      ctx.versions.save('Before export (Finish)', { auto: true, reason: 'export' })
+      s.log.write('export', 'Finish And Export requested', { preset: o.preset, captions: o.captions, dir })
+      const jobId = await ctx.renders.start({ preset: o.preset, quick: false, captions: o.captions, outDir: dir })
+      return { dir, files, jobId }
+    },
     'project.cancelExport': () => ctx.renders.cancel(),
     'project.exportLog': (filter: 'all' | 'last_session') => {
       const file = exportLog(ctx, filter === 'last_session' ? 'last_session' : 'all')
@@ -473,6 +485,7 @@ export function registerIpc(ctx: AppContext, getWindow: () => BrowserWindow | nu
     'thumbnails.titles': (req: TitlesRequest) => ctx.pikzels.titles({ ...req, source: 'user' }),
     'thumbnails.grabBase': async (time: number) => void (await grabBase(ctx, store(), Number(time) || 0, 'user')),
     'thumbnails.clearBase': () => clearBase(store()),
+    'thumbnails.useImageAsBase': async (path: string) => void (await useImageAsBase(ctx, store(), String(path ?? ''))),
     'thumbnails.requestDraft': async () => {
       const s = store()
       if (!s.project.items.some((i) => i.type === 'segment')) throw new Error('There is no edit yet to write a thumbnail for.')
@@ -484,6 +497,17 @@ export function registerIpc(ctx: AppContext, getWindow: () => BrowserWindow | nu
         }, BOOKKEEPING)
       draftJob ??= writeThumbnailDraft(ctx, s).finally(() => (draftJob = null))
       await draftJob
+    },
+    // ---------------------------------------------------------------- Title, desc, tags page
+    'publish.generate': async (opts?: { only?: PublishPart; direction?: string }) => {
+      if (publishJob) throw new Error('Claude is already writing. Wait for it to finish.')
+      const only = opts?.only && ['titles', 'description', 'tags'].includes(opts.only) ? opts.only : undefined
+      publishJob = writePublishDraft(ctx, store(), { only, direction: typeof opts?.direction === 'string' ? opts.direction.slice(0, 500) : undefined })
+      try {
+        return await publishJob
+      } finally {
+        publishJob = null
+      }
     },
     'thumbnails.choose': (id: string) => {
       store().mutate('Choose thumbnail', 'user', (d) => {

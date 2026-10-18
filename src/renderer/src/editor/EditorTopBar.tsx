@@ -30,9 +30,6 @@ export function EditorTopBar() {
       <ProfileChip name={snap.profile?.name} color={snap.profile?.color} />
       <ClaudeStatus />
       <Checklist />
-      <button className="btn ghost small" onClick={() => openDialog({ kind: 'inspiration' })} title="Your vision for this video">
-        Inspiration
-      </button>
       <UndoButton />
       <IntroBar />
       <div className="spacer" />
@@ -215,3 +212,4 @@ function JobChip() {
     </div>
   )
 }
+

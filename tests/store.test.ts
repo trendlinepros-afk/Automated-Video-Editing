@@ -72,6 +72,24 @@ describe('ProjectStore', () => {
     expect(leftovers(join(f, '..'))).toEqual([])
   })
 
+  it('backs up only when the project changed since its newest backup', () => {
+    const store = makeProject()
+    store.flush()
+    const dir = store.dir
+    const copies = () => readdirSync(join(dir, 'backups')).filter((f) => /^project\.\d{4}-/.test(f)).length
+    ProjectStore.open(dir, '1.0.0-test')
+    expect(copies()).toBe(1)
+    // Opened again and again without a change: no more copies.
+    for (let i = 0; i < 5; i++) ProjectStore.open(dir, '1.0.0-test')
+    expect(copies()).toBe(1)
+    // A real change, then opening: one more.
+    const { store: s2 } = ProjectStore.open(dir, '1.0.0-test')
+    s2.mutate('change', 'user', (d) => void (d.project.inspiration = 'changed'))
+    s2.flush()
+    ProjectStore.open(dir, '1.0.0-test')
+    expect(copies()).toBe(2)
+  })
+
   it('after a power cut leaves project.json empty or damaged, opens from the newest saved copy and keeps the damaged file', () => {
     const store = makeProject()
     store.mutate('a', 'user', (d) => { d.project.inspiration = 'first' })

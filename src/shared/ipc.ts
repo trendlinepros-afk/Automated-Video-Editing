@@ -285,6 +285,15 @@ export interface TitlesRequest {
   thumbnailId?: string
 }
 
+export type PublishPart = 'titles' | 'description' | 'tags'
+
+/** What Claude wrote on the Title, desc, tags page (only the asked-for part is filled when `only` was given). */
+export interface PublishDraft {
+  titles?: { search: string; clickbait: string; mix: string }
+  description?: string
+  tags?: string[]
+}
+
 export interface ThumbnailScore {
   main: number
   subscores: Record<string, unknown>
@@ -430,6 +439,8 @@ export interface Api {
       compareFrames(aId: string, bId: string, time: number): Promise<{ a: string | null; b: string | null }>
     }
     exportVideo(opts: { range?: Range; preset: ExportPreset; quick: boolean; captions: 'burn' | 'srt' | 'both' | 'none' }): Promise<string>
+    /** Finish And Export: the video, thumbnails and a title/description/tags text file into the project's Export folder. */
+    finishAndExport(opts: { preset: ExportPreset; captions: 'burn' | 'srt' | 'both' | 'none' }): Promise<{ dir: string; files: string[]; jobId: string }>
     /** The check before export: timeline problems, then the picture and sound of the preview. */
     exportCheck(range?: Range): Promise<ExportCheckResult>
     onCheckProgress(cb: (message: string) => void): () => void
@@ -452,8 +463,18 @@ export interface Api {
     /** Use a clean frame of the footage at this timeline time (no captions, graphics or effects) as the base picture. */
     grabBase(time: number): Promise<void>
     clearBase(): Promise<void>
+    /** Use your own picture (a blank thumbnail template, a photo) as the base picture, cropped to the thumbnail format. */
+    useImageAsBase(path: string): Promise<void>
     /** Ask Claude to write the description and pick the base frame (fills thumbnails.draft and thumbnails.base). */
     requestDraft(): Promise<void>
+  }
+  publish: {
+    /**
+     * One quick Claude call (not a queued editing request) for the Title, desc, tags page. Saves the result: the three
+     * titles in publish.generated (the chosen one, Mix by default, becomes titles[0]); the description and tags when
+     * they were empty or when that part is the one asked for. `only` regenerates just that part.
+     */
+    generate(opts?: { only?: PublishPart; direction?: string }): Promise<PublishDraft>
   }
   preview: {
     state(): Promise<PreviewState>

@@ -387,7 +387,7 @@ export function installMockApi(): void {
       showItemInFolder: async () => undefined,
       openExternal: async (url) => void window.open(url, '_blank'),
       pickFolder: async () => 'C:\\Users\\Adam\\Videos\\New footage',
-      pickFiles: async (o) => (o.multi ? ['a.jpg', 'b.jpg', 'c.jpg'] : ['C:\\Users\\Adam\\file.wav']),
+      pickFiles: async (o) => (o.multi ? ['a.jpg', 'b.jpg', 'c.jpg'] : o.filters?.some((f) => f.extensions.includes('png')) ? ['C:\\Users\\Adam\\blank-thumbnail.png'] : ['C:\\Users\\Adam\\file.wav']),
       saveFile: async () => 'C:\\Users\\Adam\\out.png',
       fileUrl: (path) => placeholder(path.split(/[\\/]/).pop() ?? '', 200),
       copyText: async (t) => navigator.clipboard?.writeText(t).catch(() => undefined),
@@ -577,6 +577,7 @@ export function installMockApi(): void {
         remove: async (id) => void versions.splice(versions.findIndex((v) => v.id === id), 1),
         compareFrames: async (a, b, t) => ({ a: placeholder(`${a} @ ${t.toFixed(1)}s`, 120), b: placeholder(`${b} @ ${t.toFixed(1)}s`, 300) })
       },
+      finishAndExport: async () => ({ dir: 'C:\\Videos\\LiPo battery torture test\\Export', files: [], jobId: 'job_finish' }),
       exportVideo: async () => {
         const id = `j${Date.now()}`
         void (async () => {
@@ -595,7 +596,21 @@ export function installMockApi(): void {
       saveToLibrary: async (_id, meta) => ({ ...library[0], id: `a${Date.now()}`, name: meta.name })
     },
     thumbnails: {
-      generate: async () => undefined,
+      generate: async (req) => {
+        // A batch that arrives a moment later, scored like automatic scoring does.
+        const batchId = `b${Date.now()}`
+        const ids = Array.from({ length: req.count }, (_, i) => `${batchId}-${i}`)
+        commit((d) => {
+          for (const id of ids) d.project.thumbnails.items.push({ id, prompt: req.prompt, createdAt: now(), source: 'user', status: 'pending', batchId, kind: 'text', format: '16:9' })
+        }, 'user', 'Generate thumbnails')
+        await new Promise((r) => setTimeout(r, 1500))
+        commit((d) => {
+          ids.forEach((id, i) => {
+            const t = d.project.thumbnails.items.find((x) => x.id === id)
+            if (t) Object.assign(t, { status: 'done', file: placeholder(`New ${i + 1}`, 120 + i * 50), cost: 0.13, score: { main: [8.1, 6.7, 7.4][i] ?? 7, subscores: { clarity: 8, emotion: 7 }, suggestion: 'Make the text bigger.', at: now() } })
+          })
+        }, 'app', 'Thumbnails ready')
+      },
       regenerate: async () => undefined,
       choose: async (id) => void commit((d) => void (d.project.thumbnails.chosenId = id), 'user', 'Choose thumbnail'),
       exportImage: async () => 'C:\\Users\\Adam\\thumb.png',
@@ -613,6 +628,8 @@ export function installMockApi(): void {
       grabBase: async (time) =>
         void commit((d) => void (d.project.thumbnails.base = { file: placeholder(`Frame ${time.toFixed(1)}s`, 160), time, by: 'user', at: now() }), 'user', 'Base picture'),
       clearBase: async () => void commit((d) => void delete d.project.thumbnails.base, 'user', 'Clear base picture'),
+      useImageAsBase: async (path) =>
+        void commit((d) => void (d.project.thumbnails.base = { file: placeholder('Your template', 30), time: 0, by: 'user', at: now(), image: path.split(/[\\/]/).pop() }), 'user', 'Base picture'),
       requestDraft: async () => {
         // One quick call: the description and the base frame Claude picked arrive when it returns.
         await new Promise((r) => setTimeout(r, 1500))
@@ -624,6 +641,41 @@ export function installMockApi(): void {
       titles: async () => {
         const out = ['My LiPo Almost Caught Fire', 'Do Not Charge Your LiPo Like This']
         commit((d) => void (d.project.publish.titles = [...out, ...d.project.publish.titles]), 'user', 'Titles')
+        return out
+      }
+    },
+    publish: {
+      generate: async (opts) => {
+        // One quick Claude call: everything arrives together after a moment.
+        await new Promise((r) => setTimeout(r, 1500))
+        const only = opts?.only
+        const n = (doc.project.publish.generated ? 1 : 0) + Math.floor(Math.random() * 3)
+        const sets = [
+          { search: '4S LiPo Battery Torture Test: How Hot Does It Get?', clickbait: 'I Pushed This LiPo Until It Almost Exploded', mix: 'LiPo Torture Test: This $40 Battery Got Scary Hot' },
+          { search: 'Cheap 4S LiPo vs Full Throttle: Heat Test on a Traxxas', clickbait: 'This Battery Should NOT Have Survived', mix: 'Testing a $40 LiPo to Its Limit (It Got Too Hot)' },
+          { search: 'How Hot Can a 4S LiPo Get? RC Car Battery Test', clickbait: 'My LiPo Hit 70°C and I Kept Going', mix: '4S LiPo Heat Test: I Ran It Until It Puffed' }
+        ]
+        const titles = sets[n % sets.length]
+        const description =
+          'How hot does a cheap 4S LiPo get when you run it flat out? I put a $40 battery through a full-throttle torture test in my Traxxas to find out.\n' +
+          'RC LiPo heat test, puffing and safe temperatures, explained.\n\n' +
+          'I charge it, bash it, check the temperature after every run and keep going until it gets scary. You will see what happens to the voltage, ' +
+          'when it starts to puff, and the one charging mistake that makes it worse.\n\n' +
+          'If you run LiPos in your RC car, watch this before your next pack.'
+        const tags = ['4s lipo', 'lipo battery test', 'lipo torture test', 'rc lipo heat', 'lipo puffing', 'traxxas battery', 'rc car battery', 'lipo safety', 'cheap lipo', 'rc bashing', 'rc car', 'rc cars']
+        const out = { titles: !only || only === 'titles' ? titles : undefined, description: !only || only === 'description' ? description : undefined, tags: !only || only === 'tags' ? tags : undefined }
+        commit((d) => {
+          const pub = d.project.publish
+          if (out.titles) {
+            const chosen = pub.generated?.chosen ?? 'mix'
+            pub.generated = { ...out.titles, chosen, at: now() }
+            const order = [out.titles[chosen], ...(['search', 'clickbait', 'mix'] as const).filter((k) => k !== chosen).map((k) => out.titles![k]), ...pub.titles]
+            pub.titles = order.filter((t, i) => order.indexOf(t) === i).slice(0, 6)
+          }
+          if (out.description && (only === 'description' || !pub.description.trim())) pub.description = out.description
+          if (out.tags && (only === 'tags' || !pub.tags.length)) pub.tags = out.tags
+          pub.updatedAt = now()
+        }, 'claude', 'Titles, description and tags from Claude')
         return out
       }
     },

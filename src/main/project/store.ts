@@ -300,22 +300,37 @@ export class ProjectStore extends EventEmitter {
   }
 
   /**
-   * Automatic copy of project.json (and the transcript) each time it is opened and every 10 minutes of editing;
-   * the last 30 are kept. A damaged file is restored from the newest of these.
+   * Automatic copy of project.json (and the transcript) when it is opened and every 10 minutes of editing, but only
+   * when it changed since the newest copy; the last 30 are kept. A damaged file is restored from the newest of these.
    */
   private static rotateBackup(dir: string, transcriptFile = 'transcript.json'): void {
     const p = projectPaths(dir)
-    const keep = (prefix: string, limit: number) => {
-      const auto = readdirSync(p.backups)
+    const list = (prefix: string) =>
+      readdirSync(p.backups)
         .filter((f) => new RegExp(`^${prefix}\\.\\d{4}-`).test(f))
         .sort()
+    const keep = (prefix: string, limit: number) => {
+      const auto = list(prefix)
       for (const f of auto.slice(0, Math.max(0, auto.length - limit))) rmSync(join(p.backups, f), { force: true })
     }
+    // Only when the file changed since its newest backup: an open but idle project, or one opened again and again,
+    // adds no copies (and so never pushes older, different backups out).
+    const changed = (file: string, prefix: string) => {
+      const newest = list(prefix).at(-1)
+      if (!newest) return true
+      try {
+        return !readFileSync(file).equals(readFileSync(join(p.backups, newest)))
+      } catch {
+        return true
+      }
+    }
     try {
-      copyFileSync(p.file, join(p.backups, `project.${stamp()}.json`))
-      keep('project', BACKUP_LIMIT)
+      if (changed(p.file, 'project')) {
+        copyFileSync(p.file, join(p.backups, `project.${stamp()}.json`))
+        keep('project', BACKUP_LIMIT)
+      }
       const t = join(dir, transcriptFile)
-      if (existsSync(t) && readableJson(t) !== null) {
+      if (existsSync(t) && readableJson(t) !== null && changed(t, 'transcript')) {
         copyFileSync(t, join(p.backups, `transcript.${stamp()}.json`))
         keep('transcript', 10)
       }

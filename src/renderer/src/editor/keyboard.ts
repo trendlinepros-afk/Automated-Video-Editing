@@ -29,7 +29,8 @@ export function useEditorKeys(): void {
         void redo()
         return
       }
-      if (ctrl || e.altKey) return
+      // Undo and redo work on every page; the timeline keys only where the timeline is.
+      if (ctrl || e.altKey || s.workspace !== 'edit') return
       const fps = currentDerived()?.fps ?? 30
       switch (e.key) {
         case ' ':

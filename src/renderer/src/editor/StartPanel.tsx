@@ -1,5 +1,5 @@
 /**
- * Start edit (new projects): optional inspiration, Whole video or Just the intro, and Start edit.
+ * Start edit (new projects): what the Instructions tab says, and Start edit.
  * Intro ready: Continue with the rest, Redo the intro with new direction, or Stop there.
  */
 import { useEffect, useState } from 'react'
@@ -8,25 +8,21 @@ import { EstimateNote, useEstimate } from './EstimateNote'
 import { openSettings, toast } from '../state/app'
 import { themeOneLine, type VideoTheme } from '@shared/videoTheme'
 import { errorMessage } from '../util'
-import { applyOp, editor } from '../state/editor'
+import { editor, setWorkspace } from '../state/editor'
 import { useStore } from '../state/store'
 import { useDerived } from '../state/derived'
 
 export function StartPanel({ onStarted }: { onStarted: () => void }) {
   const project = useStore(editor, (s) => s.snapshot!.doc.project)
   const readOnly = useStore(editor, (s) => s.snapshot!.readOnly)
-  const [inspiration, setInspiration] = useState(project.inspiration)
-  const [scope, setScope] = useState<'whole' | 'intro'>(project.scope.mode)
-  const [auto, setAuto] = useState(project.scope.introMaxSeconds === null)
-  const [maxSeconds, setMaxSeconds] = useState(String(project.scope.introMaxSeconds ?? 60))
+  const scope = project.scope.mode
   const [busy, setBusy] = useState(false)
   const [est, setEst] = useState<ClaudeEstimate | null>(null)
   const [themes, setThemes] = useState<VideoTheme[]>([])
-  const [themeId, setThemeId] = useState<string>(project.videoTheme?.id ?? '')
   useEffect(() => {
     void window.api.themes.list().then(setThemes, () => undefined)
   }, [])
-  const theme = themes.find((t) => t.id === themeId)
+  const theme = themes.find((t) => t.id === project.videoTheme?.id)
   useEffect(() => {
     let live = true
     window.api.claude.estimate('start_edit', { scope }).then((e) => live && setEst(e), () => undefined)
@@ -35,15 +31,16 @@ export function StartPanel({ onStarted }: { onStarted: () => void }) {
     }
   }, [scope])
 
-  const saveInspiration = () => {
-    if (inspiration !== project.inspiration) void applyOp({ op: 'setInspiration', text: inspiration })
-  }
-
+  // Everything comes from the Instructions tab, saved in the project.
   const start = async () => {
     setBusy(true)
-    const introMaxSeconds = scope === 'intro' && !auto ? Math.max(5, parseFloat(maxSeconds) || 60) : null
     try {
-      await window.api.project.startEdit({ inspiration, scope, introMaxSeconds, videoThemeId: themeId || null })
+      await window.api.project.startEdit({
+        inspiration: project.inspiration,
+        scope,
+        introMaxSeconds: scope === 'intro' ? project.scope.introMaxSeconds : null,
+        videoThemeId: project.videoTheme?.id ?? null
+      })
       onStarted()
       toast(scope === 'intro' ? 'Claude is starting on the intro. It reads the whole video first.' : 'Claude is starting the edit. Watch it land on the timeline.')
     } catch (e) {
@@ -52,71 +49,42 @@ export function StartPanel({ onStarted }: { onStarted: () => void }) {
     setBusy(false)
   }
 
+  const lines = project.inspiration.trim().split('\n').filter(Boolean)
   return (
     <div className="start-panel">
       <div className="card">
         <div>
           <h2>Start the edit</h2>
-          <div className="muted small">Nothing here is required. Claude reads the footage, the channel's rules and the brand kit either way.</div>
+          <div className="muted small">Claude reads the footage, your instructions, the channel's rules and the brand kit, then edits stage by stage.</div>
         </div>
-        <div className="field">
-          <label>Inspiration (optional)</label>
-          <textarea
-            rows={6}
-            value={inspiration}
-            disabled={readOnly}
-            onChange={(e) => setInspiration(e.target.value)}
-            onBlur={saveInspiration}
-            placeholder="Your vision: tone, pacing, jokes, moments to feature, videos to take after… (Win+H to speak)"
-          />
-        </div>
-        <div className="field">
-          <label>Video theme (optional)</label>
-          <div className="row" style={{ gap: 8 }}>
-            <select value={themeId} disabled={readOnly} onChange={(e) => setThemeId(e.target.value)} style={{ minWidth: 240 }}>
-              <option value="">None: the channel's usual style</option>
-              {themes.map((t) => (
-                <option key={t.id} value={t.id}>
-                  {t.name}
-                </option>
-              ))}
-            </select>
-            <button className="btn small ghost" onClick={() => openSettings('themes')} title="Make a theme from a YouTube video or channel">
-              {themes.length ? 'Manage…' : 'Make one from a YouTube link…'}
+        <div className="col small" style={{ gap: 6 }}>
+          <div>
+            <span className="muted">Instructions: </span>
+            {lines.length ? (
+              <span className="selectable">
+                {lines.slice(0, 3).join(' · ')}
+                {lines.length > 3 ? ' …' : ''}
+              </span>
+            ) : (
+              <span className="faint">none (Claude does its best from the footage)</span>
+            )}
+          </div>
+          <div>
+            <span className="muted">Video theme: </span>
+            {theme ? `${theme.name} (${themeOneLine(theme)})` : project.videoTheme?.name ?? "the channel's usual style"}
+          </div>
+          <div>
+            <span className="muted">Scope: </span>
+            {scope === 'intro' ? `just the intro first${project.scope.introMaxSeconds ? ` (at most ${project.scope.introMaxSeconds} s)` : ''}` : 'the whole video'}
+          </div>
+          <div>
+            <button className="btn small ghost" onClick={() => setWorkspace('instructions')} style={{ paddingLeft: 0 }}>
+              ← Change instructions
+            </button>
+            <button className="btn small ghost" onClick={() => openSettings('themes')}>
+              Video themes…
             </button>
           </div>
-          {theme && <span className="hint">Claude edits to a similar pace and style: {themeOneLine(theme)}.</span>}
-        </div>
-        <div className="field">
-          <label>Scope</label>
-          <div className="seg" style={{ width: 'fit-content' }}>
-            <button className={scope === 'whole' ? 'on' : ''} onClick={() => setScope('whole')}>
-              Whole video
-            </button>
-            <button className={scope === 'intro' ? 'on' : ''} onClick={() => setScope('intro')}>
-              Just the intro
-            </button>
-          </div>
-          {scope === 'intro' && (
-            <div className="row small" style={{ marginTop: 4 }}>
-              <span className="muted">Intro length</span>
-              <div className="seg">
-                <button className={auto ? 'on' : ''} onClick={() => setAuto(true)}>
-                  Auto
-                </button>
-                <button className={!auto ? 'on' : ''} onClick={() => setAuto(false)}>
-                  At most
-                </button>
-              </div>
-              {!auto && (
-                <>
-                  <input type="number" min={5} step={5} style={{ width: 70 }} value={maxSeconds} onChange={(e) => setMaxSeconds(e.target.value)} />
-                  <span className="muted">seconds</span>
-                </>
-              )}
-              {auto && <span className="faint">Claude judges where the intro ends.</span>}
-            </div>
-          )}
         </div>
         <div className="row">
           <EstimateNote estimate={est} />

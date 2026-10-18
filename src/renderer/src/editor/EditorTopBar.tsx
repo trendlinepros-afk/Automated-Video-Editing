@@ -5,7 +5,7 @@
 import { useEffect, useRef, useState } from 'react'
 import type { ChecklistEntry } from '@shared/project'
 import { call, leaveEditor } from '../state/app'
-import { editor, openDialog } from '../state/editor'
+import { editor, openDialog, setWorkspace } from '../state/editor'
 import { UndoButton } from './UndoButton'
 import { IntroBar } from './IntroBar'
 import { useStore } from '../state/store'
@@ -30,14 +30,12 @@ export function EditorTopBar() {
       <ProfileChip name={snap.profile?.name} color={snap.profile?.color} />
       <ClaudeStatus />
       <Checklist />
-      <button className="btn ghost small" onClick={() => openDialog({ kind: 'inspiration' })} title="Your vision for this video">
-        Inspiration
-      </button>
       <UndoButton />
       <IntroBar />
       <div className="spacer" />
       <JobChip />
       <CostChip />
+      <FlowNext />
       <button className="btn small primary" onClick={() => openDialog({ kind: 'export' })}>
         <Icon name="export" size={14} /> Export
       </button>
@@ -213,5 +211,17 @@ function JobChip() {
         <Icon name="close" size={12} />
       </button>
     </div>
+  )
+}
+
+/** In the Editing tab, once the edit is ready: on to the thumbnails (the flow's next step). */
+function FlowNext() {
+  const workspace = useStore(editor, (s) => s.workspace)
+  const status = useStore(editor, (s) => s.snapshot!.doc.project.status)
+  if (workspace !== 'edit' || (status !== 'ready_for_review' && status !== 'exported')) return null
+  return (
+    <button className="btn small primary" onClick={() => setWorkspace('thumbnails')} title="Happy with the edit? Make the thumbnails next">
+      Next: Thumbnails →
+    </button>
   )
 }

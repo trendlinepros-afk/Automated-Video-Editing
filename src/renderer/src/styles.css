@@ -445,3 +445,6 @@ button:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
 body.scrubbing, body.scrubbing * { cursor: ew-resize !important; user-select: none; }
 .tl-range-x { position: absolute; top: 1px; width: 18px; height: 18px; padding: 0; line-height: 16px; font-size: 15px; border-radius: 4px; border: 1px solid var(--line-2); background: var(--bg-2); color: var(--text); cursor: pointer; z-index: 3; }
 .tl-range-x:hover { background: var(--bad, #e5484d); border-color: transparent; color: #fff; }
+.chip-button { border: 1px solid var(--line); background: var(--bg-2); color: var(--text-2); border-radius: 999px; padding: 3px 10px; font-size: 12px; cursor: pointer; }
+.chip-button:hover:not(:disabled) { color: var(--text); border-color: var(--accent); }
+.chip-button:disabled { opacity: 0.5; cursor: default; }

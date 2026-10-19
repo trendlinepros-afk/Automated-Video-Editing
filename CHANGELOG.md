@@ -3,6 +3,10 @@
 Each release's section becomes its GitHub release text and the notes shown in the app's update dialog.
 A release is blocked until the section for its version has notes.
 
+## 1.12.2
+
+- **Thumbnail Edit, Recreate and Face swap work again.** Pikzels now only takes pictures as data URLs and rejected these with "Provide a valid image base64 data URL" (VALIDATION_ERROR). Every picture the app sends (the thumbnail, the painted mask, support images, faces, frames, scoring and title pictures) now goes as a data URL, with the old form tried once if a Pikzels version wants that instead.
+
 ## 1.12.1
 
 - **Sharper exports.** Zooms, punch-ins and camera shake used to enlarge the finished frame, which threw away much of the detail of sharp camera footage (a zoom kept about 40 % of it). They now move the camera on the original clip, so the picture is resampled once, straight from your footage: the same zoom now keeps about twice the detail. Every moved, scaled or zoomed picture is also sampled with a sharper (bicubic) filter, and footage is read with a higher-quality scaler.

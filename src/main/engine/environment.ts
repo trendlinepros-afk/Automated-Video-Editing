@@ -287,10 +287,31 @@ export function copyEngine(from: string, to: string): void {
   renameSync(tmp, to)
 }
 
+/**
+ * A short hash of an engine folder's code (ave_engine, without caches). The bundled engine is installed under
+ * "<version>-<hash>", so an app update whose engine code changed installs that code, also for existing projects
+ * (which keep their engine version), instead of reusing the copy made by an earlier app.
+ */
+export function engineContentHash(dir: string): string {
+  const h = createHash('sha256')
+  const walk = (rel: string) => {
+    const abs = join(dir, rel)
+    for (const name of readdirSync(abs).sort()) {
+      if (name === '__pycache__' || name.endsWith('.pyc')) continue
+      const r = rel ? `${rel}/${name}` : name
+      if (statSync(join(abs, name)).isDirectory()) walk(r)
+      else h.update(r).update('\0').update(readFileSync(join(abs, name))).update('\0')
+    }
+  }
+  walk('ave_engine')
+  return h.digest('hex').slice(0, 10)
+}
+
 // ------------------------------------------------------------------ the service
 
 export function createEnvironmentService(ctx: AppContext): EnvironmentService {
   let gpuCache: GpuInfo | null = null
+  let bundledHash: string | undefined
   let installing: Promise<void> | null = null
 
   const bundledEngine = (): string => {
@@ -382,13 +403,16 @@ export function createEnvironmentService(ctx: AppContext): EnvironmentService {
     const bundled = bundledEngine()
     // While developing, run the engine straight from the source folder so edits apply at once.
     if (!ctx.isPackaged && version === ENGINE_VERSION && existsSync(join(bundled, 'ave_engine'))) return bundled
-    const target = join(paths.enginesDir, version)
-    if (existsSync(join(target, 'ave_engine'))) return target
     if (version === ENGINE_VERSION && existsSync(join(bundled, 'ave_engine'))) {
+      bundledHash ??= engineContentHash(bundled)
+      const target = join(paths.enginesDir, `${version}-${bundledHash}`)
+      if (existsSync(join(target, 'ave_engine'))) return target
       copyEngine(bundled, target)
-      ctx.appLog.write('render', `Engine ${version} installed`, { dir: target })
+      ctx.appLog.write('render', `Engine ${version} (${bundledHash}) installed`, { dir: target })
       return target
     }
+    const target = join(paths.enginesDir, version)
+    if (existsSync(join(target, 'ave_engine'))) return target
     // The project was made with an engine this PC does not have: use the newest one installed.
     const installed = existsSync(paths.enginesDir)
       ? readdirSync(paths.enginesDir).filter((v) => existsSync(join(paths.enginesDir, v, 'ave_engine')))

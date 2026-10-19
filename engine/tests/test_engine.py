@@ -530,3 +530,47 @@ def test_torch_backend_draws_the_same_picture(media, tmp_path):
     b = Renderer(plan, backend=TorchBackend(device))
     for t in (0.6, 1.2, 2.1, 3.3, 4.8, 6.5, 7.6):
         assert psnr(a.frame_uint8(t), b.frame_uint8(t)) > 40, t
+
+
+def test_zoom_and_shake_resample_the_footage_once(media, tmp_path):
+    """A zoom on the footage frames the same window as zooming the finished frame, but reads the footage at
+    the zoomed size, so it keeps the detail an enlarged frame loses (sharp camera footage stays sharp)."""
+    import cv2
+
+    from ave_engine.compositor import Renderer
+
+    base = make_plan(media, str(tmp_path / 'proj'), 480, 270, effects=False, graphic=False, captions=False)
+    base['brand']['logo']['enabled'] = False
+    base['layers'] = [l for l in base['layers'] if l['id'] == 'seg0']
+    sharp = lambda img: cv2.Laplacian(cv2.cvtColor(img, cv2.COLOR_RGB2GRAY).astype(np.float32), cv2.CV_32F).var()
+    for kind, params, gain in [('zoom', {'amount': 0.6, 'x': 0.1}, 1.15), ('shake', {'amount': 0.03}, 1.05)]:
+        frames = {}
+        for scope in ('footage', 'all'):
+            plan = json.loads(json.dumps(base))
+            plan['layers'].append({'kind': 'effect', 'id': 'z', 'trackId': 'effects', 'effect': kind,
+                                   'params': {**params, 'scope': scope}, 'start': 0.5, 'end': 2.5, 'fadeIn': 0, 'fadeOut': 0})
+            r = Renderer(plan)
+            frames[scope] = r.frame_uint8(1.2)
+            r.close()
+        camera, enlarged = frames['footage'], frames['all']
+        # Same framing: the pictures agree once both are blurred.
+        assert psnr(cv2.GaussianBlur(camera, (0, 0), 3), cv2.GaussianBlur(enlarged, (0, 0), 3)) > 30, kind
+        assert sharp(camera) > sharp(enlarged) * gain, kind
+
+
+def test_a_zoom_fade_eases_the_move_instead_of_ghosting(media, tmp_path):
+    from ave_engine.compositor import Renderer
+
+    base = make_plan(media, str(tmp_path / 'proj'), 320, 180, effects=False, graphic=False, captions=False)
+    base['brand']['logo']['enabled'] = False
+    base['layers'] = [l for l in base['layers'] if l['id'] == 'seg0']
+    out = {}
+    for amount in (0.0, 0.2, 0.4):
+        plan = json.loads(json.dumps(base))
+        if amount:
+            fade = {'fadeIn': 1.0} if amount == 0.4 else {}
+            plan['layers'].append({'kind': 'effect', 'id': 'z', 'trackId': 'effects', 'effect': 'zoom',
+                                   'params': {'amount': amount, **fade}, 'start': 0.5, 'end': 2.5, 'fadeIn': 0, 'fadeOut': 0})
+        out[amount] = Renderer(plan).frame_uint8(1.0)
+    # Half way through a 1 s fade of a 0.4 zoom shows the 0.2 zoom, not a blend of the zoomed and plain frames.
+    assert psnr(out[0.4], out[0.2]) > 40

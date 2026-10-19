@@ -18,6 +18,17 @@ from PIL import Image, ImageOps
 from . import media
 
 
+# HDR footage (PQ or HLG, e.g. a camera's HDR or HLG mode) mapped to the SDR BT.709 the export is, instead of
+# showing its HDR signal as if it were SDR (flat and washed out).
+HDR_TRANSFERS = ('smpte2084', 'arib-std-b67')
+HDR_TO_SDR = ('zscale=t=linear:npl=100,format=gbrpf32le,zscale=p=bt709,tonemap=tonemap=mobius:desat=0,'
+              'zscale=t=bt709:m=bt709:r=tv,format=yuv444p10le')
+
+
+def is_hdr(info: media.ProbeInfo) -> bool:
+    return (info.color or {}).get('color_transfer') in HDR_TRANSFERS
+
+
 class VideoReader:
     # How far ahead (in source seconds) reading on beats a fresh seek.
     MAX_SKIP_SECONDS = 1.5
@@ -64,7 +75,7 @@ class VideoReader:
         if n > 0:
             args += ['-ss', f'{t:.6f}']
         args += ['-i', self.path, '-map', '0:v:0', '-an', '-sn',
-                 '-vf', f'fps={self.fps_str},{self.vf},format=rgb24',
+                 '-vf', f'fps={self.fps_str},{HDR_TO_SDR + "," if is_hdr(self.info) else ""}{self.vf},format=rgb24',
                  '-f', 'rawvideo', '-pix_fmt', 'rgb24', 'pipe:1']
         self.proc = subprocess.Popen(args, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
                                      bufsize=0, **media.popen_flags())

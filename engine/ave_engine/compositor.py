@@ -24,7 +24,7 @@ from .backend import cv2 as backend_cv2
 from .backend import get_backend
 from .captions import CaptionDrawer
 from .decode import ReaderPool, load_image
-from .effects import TIME_EFFECTS, apply_effect, p_float
+from .effects import CAMERA_EFFECTS, TIME_EFFECTS, apply_effect, camera_matrix, max_camera_zoom, p_float
 from .graphics import merge_brand, render_graphic, resolve_brand_paths
 
 EPS = 1e-6
@@ -161,6 +161,9 @@ class Renderer:
                                 and (e.get('params') or {}).get('scope') != 'all']
         self.top_effects = [e for e in effects if e.get('effect') not in TIME_EFFECTS
                             and (e.get('params') or {}).get('scope') == 'all']
+        # Zoom and shake on the footage move the camera while the footage is drawn (one resample from the source).
+        self.camera_effects = [e for e in self.footage_effects if e.get('effect') in CAMERA_EFFECTS]
+        self.footage_effects = [e for e in self.footage_effects if e.get('effect') not in CAMERA_EFFECTS]
         self.graphics = [l for l in layers if l.get('kind') == 'graphic']
         self.pool = ReaderPool()
         # Enlarge footage on the graphics card (or with OpenCV); plain numpy leaves it to ffmpeg.
@@ -260,16 +263,36 @@ class Renderer:
                 cw, ch = min(sw, max(2, int(round(w / f)))), min(sh, max(2, int(round(h / f))))
                 raw = self.pool.frame(layer['path'], info, f'crop={cw}:{ch}', cw, ch, s)
                 return self.B.upscale(self.B.from_uint8(raw), w, h)
-            vf = f'scale={w}:{h}:force_original_aspect_ratio=increase:flags=bicubic,crop={w}:{h}'
+            vf = f'scale={w}:{h}:force_original_aspect_ratio=increase:flags=lanczos+accurate_rnd+full_chroma_int,crop={w}:{h}'
         else:
             if (w > sw * 1.0001 or h > sh * 1.0001) and self.backend_upscale:
                 raw = self.pool.frame(layer['path'], info, f'scale={sw}:{sh}', sw, sh, s)
                 return self.B.upscale(self.B.from_uint8(raw), w, h)
-            vf = f'scale={w}:{h}:flags=bicubic'
+            vf = f'scale={w}:{h}:flags=lanczos+accurate_rnd+full_chroma_int'
         raw = self.pool.frame(layer['path'], info, vf, w, h, s)
         return self.B.from_uint8(raw)
 
-    def draw_video(self, F, layer: dict, ft: float):
+    def _box_source(self, layer: dict, info, need_w: float, need_h: float, s: float):
+        """The layer's whole source frame, to be drawn as a need_w x need_h box: read at that size but never larger
+        than the file itself (the warp enlarges it), so the picture is resampled once from the original."""
+        W, H = self.width, self.height
+        need_w, need_h = min(need_w, W * 2), min(need_h, H * 2)
+        if layer.get('isImage') or info.kind == 'image':
+            return self._source_frame(layer, info, 'fit', max(2, int(round(need_w))), max(2, int(round(need_h))), s)
+        sw, sh = info.width or layer.get('sourceWidth') or W, info.height or layer.get('sourceHeight') or H
+        k = min(1.0, need_w / sw, need_h / sh)
+        return self._source_frame(layer, info, 'fit', max(2, int(round(sw * k))), max(2, int(round(sh * k))), s)
+
+    def _camera_box(self, cam, x: float, y: float, bw: float, bh: float, rot: float):
+        """A box (centre x, y as frame fractions, size, rotation) moved by the camera's forward map."""
+        W, H = self.width, self.height
+        A = cam[:, :2]
+        cx, cy = A @ np.array([W * (0.5 + x), H * (0.5 + y)]) + cam[:, 2]
+        z = math.sqrt(abs(float(np.linalg.det(A))))
+        ang = math.degrees(math.atan2(A[1, 0], A[0, 0]))
+        return cx / W - 0.5, cy / H - 0.5, bw * z, bh * z, rot + ang
+
+    def draw_video(self, F, layer: dict, ft: float, cam=None, cam_zoom: float = 1.0):
         W, H = self.width, self.height
         info = media.probe(layer['path'])
         u = ft - layer['start']
@@ -279,28 +302,45 @@ class Renderer:
         sw = info.width or layer.get('sourceWidth') or W
         sh = info.height or layer.get('sourceHeight') or H
         fade = fade_opacity(layer, ft)
-        if not has_transform(layer):
+        moved = has_transform(layer)
+        cover = False
+        if not moved:
             op = fade * transform_at(layer, u)[4]
             ratio = (sw / sh) / (W / H)
-            if 1 / COVER_TOLERANCE <= ratio <= COVER_TOLERANCE:
-                src = self._source_frame(layer, info, 'cover', W, H, s)
-                return self.blend(F, src, 0, 0, op)
+            cover = 1 / COVER_TOLERANCE <= ratio <= COVER_TOLERANCE
+            if cam is None:
+                if cover:
+                    src = self._source_frame(layer, info, 'cover', W, H, s)
+                    return self.blend(F, src, 0, 0, op)
+                bw, bh = fit_size(sw, sh, W, H)
+                fw, fh = max(2, int(round(bw))), max(2, int(round(bh)))
+                src = self._source_frame(layer, info, 'fit', fw, fh, s)
+                if src.shape[2] == 3:
+                    bg = self._blur_cover(src)
+                    self.blend(F, bg, 0, 0, op)
+                return self.blend(F, src, (W - fw) // 2, (H - fh) // 2, op)
+            x = y = rot = 0.0
+            scale = dscale = 1.0
+        else:
+            x, y, scale, rot, op = transform_at(layer, u)
+            op *= fade
+            dscale = max_scale(layer)
+        if cover:
+            f = max(W / sw, H / sh)
+            bw, bh = sw * f, sh * f
+        else:
             bw, bh = fit_size(sw, sh, W, H)
-            fw, fh = max(2, int(round(bw))), max(2, int(round(bh)))
-            src = self._source_frame(layer, info, 'fit', fw, fh, s)
-            if src.shape[2] == 3:
-                bg = self._blur_cover(src)
-                self.blend(F, bg, 0, 0, op)
-            return self.blend(F, src, (W - fw) // 2, (H - fh) // 2, op)
-        x, y, scale, rot, op = transform_at(layer, u)
-        bw, bh = fit_size(sw, sh, W, H)
-        dscale = max_scale(layer)
-        dw = max(2, min(int(round(bw * dscale)), W * 2))
-        dh = max(2, min(int(round(bh * dscale)), H * 2))
-        src = self._source_frame(layer, info, 'fit', dw, dh, s)
+        # Read the source at the largest size the box reaches while it lasts (a steady size keeps one decoder).
+        src = self._box_source(layer, info, bw * dscale * cam_zoom, bh * dscale * cam_zoom, s)
+        bw, bh = bw * scale, bh * scale
+        if cam is not None:
+            if not moved and not cover and src.shape[2] == 3:
+                bg = self.with_alpha(self._blur_cover(src))
+                F = self.draw_box(F, bg, *self._camera_box(cam, 0.0, 0.0, W, H, 0.0), op)
+            x, y, bw, bh, rot = self._camera_box(cam, x, y, bw, bh, rot)
         if src.shape[2] == 3:
             src = self.with_alpha(src)
-        return self.draw_box(F, src, x, y, bw * scale, bh * scale, rot, op * fade)
+        return self.draw_box(F, src, x, y, bw, bh, rot, op)
 
     def _blur_cover(self, fitted):
         """A blurred, darkened copy of a fitted frame that fills the whole frame behind it."""
@@ -322,12 +362,20 @@ class Renderer:
             small = small[y0:y0 + ch]
         return B.resize(small, W, H) * 0.55
 
-    def footage(self, ft: float):
+    def footage(self, ft: float, t: float | None = None):
+        """The footage at footage time ft, with the camera (zoom and shake effects) at timeline time t."""
         B = self.B
         F = B.zeros(self.height, self.width, 3)
+        cam, cam_zoom = None, 1.0
+        if t is not None and not self.footage_only:
+            cam = camera_matrix(self, self.camera_effects, t)
+            if cam is not None:
+                for e in self.camera_effects:
+                    if active(e, t):
+                        cam_zoom *= max_camera_zoom(e)
         for layer in self.video:
             if active(layer, ft):
-                F = self.draw_video(F, layer, ft)
+                F = self.draw_video(F, layer, ft, cam, cam_zoom)
         return F
 
     # -- graphics, captions, logo ------------------------------------------------------------
@@ -411,13 +459,14 @@ class Renderer:
         ft = self.footage_time(t)
         remapped = abs(ft - t) > 1e-9
         if remapped:
-            key = round(ft * 1e6)
+            cam = None if self.footage_only else camera_matrix(self, self.camera_effects, t)
+            key = (round(ft * 1e6), None if cam is None else tuple(np.round(cam, 6).ravel()))
             if key != self._footage_key:
-                self._footage = self.footage(ft)
+                self._footage = self.footage(ft, t)
                 self._footage_key = key
             F = self.B.copy(self._footage)
         else:
-            F = self.footage(t)
+            F = self.footage(t, t)
         if self.footage_only:
             self.pool.tick()
             return F

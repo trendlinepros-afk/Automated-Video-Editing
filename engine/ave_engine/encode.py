@@ -60,10 +60,10 @@ def preview_video_args(frames: int) -> list[str]:
 
 
 QUALITY = {
-    'h264': {'cpu': {'draft': ('veryfast', 26), 'good': ('medium', 20), 'best': ('slow', 17)},
-             'nvenc': {'draft': ('p3', 28), 'good': ('p5', 22), 'best': ('p7', 18)}},
-    'hevc': {'cpu': {'draft': ('veryfast', 30), 'good': ('medium', 24), 'best': ('slow', 21)},
-             'nvenc': {'draft': ('p3', 30), 'good': ('p5', 24), 'best': ('p7', 20)}},
+    'h264': {'cpu': {'draft': ('veryfast', 26), 'good': ('medium', 20), 'best': ('slow', 16)},
+             'nvenc': {'draft': ('p3', 28), 'good': ('p5', 22), 'best': ('p7', 16)}},
+    'hevc': {'cpu': {'draft': ('veryfast', 30), 'good': ('medium', 24), 'best': ('slow', 19)},
+             'nvenc': {'draft': ('p3', 30), 'good': ('p5', 24), 'best': ('p7', 18)}},
 }
 
 
@@ -74,7 +74,10 @@ def export_video_args(codec: str, encoder: str, quality: str, fps: float) -> lis
     gop = str(max(1, int(round(fps * 2))))
     if encoder == 'nvenc':
         args = ['-c:v', 'hevc_nvenc' if codec == 'hevc' else 'h264_nvenc', '-preset', preset, '-tune', 'hq',
-                '-rc', 'vbr', '-cq', str(q), '-b:v', '0', '-spatial-aq', '1', '-g', gop, '-bf', '3']
+                '-rc', 'vbr', '-cq', str(q), '-b:v', '0', '-g', gop, '-bf', '3', '-rc-lookahead', '32']
+        # Adaptive quantization moves bits out of detailed areas; Best keeps them for the fine texture of sharp footage.
+        if quality != 'best':
+            args += ['-spatial-aq', '1']
         args += ['-profile:v', 'main' if codec == 'hevc' else 'high']
     elif codec == 'hevc':
         args = ['-c:v', 'libx265', '-preset', preset, '-crf', str(q), '-g', gop, '-x265-params', 'log-level=error']

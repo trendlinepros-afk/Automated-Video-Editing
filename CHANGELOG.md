@@ -3,6 +3,13 @@
 Each release's section becomes its GitHub release text and the notes shown in the app's update dialog.
 A release is blocked until the section for its version has notes.
 
+## 1.12.1
+
+- **Sharper exports.** Zooms, punch-ins and camera shake used to enlarge the finished frame, which threw away much of the detail of sharp camera footage (a zoom kept about 40 % of it). They now move the camera on the original clip, so the picture is resampled once, straight from your footage: the same zoom now keeps about twice the detail. Every moved, scaled or zoomed picture is also sampled with a sharper (bicubic) filter, and footage is read with a higher-quality scaler.
+- **Best quality is higher**: the NVIDIA encoder no longer moves bits out of detailed areas at Best (that smoothed fine texture), looks further ahead, and both encoders use a lower quality number (more detail, larger files).
+- **HDR footage** (HLG or PQ, from a camera's HDR or HLG mode) is converted to normal video properly instead of looking flat and washed out.
+- App updates now always install the new render engine, also for projects you already have (they used to keep the engine copy made when you first installed the app).
+
 ## 1.12.0
 
 - **The editor is now four steps, as tabs at the top: Instructions, Editing, Thumbnails, and Title, desc, tags.** A new project opens on Instructions; each step has a Next button that takes you to the next one, and the last one is **Finish And Export**. You can open any tab at any time, also while Claude is still editing. Projects you already have open on the Editing tab, exactly as before.

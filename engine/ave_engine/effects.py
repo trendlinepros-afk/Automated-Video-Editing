@@ -53,6 +53,10 @@ def p_rgb(params: dict, name: str, default) -> tuple:
     return tuple(float(x) for x in default) if isinstance(default, (list, tuple)) else (float(default),) * 3
 
 
+def active_at(layer: dict, t: float) -> bool:
+    return layer['start'] - 1e-6 <= t < layer['end'] - 1e-6
+
+
 def blend_weight(layer: dict, t: float) -> float:
     params = layer.get('params') or {}
     u = t - layer['start']
@@ -256,21 +260,22 @@ def _noise1(t: float, seed: int, salt: int, freqs=(1.0, 2.3, 4.1)) -> float:
     return v / sum(amps[: len(freqs)])
 
 
-def _affine_frame(c: EffectContext, F, zoom: float, cx: float, cy: float, dx: float, dy: float, rot_deg: float):
-    """Zoom about (cx, cy) (pixels), rotate and shift the whole frame; returns RGB."""
+def forward_similarity(zoom: float, cx: float, cy: float, ox: float, oy: float, rot_deg: float) -> np.ndarray:
+    """2x3 map from a frame point S to where it shows, P = O + zoom R(rot) (S - C), in pixels (pixel centres at +0.5)."""
     th = math.radians(rot_deg)
-    cos, sin = math.cos(th), math.sin(th)
-    # output point P -> source point S = C + R(-th) (P - C - D) / zoom
-    a = cos / zoom
-    b = sin / zoom
-    ox, oy = cx + dx, cy + dy
-    # Output pixel centre P = i + 0.5; source index = M (P - O) + C - 0.5 with M = R(-th) / zoom.
-    m = np.array([[a, b, cx - 0.5 + a * (0.5 - ox) + b * (0.5 - oy)],
-                  [-b, a, cy - 0.5 - b * (0.5 - ox) + a * (0.5 - oy)]])
+    A = zoom * np.array([[math.cos(th), -math.sin(th)], [math.sin(th), math.cos(th)]])
+    return np.hstack([A, (np.array([ox, oy]) - A @ np.array([cx, cy]))[:, None]])
+
+
+def warp_forward(c: EffectContext, F, M: np.ndarray):
+    """The whole frame moved by the forward map M (see forward_similarity)."""
+    inv = np.linalg.inv(M[:, :2])
+    # Source index = A^-1 (P_index + 0.5 - b) - 0.5.
+    m = np.hstack([inv, (inv @ (0.5 - M[:, 2]) - 0.5)[:, None]])
     return c.B.warp(F, m, c.W, c.H)
 
 
-def fx_shake(F, c: EffectContext):
+def shake_camera(c: EffectContext) -> np.ndarray:
     amt = p_float(c.params, 'amount', 0.015) * c.intensity
     freq = p_float(c.params, 'frequency', 1.0)
     t = c.t * freq
@@ -278,7 +283,11 @@ def fx_shake(F, c: EffectContext):
     dy = amt * c.H * 1.4 * _noise1(t * 6.5, c.seed, 42)
     rot = amt * 40 * _noise1(t * 4.0, c.seed, 43)
     zoom = 1 + amt * 3.2
-    return _affine_frame(c, F, zoom, c.W / 2, c.H / 2, dx, dy, rot)
+    return forward_similarity(zoom, c.W / 2, c.H / 2, c.W / 2 + dx, c.H / 2 + dy, rot)
+
+
+def fx_shake(F, c: EffectContext):
+    return warp_forward(c, F, shake_camera(c))
 
 
 def fx_flash(F, c: EffectContext):
@@ -290,7 +299,7 @@ def fx_flash(F, c: EffectContext):
     return F * (1 - a) + c.B.upload(col) * a
 
 
-def fx_zoom(F, c: EffectContext):
+def zoom_camera(c: EffectContext) -> np.ndarray | None:
     amount = p_float(c.params, 'amount', 0.2)
     ramp = p_float(c.params, 'ramp', 0.0)
     ramp_out = p_float(c.params, 'rampOut', 0.0)
@@ -301,7 +310,7 @@ def fx_zoom(F, c: EffectContext):
         k = min(k, ease_out_cubic((c.duration - c.u) / ramp_out))
     zoom = 1 + amount * k * c.intensity
     if zoom <= 1.0005:
-        return F
+        return None
     cx = (0.5 + p_float(c.params, 'x', 0.0) * k) * c.W
     cy = (0.5 + p_float(c.params, 'y', 0.0) * k) * c.H
     # Keep the zoomed view inside the picture.
@@ -309,9 +318,44 @@ def fx_zoom(F, c: EffectContext):
     cx = min(max(cx, hw), c.W - hw)
     cy = min(max(cy, hh), c.H - hh)
     # Show the window around (cx, cy) full frame.
-    a = 1 / zoom
-    m = np.array([[a, 0.0, cx - 0.5 - a * (c.W / 2 - 0.5)], [0.0, a, cy - 0.5 - a * (c.H / 2 - 0.5)]])
-    return c.B.warp(F, m, c.W, c.H)
+    return forward_similarity(zoom, cx, cy, c.W / 2, c.H / 2, 0.0)
+
+
+def fx_zoom(F, c: EffectContext):
+    M = zoom_camera(c)
+    return F if M is None else warp_forward(c, F, M)
+
+
+CAMERA_EFFECTS = {'zoom': zoom_camera, 'shake': shake_camera}
+
+
+def max_camera_zoom(layer: dict) -> float:
+    """The most a camera effect ever enlarges the picture (decides how much footage detail to read)."""
+    p = layer.get('params') or {}
+    intensity = p_float(p, 'intensity', 1.0)
+    if layer.get('effect') == 'zoom':
+        return max(1.0, 1 + p_float(p, 'amount', 0.2) * intensity)
+    return max(1.0, 1 + p_float(p, 'amount', 0.015) * intensity * 3.2)
+
+
+def camera_matrix(renderer, layers: list, t: float) -> np.ndarray | None:
+    """The zoom and shake effects active at t as one move of the footage (forward map, see forward_similarity).
+    Applied while the footage is drawn, so the picture is resampled once, straight from the source file, instead
+    of enlarging the finished frame. A fade in or out eases the move rather than cross-fading two pictures."""
+    M = None
+    for layer in layers:
+        if not active_at(layer, t):
+            continue
+        w = blend_weight(layer, t)
+        if w <= 0:
+            continue
+        m = CAMERA_EFFECTS[layer['effect']](EffectContext(renderer, layer, t))
+        if m is None:
+            continue
+        if w < 1:
+            m = np.hstack([np.eye(2), np.zeros((2, 1))]) * (1 - w) + m * w
+        M = m if M is None else np.hstack([m[:, :2] @ M[:, :2], (m[:, :2] @ M[:, 2] + m[:, 2])[:, None]])
+    return M
 
 
 def fx_vignette(F, c: EffectContext):

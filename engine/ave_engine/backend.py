@@ -2,8 +2,8 @@
 
 Frames are float32 arrays shaped (height, width, channels) with values 0..1, in both backends, so
 compositing and effect code is written once with ordinary operators (+ - * / ** slicing .clip) and the
-few helpers below. Both backends use the same sampling conventions (pixel centres at +0.5, bilinear
-interpolation, transparent outside the source), so they draw the same picture.
+few helpers below. Both backends use the same sampling conventions (pixel centres at +0.5, bicubic
+interpolation for warps, transparent outside the source), so they draw the same picture.
 
 Set AVE_BACKEND=numpy to force the CPU path.
 """
@@ -41,6 +41,14 @@ def torch_status() -> dict:
     except Exception:  # noqa: BLE001
         cuda = False
     return {'torch': getattr(torch, '__version__', None), 'cuda': cuda, 'gpu': gpu}
+
+
+def clamp_premultiplied(x, clip, minimum):
+    """Bicubic overshoots a little at hard edges: back to 0..1, colour no brighter than its alpha."""
+    x = clip(x, 0.0, 1.0)
+    if x.shape[-1] == 4:
+        x[..., :3] = minimum(x[..., :3], x[..., 3:4])
+    return x
 
 
 class NumpyBackend:
@@ -152,9 +160,10 @@ class NumpyBackend:
         m = m_inv.astype(np.float64).copy()
         m[:, 2] += 1.0  # padding offset
         if cv2 is not None and c <= 4:
-            out = cv2.warpAffine(padded, m, (out_w, out_h), flags=cv2.INTER_LINEAR | cv2.WARP_INVERSE_MAP,
+            # Bicubic: bilinear blurs every moved or enlarged picture (zooms, shakes, punch-ins).
+            out = cv2.warpAffine(padded, m, (out_w, out_h), flags=cv2.INTER_CUBIC | cv2.WARP_INVERSE_MAP,
                                  borderMode=cv2.BORDER_CONSTANT, borderValue=(0, 0, 0, 0))
-            return out.reshape(out_h, out_w, c)
+            return clamp_premultiplied(out.reshape(out_h, out_w, c), np.clip, np.minimum)
         xs = np.arange(out_w, dtype=np.float32)[None, :]
         ys = np.arange(out_h, dtype=np.float32)[:, None]
         u = (m[0, 0] * xs + m[0, 1] * ys + m[0, 2]).astype(np.float32)
@@ -300,8 +309,8 @@ class TorchBackend:
         gx = (2 * u + 1) / w - 1
         gy = (2 * v + 1) / h - 1
         g = t.stack([gx, gy], dim=-1).unsqueeze(0)
-        y = self.F.grid_sample(self._nchw(src), g, mode='bilinear', padding_mode='zeros', align_corners=False)
-        return self._hwc(y)
+        y = self.F.grid_sample(self._nchw(src), g, mode='bicubic', padding_mode='zeros', align_corners=False)
+        return clamp_premultiplied(self._hwc(y), lambda a, lo, hi: a.clamp(lo, hi), t.minimum)
 
     def to_yuv420p(self, x) -> bytes:
         """BT.709 limited range, chroma averaged over 2x2 blocks. Halves what goes down the pipe."""

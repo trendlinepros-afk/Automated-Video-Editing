@@ -8,7 +8,9 @@ import { SettingsSchema } from '@shared/settings'
 import type { AppContext } from '../src/main/context'
 import { ActivityLog } from '../src/main/log'
 import { ProjectStore } from '../src/main/project/store'
-import { FEATURE_CHANGED, PIKZELS_API, createPikzelsService, fieldProblems, plainError, stripLinks } from '../src/main/services/pikzels'
+import { FEATURE_CHANGED, PIKZELS_API, asDataUrl, createPikzelsService, fieldProblems, plainError, stripLinks } from '../src/main/services/pikzels'
+
+const du = (text: string) => asDataUrl(Buffer.from(text).toString('base64'))
 import { createSecretsService, createSettingsService } from '../src/main/services/settings'
 import { initPaths, paths } from '../src/main/paths'
 import { clearBase, grabBase, useImageAsBase } from '../src/main/services/thumbnailBase'
@@ -295,7 +297,7 @@ describe('Pikzels', () => {
     const a = await svc.recreate({ from: { path: img }, prompt: 'Make it red', source: 'user' })
     expect(a).toMatchObject({ kind: 'recreate', status: 'done', model: 'pkz_4_5' })
     const b1 = calls.filter((c) => c.url.endsWith(PIKZELS_API.thumbnailFromImage))[0].body
-    expect(b1).toMatchObject({ image_base64: Buffer.from('REFIMG').toString('base64'), prompt: 'Make it red', model: 'pkz_4_5', persona: 'persona_a', style: 'style_b' })
+    expect(b1).toMatchObject({ image_base64: du('REFIMG'), prompt: 'Make it red', model: 'pkz_4_5', persona: 'persona_a', style: 'style_b' })
 
     await svc.recreate({ from: { url: 'https://www.youtube.com/watch?v=abc123' }, source: 'user' })
     const b2 = calls.filter((c) => c.url.endsWith(PIKZELS_API.thumbnailFromImage))[1].body
@@ -307,7 +309,7 @@ describe('Pikzels', () => {
     const b3 = calls.filter((c) => c.url.endsWith(PIKZELS_API.thumbnailFromImage))[2].body
     // The frame is the clean footage (no captions or graphics), sized for a 16:9 thumbnail.
     expect(frames.at(-1)).toEqual({ time: 12.5, footageOnly: true })
-    expect(jpegSize(Buffer.from(b3.image_base64, 'base64'))).toEqual({ width: 1280, height: 720 })
+    expect(jpegSize(Buffer.from(b3.image_base64.replace(/^data:image\/jpeg;base64,/, ''), 'base64'))).toEqual({ width: 1280, height: 720 })
     expect(b3).toMatchObject({ model: 'pkz_2', image_weight: 'high' })
     expect(b3.persona).toBeUndefined()
     expect(store.project.thumbnails.spend?.byAction).toEqual({ 'recreate:pkz_4_5': 0.26, 'recreate:pkz_2': 0.2 })
@@ -322,7 +324,7 @@ describe('Pikzels', () => {
     const t = await createPikzelsService(makeCtx(), { fetch: fn, sleep: async () => {} }).edit({ thumbnailId: base, prompt: 'Text says WOW', maskBase64: 'data:image/png;base64,TUFTSw==', supportImagePath: support, source: 'user' })
     expect(t).toMatchObject({ kind: 'edit', status: 'done', parentId: base, cost: 0.12 })
     const body = calls.find((c) => c.url.endsWith(PIKZELS_API.thumbnailEdit))!.body
-    expect(body).toMatchObject({ prompt: 'Text says WOW', image_base64: Buffer.from('PNG').toString('base64'), mask_base64: 'TUFTSw==', support_image_base64: Buffer.from('SUP').toString('base64'), format: '16:9' })
+    expect(body).toMatchObject({ prompt: 'Text says WOW', image_base64: du('PNG'), mask_base64: 'data:image/png;base64,TUFTSw==', support_image_base64: du('SUP'), format: '16:9' })
     expect(store.project.thumbnails.items.find((x) => x.id === base)!.status).toBe('done')
   })
 
@@ -333,7 +335,7 @@ describe('Pikzels', () => {
     const ok = fakeFetch()
     const t = await createPikzelsService(makeCtx(), { fetch: ok.fn, sleep: async () => {} }).faceSwap({ thumbnailId: base, facePath: face })
     expect(t).toMatchObject({ kind: 'faceswap', status: 'done', source: 'user' })
-    expect(ok.calls.find((c) => c.url.endsWith(PIKZELS_API.thumbnailFaceSwap))!.body).toEqual({ image_base64: Buffer.from('PNG').toString('base64'), face_image_base64: Buffer.from('FACE').toString('base64') })
+    expect(ok.calls.find((c) => c.url.endsWith(PIKZELS_API.thumbnailFaceSwap))!.body).toEqual({ image_base64: du('PNG'), face_image_base64: du('FACE') })
 
     const changed = fakeFetch({ routes: { [PIKZELS_API.thumbnailFaceSwap]: () => ({ status: 404, json: { error: { code: 'not_found', message: 'Not found' } } }) } })
     const before = store.project.thumbnails.spend?.total
@@ -349,7 +351,7 @@ describe('Pikzels', () => {
     const base = addDoneThumb()
     const res = await createPikzelsService(makeCtx(), { fetch: fn, sleep: async () => {} }).score(base, 'My video')
     expect(res).toMatchObject({ main: 8.2, subscores: { clarity: 9, emotion: 7 }, suggestion: 'Bigger text', title: 'My video', requestId: 'req_score' })
-    expect(calls.find((c) => c.url.endsWith(PIKZELS_API.thumbnailScore))!.body).toEqual({ image_base64: Buffer.from('PNG').toString('base64'), title: 'My video' })
+    expect(calls.find((c) => c.url.endsWith(PIKZELS_API.thumbnailScore))!.body).toEqual({ image_base64: du('PNG'), title: 'My video' })
     expect(store.project.thumbnails.items.find((t) => t.id === base)!.score).toMatchObject({ main: 8.2, suggestion: 'Bigger text' })
     expect(store.project.thumbnails.spend).toEqual({ total: 0.03, byAction: { score: 0.03 } })
   })
@@ -362,7 +364,7 @@ describe('Pikzels', () => {
     expect(out).toEqual(['Title A', 'Title B'])
     const body = calls.find((c) => c.url.endsWith(PIKZELS_API.titleFromText))!.body
     expect(body.prompt).toBe('Thumbs') // no transcript yet: the project name
-    expect(body.support_image_base64).toBe(Buffer.from('PNG').toString('base64'))
+    expect(body.support_image_base64).toBe(du('PNG'))
     expect(store.project.publish.titles).toEqual(['Title A', 'Title B', 'Old title'])
     expect(store.project.thumbnails.spend?.byAction).toEqual({ title: 0.08 })
   })
@@ -461,7 +463,7 @@ describe('Thumbnail base picture', () => {
     await createPikzelsService(ctx, { fetch: fn, sleep: async () => {} }).generate({ prompts: ['Me with the drift car', 'Close-up'], source: 'user' })
     const posts = calls.filter((c) => c.url.endsWith(PIKZELS_API.thumbnailFromText))
     expect(posts).toHaveLength(2)
-    for (const p of posts) expect(p.body.support_image_base64).toBe(readFileSync(firstPath).toString('base64'))
+    for (const p of posts) expect(p.body.support_image_base64).toBe(asDataUrl(readFileSync(firstPath).toString('base64')))
 
     // A new grab replaces the old picture; clearing removes it, and prompts go without one.
     const second = await grabBase(ctx, store, 9, 'user')
@@ -499,7 +501,7 @@ describe('Your own picture as the base', () => {
 
     const { fn, calls } = fakeFetch()
     await createPikzelsService(ctx, { fetch: fn, sleep: async () => {} }).generate({ prompts: ['On the template'], source: 'user' })
-    expect(calls.find((c) => c.url.endsWith(PIKZELS_API.thumbnailFromText))!.body.support_image_base64).toBe(readFileSync(join(store.dir, b.file)).toString('base64'))
+    expect(calls.find((c) => c.url.endsWith(PIKZELS_API.thumbnailFromText))!.body.support_image_base64).toBe(asDataUrl(readFileSync(join(store.dir, b.file)).toString('base64')))
 
     // The project still loads with an uploaded base, and older bases without `image` stay valid.
     expect(ProjectSchema.parse(JSON.parse(JSON.stringify(store.project))).thumbnails.base?.image).toBe('blank template.png')
@@ -523,14 +525,14 @@ describe('Pikzels rejecting the base picture', () => {
   const invalid = { status: 400, json: { error: { code: 'VALIDATION_ERROR', message: 'The request is invalid', details: [{ field: 'support_image_base64', message: 'must be a data URI' }] } } }
   const ok = { status: 200, json: { output: 'https://cdn.example.com/ok.png', request_id: 'req_ok' } }
 
-  it('tries the picture as a data URI, then without it, and says so', async () => {
+  it('sends the picture as a data URL, then bare, then without it, and says so', async () => {
     const ctx = makeCtx()
     await grabBase(ctx, store, 2, 'user')
     const bodies: any[] = []
     const { fn } = fakeFetch({ routes: { [PIKZELS_API.thumbnailFromText]: (b) => (bodies.push(b), bodies.length < 2 ? invalid : ok) } })
     await createPikzelsService(ctx, { fetch: fn, sleep: async () => {} }).generate({ prompts: ['Me and the car'], source: 'user' })
-    expect(bodies[0].support_image_base64.startsWith('/9j/')).toBe(true)
-    expect(bodies[1].support_image_base64.startsWith('data:image/jpeg;base64,/9j/')).toBe(true)
+    expect(bodies[0].support_image_base64.startsWith('data:image/jpeg;base64,/9j/')).toBe(true)
+    expect(bodies[1].support_image_base64.startsWith('/9j/')).toBe(true)
     const t = store.project.thumbnails.items.at(-1)!
     expect(t.status).toBe('done')
     expect(t.warning ?? '').not.toMatch(/did not accept/)
@@ -541,6 +543,20 @@ describe('Pikzels rejecting the base picture', () => {
     expect(bodies).toHaveLength(3)
     expect(bodies[2].support_image_base64).toBeUndefined()
     expect(store.project.thumbnails.items.at(-1)).toMatchObject({ status: 'done', warning: expect.stringMatching(/did not accept the base picture/) })
+  })
+
+  it('sends an edit with its picture and painted mask as data URLs (Pikzels rejects bare base64 there)', async () => {
+    const dataUrlsOnly = (b: any) =>
+      String(b.image_base64).startsWith('data:image/') && String(b.mask_base64).startsWith('data:image/png;base64,')
+        ? ok
+        : { status: 400, json: { error: { code: 'VALIDATION_ERROR', message: 'The request is invalid.', details: [{ field: 'image_base64', message: 'Provide a valid image base64 data URL' }] } } }
+    const base = { id: addDoneThumb() }
+    const { fn, calls } = fakeFetch({ routes: { [PIKZELS_API.thumbnailEdit]: dataUrlsOnly } })
+    const t = await createPikzelsService(makeCtx(), { fetch: fn, sleep: async () => {} }).edit({ thumbnailId: base.id, prompt: 'Remove the mess on the side of the table', maskBase64: 'data:image/png;base64,TUFTSw==', source: 'user' })
+    expect(t).toMatchObject({ kind: 'edit', status: 'done' })
+    expect(calls.filter((c) => c.url.endsWith(PIKZELS_API.thumbnailEdit))).toHaveLength(1)
+    expect(asDataUrl('/9j/abc')).toBe('data:image/jpeg;base64,/9j/abc')
+    expect(asDataUrl('data:image/webp;base64,x')).toBe('data:image/webp;base64,x')
   })
 
   it("shows Pikzels' own words about the field it rejected", async () => {

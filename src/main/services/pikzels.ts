@@ -179,6 +179,34 @@ const b64 = (path: string) => readFileSync(path).toString('base64')
 const IMAGE_TYPES: Record<string, string> = { '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.png': 'image/png', '.webp': 'image/webp' }
 const dataUri = (path: string) => `data:${IMAGE_TYPES[extname(path).toLowerCase()] ?? 'image/jpeg'};base64,${b64(path)}`
 
+/** Bare base64 picture data as a data URL, its type read from the first bytes. */
+export function asDataUrl(value: string): string {
+  if (value.startsWith('data:')) return value
+  const type = value.startsWith('/9j/') ? 'image/jpeg' : value.startsWith('UklGR') ? 'image/webp' : value.startsWith('R0lGOD') ? 'image/gif' : 'image/png'
+  return `data:${type};base64,${value}`
+}
+
+/**
+ * The request with every picture field (…_base64, …_base64s) as a data URL, which is what Pikzels asks for
+ * ("Provide a valid image base64 data URL"). Other fields are unchanged.
+ */
+export function withDataUrls(body: Record<string, unknown>): Record<string, unknown> {
+  return Object.fromEntries(
+    Object.entries(body).map(([k, v]) => [
+      k,
+      /_base64$/.test(k) && typeof v === 'string' ? asDataUrl(v) : /_base64s$/.test(k) && Array.isArray(v) ? v.map((x) => (typeof x === 'string' ? asDataUrl(x) : x)) : v
+    ])
+  )
+}
+
+/** The same request with picture fields as bare base64 (the other form some Pikzels versions take). */
+function withBareBase64(body: Record<string, unknown>): Record<string, unknown> {
+  const bare = (x: unknown) => (typeof x === 'string' ? x.replace(/^data:image\/[\w+.-]+;base64,/, '') : x)
+  return Object.fromEntries(
+    Object.entries(body).map(([k, v]) => [k, /_base64$/.test(k) ? bare(v) : /_base64s$/.test(k) && Array.isArray(v) ? v.map(bare) : v])
+  )
+}
+
 /** A thumbnail picked from YouTube is saved as <videoId>__<size>.jpg; its public link is rebuilt from that name. */
 export function youtubeThumbnailUrl(path: string): string | null {
   const m = /^([A-Za-z0-9_-]{11})__(maxresdefault|sddefault|hqdefault)\.jpg$/.exec(basename(path))
@@ -384,13 +412,20 @@ export function createPikzelsService(ctx: AppContext, deps: PikzelsDeps = {}): P
     const logData = { action: job.action, ...job.logData }
     try {
       let data: Record<string, any> | undefined
-      for (const attempt of [{ body: job.body, label: 'as written', warning: undefined as string | undefined }, ...(job.fallbacks ?? [])]) {
+      // Pictures go as data URLs; if Pikzels rejects that, the same request with bare base64, then the job's own fallbacks.
+      const hasPictures = Object.keys(job.body).some((k) => /_base64s?$/.test(k))
+      const attempts = [
+        { body: withDataUrls(job.body), label: 'as written', warning: undefined as string | undefined },
+        ...(hasPictures ? [{ body: withBareBase64(job.body), label: 'pictures as bare base64', warning: undefined as string | undefined }] : []),
+        ...(job.fallbacks ?? []).map((f) => ({ ...f, body: withDataUrls(f.body) }))
+      ]
+      for (const attempt of attempts) {
         try {
           data = await call('POST', job.path, attempt.body, 'thumbnail')
           if (attempt.warning) updateThumb(store, record.id, { warning: [thumbOf(store, record.id).warning, attempt.warning].filter(Boolean).join(' ') })
           break
         } catch (err) {
-          const last = attempt === (job.fallbacks ?? []).at(-1) || !job.fallbacks?.length
+          const last = attempt === attempts.at(-1)
           if (!(err instanceof PikzelsError) || (err.status !== 400 && err.status !== 422) || last) throw err
           store.log.write('thumbnail', `Pikzels rejected the request (${attempt.label}); trying another way`, { ...logData, pikzelsAnswer: err.details ?? null, errorCode: err.code ?? null })
         }
@@ -536,10 +571,9 @@ export function createPikzelsService(ctx: AppContext, deps: PikzelsDeps = {}): P
         if (persona) body[r.persona] = persona
         if (style) body[r.style] = style
         if (supportImage) body[r.supportImage] = supportImage
-        // Not every Pikzels version takes a bare picture: then a data URI, then without the picture (the thumbnail still gets made).
+        // If Pikzels takes the picture in neither form, the thumbnail is still made, from the description only.
         const fallbacks = supportImage
           ? [
-              { label: 'picture as a data URI', body: { ...body, [r.supportImage]: `data:${supportImage.startsWith('/9j/') ? 'image/jpeg' : 'image/png'};base64,${supportImage}` } },
               {
                 label: 'without the picture',
                 body: Object.fromEntries(Object.entries(body).filter(([k]) => k !== r.supportImage)),
@@ -615,7 +649,7 @@ export function createPikzelsService(ctx: AppContext, deps: PikzelsDeps = {}): P
     const prompt = stripLinks(original)
     const image = sourceImage(store, o)
     const body: Record<string, unknown> = { [r.prompt]: prompt, [r.imageBase64]: b64(image), [r.format]: store.project.thumbnails.format }
-    if (o.maskBase64) body[r.maskBase64] = o.maskBase64.replace(/^data:image\/\w+;base64,/, '')
+    if (o.maskBase64) body[r.maskBase64] = o.maskBase64
     if (o.supportImagePath) {
       if (!existsSync(o.supportImagePath)) throw new Error(`Image not found: ${o.supportImagePath}`)
       body[r.supportImage] = b64(o.supportImagePath)
@@ -658,6 +692,17 @@ export function createPikzelsService(ctx: AppContext, deps: PikzelsDeps = {}): P
 
   // ---------------------------------------------------------------- score and titles
 
+  /** A POST with pictures: as data URLs, and once more as bare base64 if Pikzels rejects that as invalid. */
+  async function callWithPictures(path: string, body: Record<string, unknown>): Promise<Record<string, any>> {
+    try {
+      return await call('POST', path, withDataUrls(body))
+    } catch (err) {
+      const pictures = Object.keys(body).some((k) => /_base64s?$/.test(k))
+      if (!pictures || !(err instanceof PikzelsError) || (err.status !== 400 && err.status !== 422)) throw err
+      return call('POST', path, withBareBase64(body))
+    }
+  }
+
   async function score(thumbnailId: string, title?: string): Promise<ThumbnailScore> {
     const store = openStore()
     const image = sourceImage(store, { thumbnailId })
@@ -668,7 +713,7 @@ export function createPikzelsService(ctx: AppContext, deps: PikzelsDeps = {}): P
     const logData = { action: 'score', thumbnailId, title: cleanTitle || null }
     let data: Record<string, any>
     try {
-      data = await call('POST', PIKZELS_API.thumbnailScore, body)
+      data = await callWithPictures(PIKZELS_API.thumbnailScore, body)
     } catch (err) {
       const e = err as PikzelsError
       store.log.write('thumbnail', `Score failed: ${e.message}`, { ...logData, requestId: e.requestId ?? null, errorCode: e.code ?? null, costUsd: 0 })
@@ -711,7 +756,7 @@ export function createPikzelsService(ctx: AppContext, deps: PikzelsDeps = {}): P
     const logData = { action: 'title', prompt, thumbnailId: o.thumbnailId ?? null, fromTranscript: !own, source: o.source }
     let data: Record<string, any>
     try {
-      data = await call('POST', PIKZELS_API.titleFromText, body)
+      data = await callWithPictures(PIKZELS_API.titleFromText, body)
     } catch (err) {
       const e = err as PikzelsError
       store.log.write('thumbnail', `Titles failed: ${e.message}`, { ...logData, requestId: e.requestId ?? null, errorCode: e.code ?? null, costUsd: 0 })

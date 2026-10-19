@@ -37,10 +37,12 @@ export function safeFileName(name: string): string {
 }
 
 /** exports/<project>_<whole|mm-ss_to_mm-ss>_<YYYY-MM-DD_HH-mm>.mp4 */
-export function exportFileName(projectName: string, range: Range | undefined, when = new Date()): string {
+/** e.g. "Drift car_whole_2160p_2026-10-20_14-05.mp4"; a quick check says so, so it is never mistaken for the real export. */
+export function exportFileName(projectName: string, range: Range | undefined, when = new Date(), size?: { height: number; quick?: boolean }): string {
   const part = range ? `${mmss(range.start)}_to_${mmss(range.end)}` : 'whole'
   const stamp = `${when.getFullYear()}-${pad(when.getMonth() + 1)}-${pad(when.getDate())}_${pad(when.getHours())}-${pad(when.getMinutes())}`
-  return `${safeFileName(projectName)}_${part}_${stamp}.mp4`
+  const label = size ? `_${size.quick ? `QUICK-CHECK-${size.height}p` : `${size.height}p`}` : ''
+  return `${safeFileName(projectName)}_${part}${label}_${stamp}.mp4`
 }
 
 function uniquePath(dir: string, file: string): string {
@@ -91,7 +93,7 @@ export function createRenderJobs(ctx: AppContext): RenderJobs {
 
     const outDir = opts.outDir || ctx.settings.get().defaultExportsFolder || store.paths.exports
     mkdirSync(outDir, { recursive: true })
-    const out = uniquePath(outDir, exportFileName(doc.project.name, range))
+    const out = uniquePath(outDir, exportFileName(doc.project.name, range, new Date(), { height: preset.height, quick: opts.quick }))
     const planFile = ctx.engine.writePlan(plan, join(store.paths.cache, 'plans'), `export-${id}`)
 
     try {
@@ -153,7 +155,7 @@ export function createRenderJobs(ctx: AppContext): RenderJobs {
             store.log.write('error', 'Could not mark the project exported', { error: (err as Error).message })
           }
         }
-        emit({ ...current!.state, status: 'done', percent: 100, out: file, message: `Saved ${file}` })
+        emit({ ...current!.state, status: 'done', percent: 100, out: file, message: `Saved ${preset.width}x${preset.height}${opts.quick ? ' (quick check, not for upload)' : ''}: ${file}` })
       } catch (err) {
         rmSync(out, { force: true })
         if (srt) rmSync(srtFile, { force: true })

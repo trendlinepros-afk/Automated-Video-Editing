@@ -68,3 +68,12 @@ describe('Finish And Export files', () => {
     expect(existsSync(r.files[0])).toBe(true)
   })
 })
+
+describe('export file names', () => {
+  it('say the size, and mark a quick check so it is not uploaded by mistake', async () => {
+    const { exportFileName } = await import('../src/main/engine/renders')
+    const when = new Date(2026, 9, 20, 14, 5)
+    expect(exportFileName('Drift car', undefined, when, { height: 2160 })).toBe('Drift car_whole_2160p_2026-10-20_14-05.mp4')
+    expect(exportFileName('Drift', undefined, when, { height: 540, quick: true })).toBe('Drift_whole_QUICK-CHECK-540p_2026-10-20_14-05.mp4')
+  })
+})

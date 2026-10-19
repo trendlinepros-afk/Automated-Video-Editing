@@ -164,7 +164,7 @@ describe.skipIf(!available)('preview with the real engine', () => {
     const info = probe(job.out!)
     expect(info.duration).toBeGreaterThan(3.8)
     expect(info.duration).toBeLessThan(4.3)
-    expect(job.out).toMatch(/Tiny test_whole_\d{4}-\d{2}-\d{2}_\d{2}-\d{2}\.mp4$/)
+    expect(job.out).toMatch(/Tiny test_whole_QUICK-CHECK-540p_\d{4}-\d{2}-\d{2}_\d{2}-\d{2}\.mp4$/)
   })
 
   it('checks the finished picture and sound before export, on the preview', async () => {

@@ -3,6 +3,10 @@
 Each release's section becomes its GitHub release text and the notes shown in the app's update dialog.
 A release is blocked until the section for its version has notes.
 
+## 1.12.3
+
+- Export file names now say the size, e.g. "Rlaarlo XDX_whole_2160p_2026-10-20_14-05.mp4", and a quick check is named "…_QUICK-CHECK-540p_…" so it is never uploaded by mistake. The finished message in the top bar shows the size too.
+
 ## 1.12.2
 
 - **Thumbnail Edit, Recreate and Face swap work again.** Pikzels now only takes pictures as data URLs and rejected these with "Provide a valid image base64 data URL" (VALIDATION_ERROR). Every picture the app sends (the thumbnail, the painted mask, support images, faces, frames, scoring and title pictures) now goes as a data URL, with the old form tried once if a Pikzels version wants that instead.

@@ -6,6 +6,7 @@
  * URL hash options: #editor opens the sample project straight away, #setup shows first-launch setup.
  */
 import type { VideoTheme, VideoThemeProgress } from '@shared/videoTheme'
+import type { OpusClipItem, OpusPostRecord, OpusRun, OpusState } from '@shared/opusclip'
 import type {
   Api,
   LibraryAsset,
@@ -254,6 +255,49 @@ export function installMockApi(): void {
   let runner: RunnerState = { status: 'running', connected: true, queue: 1, lastActivity: 'Checking the cut at 3:41 in 5 ms steps' }
   let preview: PreviewState = { status: 'unavailable', version: 1, chunksTotal: 0, chunksDone: 0, chunksPending: 0, message: 'Browser review mode: no render engine' }
 
+  const mockKeys = { pikzels: true, elevenlabs: true, opusclip: !location.search.includes('nokey') }
+  const clip = (n: number, title: string, score: number, secs: number): OpusClipItem => ({
+    id: `Q20107035eDq.CU0b92e${n}`,
+    curationId: `CU0b92e${n}`,
+    title,
+    durationSeconds: secs,
+    score,
+    hashtags: '#rc #drift #rccar',
+    extra: { genre: 'Automotive', hookScore: 8 + n / 10 }
+  })
+  let opusState: OpusState = {
+    hasKey: true,
+    runs: location.search.includes('noruns')
+      ? []
+      : [
+          {
+            id: 'opus_demo1',
+            projectId: 'Q20107035eDq',
+            title: 'Rlaarlo XDX review',
+            createdAt: now(),
+            updatedAt: now(),
+            sourceFile: 'C:/Projects/Rlaarlo XDX/Export/Rlaarlo XDX_whole_2160p_2026-10-20_14-05.mp4',
+            options: { sourcePath: '', model: 'ClipAnything', layoutAspectRatio: 'portrait' },
+            phase: 'complete',
+            stage: 'COMPLETE',
+            percent: 100,
+            message: '4 clips ready',
+            visibility: 'DEFAULT',
+            clips: [
+              clip(1, 'This $65 drift car has a REAL gyro', 92, 38),
+              clip(2, 'The price reveal nobody expected', 88, 27),
+              clip(3, 'Gold wheels, big wing, tiny car', 81, 44),
+              clip(4, 'Does the gyro actually work? Watch this', 76, 59)
+            ]
+          }
+        ],
+    posts: []
+  }
+  const opusEmitter = emitter<OpusState>()
+  const setOpus = (s: OpusState) => {
+    opusState = s
+    opusEmitter.emit(s)
+  }
   const ev = {
     update: emitter<UpdateState>(),
     change: emitter<ProjectChangeEvent>(),
@@ -439,6 +483,8 @@ export function installMockApi(): void {
       hasPikzelsKey: async () => true,
       setElevenLabsKey: async () => undefined,
       hasElevenLabsKey: async () => true,
+      apiKeys: async () => ({ ...mockKeys }),
+      setApiKey: async (name, key) => void (mockKeys[name] = !!key),
       openAppLog: async () => undefined,
       claudeSetup: async () => ({ command: 'claude mcp add --transport http ave http://127.0.0.1:47821/mcp', json: '{\n  "mcpServers": { "ave": { "type": "http", "url": "http://127.0.0.1:47821/mcp" } }\n}', url: 'http://127.0.0.1:47821/mcp' })
     },
@@ -802,6 +848,57 @@ export function installMockApi(): void {
         priceOverrides = o ?? {}
         return mockPricing()
       }
+    },
+    opusclip: {
+      state: async () => ({ ...opusState, hasKey: mockKeys.opusclip }),
+      onState: opusEmitter.on,
+      check: async () => ({ ok: true, message: 'Connected to OpusClip (3 brand templates).' }),
+      defaultSource: async () => ({ path: 'C:/Projects/Rlaarlo XDX/Export/Rlaarlo XDX_whole_2160p_2026-10-20_14-05.mp4', sizeBytes: 6.2e9, modified: now() }),
+      start: async (options) => {
+        const run: OpusRun = { id: `opus_${Date.now()}`, title: options.title || 'Rlaarlo XDX', createdAt: now(), updatedAt: now(), sourceFile: options.sourcePath, options, phase: 'uploading', percent: 12, message: 'Uploading to OpusClip… 12% (0.74 of 6.20 GB)', clips: [] }
+        setOpus({ ...opusState, runs: [run, ...opusState.runs] })
+        return run
+      },
+      refresh: async (id) => opusState.runs.find((r) => r.id === id)!,
+      cancel: async () => undefined,
+      removeRun: async (id) => setOpus({ ...opusState, runs: opusState.runs.filter((r) => r.id !== id) }),
+      download: async () => 'C:/Projects/Rlaarlo XDX/Export/Shorts/clip.mp4',
+      share: async (id, visibility) => {
+        setOpus({ ...opusState, runs: opusState.runs.map((r) => (r.id === id ? { ...r, visibility } : r)) })
+        return opusState.runs.find((r) => r.id === id)!
+      },
+      censor: async (id, clipId, beep) => {
+        setOpus({ ...opusState, runs: opusState.runs.map((r) => (r.id === id ? { ...r, clips: r.clips.map((c) => (c.id === clipId ? { ...c, censor: { status: beep ? 'Swear words bleeped' : 'Swear words muted', beep } } : c)) } : r)) })
+        return opusState.runs.find((r) => r.id === id)!
+      },
+      brandTemplates: async () => [
+        { id: 'preset-fancy-Karaoke', name: 'Karaoke' },
+        { id: 'tpl_wicked', name: 'Wicked RC' },
+        { id: 'preset-basic', name: 'Basic' }
+      ],
+      socialAccounts: async () => [
+        { postAccountId: 'yt_1', platform: 'YOUTUBE', name: 'Wicked RC' },
+        { postAccountId: 'tt_1', platform: 'TIKTOK', name: '@wickedrc' },
+        { postAccountId: 'ig_1', subAccountId: 'ig_biz', platform: 'INSTAGRAM', name: 'wicked.rc' }
+      ],
+      socialCopy: async () => {
+        await sleep(800)
+        return { title: 'This $65 drift car has a REAL gyro 🤯', description: 'Tiny Rlaarlo XDX, gold wheels, big wing, and a gyro that actually holds the drift.', hashtags: '#rc #drift #rccar #shorts' }
+      },
+      post: async (req) => {
+        const run = opusState.runs.find((r) => r.id === req.runId)!
+        const c = run.clips.find((x) => x.id === req.clipId)!
+        const rec: OpusPostRecord = { kind: req.publishAt ? 'scheduled' : 'posted', ...(req.publishAt ? { scheduleId: `sch_${Date.now()}`, publishAt: req.publishAt } : { postId: `post_${Date.now()}` }), runId: run.id, clipId: c.id, clipTitle: c.title, account: req.postAccountId, platform: 'YOUTUBE', title: req.title, createdAt: now() }
+        setOpus({ ...opusState, posts: [rec, ...opusState.posts] })
+        return rec
+      },
+      cancelSchedule: async (id) => setOpus({ ...opusState, posts: opusState.posts.map((p) => (p.scheduleId === id ? { ...p, cancelled: true } : p)) }),
+      collections: async () => [{ id: 'col_1', name: 'Best of RC' }],
+      createCollection: async (name) => ({ id: `col_${Date.now()}`, name }),
+      deleteCollection: async () => undefined,
+      addToCollection: async () => undefined,
+      removeFromCollection: async () => undefined,
+      exportCollection: async () => ({ files: [], dir: 'C:/Projects/Rlaarlo XDX/Export/Shorts/Collections' })
     },
     youtube: {
       status: async () => ({ ...yt }),

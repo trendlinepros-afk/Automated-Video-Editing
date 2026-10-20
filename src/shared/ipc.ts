@@ -3,6 +3,10 @@
  * The preload script exposes `window.api` with exactly this shape.
  */
 import type { VideoTheme, VideoThemeProgress } from './videoTheme'
+/** Service keys managed in Settings > API keys. */
+export type ApiKeyName = 'pikzels' | 'elevenlabs' | 'opusclip'
+
+import type { OpusAccount, OpusClipOptions, OpusCollection, OpusPostRecord, OpusPostRequest, OpusRun, OpusSocialCopy, OpusSourceInfo, OpusState, OpusTemplate } from './opusclip'
 import type { ExportCheckResult } from './exportCheck'
 import type { ChannelRetention, YouTubeStatus } from './retention'
 import type {
@@ -367,6 +371,10 @@ export interface Api {
     hasPikzelsKey(): Promise<boolean>
     setElevenLabsKey(key: string | null): Promise<void>
     hasElevenLabsKey(): Promise<boolean>
+    /** Which service keys are saved (never the keys themselves). */
+    apiKeys(): Promise<Record<ApiKeyName, boolean>>
+    /** Save (or with null, remove) a service key. It is encrypted on this PC and never shown again. */
+    setApiKey(name: ApiKeyName, key: string | null): Promise<void>
     openAppLog(): Promise<void>
     claudeSetup(): Promise<{ command: string; json: string; url: string }>
   }
@@ -548,6 +556,32 @@ export interface Api {
     pricing(): Promise<PikzelsPricing>
     /** Save price overrides (null = reset to the published prices). */
     setPrices(overrides: Record<string, number> | null): Promise<PikzelsPricing>
+  }
+  /** Shorts made by OpusClip from the finished video, posted or scheduled to the accounts connected in OpusClip. */
+  opusclip: {
+    state(): Promise<OpusState>
+    onState(cb: (s: OpusState) => void): () => void
+    check(): Promise<{ ok: boolean; message: string }>
+    /** The newest whole-video export of this project (null: none yet). */
+    defaultSource(): Promise<OpusSourceInfo | null>
+    start(options: OpusClipOptions): Promise<OpusRun>
+    refresh(runId: string): Promise<OpusRun>
+    cancel(runId: string): Promise<void>
+    removeRun(runId: string): Promise<void>
+    download(runId: string, clipId: string): Promise<string>
+    share(runId: string, visibility: 'DEFAULT' | 'PUBLIC'): Promise<OpusRun>
+    censor(runId: string, clipId: string, beep: boolean): Promise<OpusRun>
+    brandTemplates(): Promise<OpusTemplate[]>
+    socialAccounts(): Promise<OpusAccount[]>
+    socialCopy(o: { runId: string; clipId: string; postAccountId: string; subAccountId?: string; prompt?: string; forceRegenerate?: boolean }): Promise<OpusSocialCopy>
+    post(req: OpusPostRequest): Promise<OpusPostRecord>
+    cancelSchedule(scheduleId: string): Promise<void>
+    collections(): Promise<OpusCollection[]>
+    createCollection(name: string): Promise<OpusCollection>
+    deleteCollection(id: string): Promise<void>
+    addToCollection(collectionId: string, clipId: string): Promise<void>
+    removeFromCollection(collectionId: string, clipId: string): Promise<void>
+    exportCollection(id: string): Promise<{ files: string[]; dir: string }>
   }
   /** The owner's own YouTube channel, read-only: Google sign-in and audience retention insights. */
   youtube: {

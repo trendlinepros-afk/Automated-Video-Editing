@@ -55,7 +55,7 @@ export function PersonasScreen() {
           {!hasKey && (
             <div className="banner" style={{ borderRadius: 6 }}>
               Add your Pikzels API key in Settings to create personas and styles.
-              <button className="btn small" onClick={() => openSettings('general')}>
+              <button className="btn small" onClick={() => openSettings('keys')}>
                 Open Settings
               </button>
             </div>

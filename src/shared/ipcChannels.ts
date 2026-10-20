@@ -6,7 +6,7 @@ export const API_METHODS = [
   'app.saveFile', 'app.copyText',
   'updates.state', 'updates.check', 'updates.restartNow', 'updates.later',
   'setup.status', 'setup.installEnvironment',
-  'settings.get', 'settings.update', 'settings.setPikzelsKey', 'settings.hasPikzelsKey', 'settings.setElevenLabsKey', 'settings.hasElevenLabsKey', 'settings.openAppLog',
+  'settings.get', 'settings.update', 'settings.setPikzelsKey', 'settings.hasPikzelsKey', 'settings.setElevenLabsKey', 'settings.hasElevenLabsKey', 'settings.apiKeys', 'settings.setApiKey', 'settings.openAppLog',
   'settings.claudeSetup',
   'profiles.list', 'profiles.save', 'profiles.create', 'profiles.delete', 'profiles.suggestions', 'profiles.answerSuggestion',
   'music.list', 'music.rescan', 'music.addFolder', 'music.removeFolder',
@@ -29,6 +29,10 @@ export const API_METHODS = [
   'pikzels.rename', 'pikzels.pricing', 'pikzels.setPrices', 'pikzels.thumbnailsFromLink',
   'shorts.state', 'shorts.exportShort', 'shorts.exportAll', 'shorts.remove', 'shorts.refresh',
   'themes.list', 'themes.analyze', 'themes.cancel', 'themes.update', 'themes.remove', 'themes.sheets',
+  'opusclip.state', 'opusclip.check', 'opusclip.defaultSource', 'opusclip.start', 'opusclip.refresh', 'opusclip.cancel', 'opusclip.removeRun',
+  'opusclip.download', 'opusclip.share', 'opusclip.censor', 'opusclip.brandTemplates', 'opusclip.socialAccounts', 'opusclip.socialCopy',
+  'opusclip.post', 'opusclip.cancelSchedule', 'opusclip.collections', 'opusclip.createCollection', 'opusclip.deleteCollection',
+  'opusclip.addToCollection', 'opusclip.removeFromCollection', 'opusclip.exportCollection',
   'youtube.status', 'youtube.setClient', 'youtube.connect', 'youtube.disconnect', 'youtube.insights'
 ] as const
 
@@ -48,5 +52,6 @@ export const API_EVENTS = {
   'themes.onProgress': 'themes:progress',
   'project.onCheckProgress': 'exportcheck:progress',
   'shorts.onState': 'shorts:state',
-  'voice.onApproval': 'voice:approval'
+  'voice.onApproval': 'voice:approval',
+  'opusclip.onState': 'opusclip:state'
 } as const

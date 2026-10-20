@@ -15,6 +15,7 @@ import { WorkspaceTabs } from '../workspaces/WorkspaceTabs'
 import { InstructionsWorkspace } from '../workspaces/InstructionsWorkspace'
 import { ThumbnailsWorkspace } from '../workspaces/ThumbnailsWorkspace'
 import { PublishWorkspace } from '../workspaces/PublishWorkspace'
+import { ShortsWorkspace } from '../workspaces/ShortsWorkspace'
 import { IMAGE_EXTS, VIDEO_EXTS, AUDIO_EXTS, basename, clamp } from '../util'
 
 function stored(key: string, fallback: number): number {
@@ -88,6 +89,8 @@ export function EditorScreen() {
         <InstructionsWorkspace />
       ) : workspace === 'thumbnails' ? (
         <ThumbnailsWorkspace />
+      ) : workspace === 'shorts' ? (
+        <ShortsWorkspace />
       ) : (
         <PublishWorkspace />
       )}

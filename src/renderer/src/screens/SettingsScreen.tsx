@@ -1,6 +1,6 @@
 /** Settings: keys, folders, music folders, Claude connection, profiles, suggested rules, About. */
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import type { MusicTrack, RunnerState, Suggestion, VoiceStatus } from '@shared/ipc'
+import type { ApiKeyName, MusicTrack, RunnerState, Suggestion, VoiceStatus } from '@shared/ipc'
 import { CORRECTION_KINDS, SettingsSchema } from '@shared/settings'
 import { app, call, profileById, refreshProfiles, refreshSettings, toast, updateSettings, type SettingsSection } from '../state/app'
 import { useStore } from '../state/store'
@@ -19,6 +19,7 @@ import { PriceEditor } from '../panels/ThumbnailsPanelCosts'
 
 const SECTIONS: [SettingsSection, string][] = [
   ['general', 'General'],
+  ['keys', 'API keys'],
   ['music', 'Music folders'],
   ['claude', 'Claude connection'],
   ['models', 'Claude models'],
@@ -53,6 +54,8 @@ export function SettingsScreen() {
                 <Spinner label="Loading settings…" />
               ) : section === 'general' ? (
                 <General />
+              ) : section === 'keys' ? (
+                <ApiKeys />
               ) : section === 'music' ? (
                 <Music />
               ) : section === 'claude' ? (
@@ -103,59 +106,16 @@ function FolderRow({ label, value, hint, onPick, onClear }: { label: string; val
 
 function General() {
   const settings = useStore(app, (s) => s.settings)!
-  const [hasKey, setHasKey] = useState<boolean | null>(null)
-  const [key, setKey] = useState('')
-  const [editingKey, setEditingKey] = useState(false)
-  useEffect(() => {
-    void call(() => window.api.settings.hasPikzelsKey()).then((k) => setHasKey(!!k))
-  }, [])
   const pick = async (field: 'defaultProjectsFolder' | 'defaultExportsFolder' | 'libraryFolder', title: string) => {
     const dir = await call(() => window.api.app.pickFolder(title, settings[field] || undefined))
     if (dir) await updateSettings({ [field]: dir })
-  }
-  const saveKey = async () => {
-    await call(() => window.api.settings.setPikzelsKey(key.trim()))
-    setKey('')
-    setEditingKey(false)
-    setHasKey(true)
-    toast('Pikzels key saved with Windows credential protection.')
   }
   return (
     <>
       <h1 style={{ marginBottom: 8 }}>General</h1>
       <div className="section col">
-        <h3>Pikzels API key</h3>
-        <span className="hint">Used for thumbnails only. Stored with Windows credential protection, never in project files or logs.</span>
-        {hasKey === null ? null : hasKey && !editingKey ? (
-          <div className="row">
-            <code className="grow">••••••••••••••••</code>
-            <button className="btn" onClick={() => setEditingKey(true)}>
-              Replace
-            </button>
-            <button
-              className="btn ghost danger"
-              onClick={async () => {
-                await call(() => window.api.settings.setPikzelsKey(null))
-                setHasKey(false)
-                toast('Pikzels key removed.')
-              }}
-            >
-              Clear
-            </button>
-          </div>
-        ) : (
-          <div className="row">
-            <input type="password" className="grow" placeholder="Paste your Pikzels API key" value={key} onChange={(e) => setKey(e.target.value)} autoComplete="off" />
-            <button className="btn primary" disabled={!key.trim()} onClick={saveKey}>
-              Save key
-            </button>
-            {editingKey && (
-              <button className="btn ghost" onClick={() => setEditingKey(false)}>
-                Cancel
-              </button>
-            )}
-          </div>
-        )}
+        <h3>Pikzels thumbnails</h3>
+        <span className="hint">The Pikzels key is in API keys.</span>
       </div>
       <PriceEditor />
       <ElevenLabs />
@@ -202,12 +162,109 @@ function General() {
   )
 }
 
-/** ElevenLabs: the key, the owner's voice (by name) and the model every voiceover uses. */
+/** Service keys: pasted once, encrypted with Windows credential protection in the user data folder (kept through app
+ * updates), and never shown again; only whether one is saved. */
+const KEYS: { name: ApiKeyName; title: string; hint: string }[] = [
+  { name: 'opusclip', title: 'OpusClip', hint: 'Shorts tab: clips, posting and scheduling. From app.opus.pro → Settings → Integration tokens (needs a plan with API access).' },
+  { name: 'pikzels', title: 'Pikzels', hint: 'Thumbnails. From your Pikzels account → API.' },
+  { name: 'elevenlabs', title: 'ElevenLabs', hint: 'Voiceovers in your voice. From elevenlabs.io → Profile → API keys.' }
+]
+
+function ApiKeys() {
+  const [saved, setSaved] = useState<Record<ApiKeyName, boolean> | null>(null)
+  const load = () => void call(() => window.api.settings.apiKeys()).then((k) => k && setSaved(k))
+  useEffect(load, [])
+  return (
+    <>
+      <h1 style={{ marginBottom: 8 }}>API keys</h1>
+      <span className="hint">
+        Keys are encrypted with Windows credential protection for your Windows account and kept in the app's data folder, so updates never remove them.
+        Once saved, a key is never shown again, here or anywhere else; you can only replace or remove it. They never go into project files or logs.
+      </span>
+      {saved && KEYS.map((k) => <KeyBox key={k.name} {...k} saved={saved[k.name]} onChange={load} />)}
+    </>
+  )
+}
+
+function KeyBox({ name, title, hint, saved, onChange }: { name: ApiKeyName; title: string; hint: string; saved: boolean; onChange: () => void }) {
+  const [key, setKey] = useState('')
+  const [editing, setEditing] = useState(false)
+  const [status, setStatus] = useState<string | null>(null)
+  const save = async () => {
+    const value = key.trim()
+    setKey('')
+    if (!value) return
+    const ok = await call(() => window.api.settings.setApiKey(name, value).then(() => true), `Could not save the ${title} key`)
+    if (!ok) return
+    setEditing(false)
+    onChange()
+    toast(`${title} key saved. It is encrypted on this PC and will not be shown again.`)
+    if (name === 'opusclip') {
+      setStatus('Checking…')
+      const r = await call(() => window.api.opusclip.check())
+      setStatus(r ? r.message : null)
+    }
+  }
+  return (
+    <div className="section col">
+      <h3>{title}</h3>
+      <span className="hint">{hint}</span>
+      {saved && !editing ? (
+        <div className="row">
+          <code className="grow">Saved · ••••••••••••••••</code>
+          <button className="btn" onClick={() => setEditing(true)}>
+            Replace
+          </button>
+          <button
+            className="btn ghost danger"
+            onClick={async () => {
+              if (!confirm(`Remove the ${title} key from this PC?`)) return
+              await call(() => window.api.settings.setApiKey(name, null))
+              setStatus(null)
+              onChange()
+              toast(`${title} key removed.`)
+            }}
+          >
+            Remove
+          </button>
+        </div>
+      ) : (
+        <div className="row">
+          <input
+            type="password"
+            className="grow"
+            placeholder={`Paste your ${title} API key`}
+            value={key}
+            onChange={(e) => setKey(e.target.value)}
+            onKeyDown={(e) => e.key === 'Enter' && void save()}
+            autoComplete="off"
+            spellCheck={false}
+          />
+          <button className="btn primary" disabled={!key.trim()} onClick={() => void save()}>
+            Save key
+          </button>
+          {editing && (
+            <button
+              className="btn ghost"
+              onClick={() => {
+                setKey('')
+                setEditing(false)
+              }}
+            >
+              Cancel
+            </button>
+          )}
+        </div>
+      )}
+      {status && <span className="small muted">{status}</span>}
+    </div>
+  )
+}
+
+/** ElevenLabs: the owner's voice (by name) and the model every voiceover uses (the key is in API keys). */
 function ElevenLabs() {
   const voice = useStore(app, (s) => s.settings!.voice)
   const [hasKey, setHasKey] = useState<boolean | null>(null)
-  const [key, setKey] = useState('')
-  const [editingKey, setEditingKey] = useState(false)
   const [name, setName] = useState(voice.voiceName)
   const [status, setStatus] = useState<VoiceStatus | null>(null)
   const [checking, setChecking] = useState(false)
@@ -224,14 +281,6 @@ function ElevenLabs() {
       if (k) void check()
     })
   }, [check])
-  const saveKey = async () => {
-    await call(() => window.api.settings.setElevenLabsKey(key.trim()))
-    setKey('')
-    setEditingKey(false)
-    setHasKey(true)
-    toast('ElevenLabs key saved with Windows credential protection.')
-    void check()
-  }
   // A new name clears the remembered id so the voice is looked up again.
   const saveName = async () => {
     const n = name.trim()
@@ -255,38 +304,10 @@ function ElevenLabs() {
   return (
     <div className="section col">
       <h3>ElevenLabs voiceovers</h3>
-      <span className="hint">From elevenlabs.io → Profile → API keys. Stored encrypted on this PC.</span>
-      {hasKey === null ? null : hasKey && !editingKey ? (
-        <div className="row">
-          <code className="grow">••••••••••••••••</code>
-          <button className="btn" onClick={() => setEditingKey(true)}>
-            Replace
-          </button>
-          <button
-            className="btn ghost danger"
-            onClick={async () => {
-              await call(() => window.api.settings.setElevenLabsKey(null))
-              setHasKey(false)
-              setStatus(null)
-              toast('ElevenLabs key removed.')
-            }}
-          >
-            Clear
-          </button>
-        </div>
-      ) : (
-        <div className="row">
-          <input type="password" className="grow" placeholder="Paste your ElevenLabs API key" value={key} onChange={(e) => setKey(e.target.value)} autoComplete="off" />
-          <button className="btn primary" disabled={!key.trim()} onClick={saveKey}>
-            Save key
-          </button>
-          {editingKey && (
-            <button className="btn ghost" onClick={() => setEditingKey(false)}>
-              Cancel
-            </button>
-          )}
-        </div>
-      )}
+      <span className="hint">
+        {hasKey === false ? 'Paste your ElevenLabs key in ' : 'The ElevenLabs key is in '}
+        <a onClick={() => app.set({ settingsSection: 'keys' })}>API keys</a>.
+      </span>
       <div className="field-row">
         <label className="label">Voice</label>
         <input

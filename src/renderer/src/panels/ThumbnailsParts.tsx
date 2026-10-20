@@ -182,7 +182,7 @@ export function PikzelsKeyBanner({ c }: { c: Thumbs }) {
   return (
     <div className="banner" style={{ borderRadius: 6 }}>
       Add your Pikzels API key to make thumbnails.
-      <button className="btn small" onClick={() => openSettings('general')}>
+      <button className="btn small" onClick={() => openSettings('keys')}>
         Settings
       </button>
     </div>

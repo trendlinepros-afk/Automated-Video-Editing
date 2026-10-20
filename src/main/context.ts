@@ -57,6 +57,7 @@ import type { RenderPlan } from '@shared/plan'
 import type { ActivityLog } from './log'
 import type { ProjectStore } from './project/store'
 import type { VoiceService } from './services/elevenlabs'
+import type { OpusClipService } from './services/opusclip'
 
 export interface SettingsService {
   get(): Settings
@@ -74,8 +75,8 @@ export interface ProfileService {
 
 export interface SecretsService {
   /** Encrypted with Windows credential protection (Electron safeStorage). Never logged. */
-  get(name: 'pikzels' | 'elevenlabs' | 'mcpToken' | 'githubToken' | 'googleClientSecret' | 'googleRefreshToken'): string | null
-  set(name: 'pikzels' | 'elevenlabs' | 'mcpToken' | 'githubToken' | 'googleClientSecret' | 'googleRefreshToken', value: string | null): void
+  get(name: 'pikzels' | 'elevenlabs' | 'opusclip' | 'mcpToken' | 'githubToken' | 'googleClientSecret' | 'googleRefreshToken'): string | null
+  set(name: 'pikzels' | 'elevenlabs' | 'opusclip' | 'mcpToken' | 'githubToken' | 'googleClientSecret' | 'googleRefreshToken', value: string | null): void
 }
 
 export interface RecentService {
@@ -309,6 +310,8 @@ export interface AppContext {
   footage: FootageIndexService
   pikzels: PikzelsService
   voice: VoiceService
+  /** services/opusclip.ts: shorts made and posted by OpusClip. */
+  opusclip: OpusClipService
   youtube: YouTubeAnalyticsService
   updater: UpdaterService
   /** Send an event to the window (no-op when no window is open). */

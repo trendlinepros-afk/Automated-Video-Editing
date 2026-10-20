@@ -22,6 +22,7 @@ export type LogCategory =
   | 'app'
   | 'library'
   | 'version'
+  | 'shorts'
 
 export interface LogEntry {
   ts: string

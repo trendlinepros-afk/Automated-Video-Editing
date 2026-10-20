@@ -10,6 +10,7 @@ import { API_METHODS, type ApiMethod } from '@shared/ipcChannels'
 import type { EditThumbnailRequest, FaceSwapRequest, LibraryAsset, ProjectSnapshot, PublishDraft, PublishPart, RecreateRequest, ThumbnailRequest, TitlesRequest, UserOp, VoiceoverRequest } from '@shared/ipc'
 import type { ExportPreset, Item, Range, RequestKind, TrackKind } from '@shared/project'
 import type { Profile, Settings } from '@shared/settings'
+import type { OpusClipOptions, OpusPostRequest } from '@shared/opusclip'
 import { TimelineResolver, findTimeRange, formatTime, placeSegments } from '@shared/timeline'
 import type { AppContext } from './context'
 import { paths } from './paths'
@@ -152,6 +153,16 @@ export function registerIpc(ctx: AppContext, getWindow: () => BrowserWindow | nu
       if (v?.voiceId) ctx.settings.update({ voice: { ...v, voiceId: '' } })
     },
     'settings.hasElevenLabsKey': () => !!ctx.secrets.get('elevenlabs'),
+    'settings.apiKeys': () => ({ pikzels: !!ctx.secrets.get('pikzels'), elevenlabs: !!ctx.secrets.get('elevenlabs'), opusclip: !!ctx.secrets.get('opusclip') }),
+    'settings.setApiKey': (name: string, key: string | null) => {
+      if (name !== 'pikzels' && name !== 'elevenlabs' && name !== 'opusclip') throw new Error('Unknown key')
+      ctx.secrets.set(name, key)
+      if (name === 'elevenlabs') {
+        // A new key may belong to another account: find the voice by name again.
+        const v = ctx.settings.get().voice
+        if (v?.voiceId) ctx.settings.update({ voice: { ...v, voiceId: '' } })
+      }
+    },
     'voice.check': () => ctx.voice.check(),
     'voice.generate': (req: VoiceoverRequest) => ctx.voice.generate({ ...req, source: 'user' }),
     'voice.sample': (text?: string) => ctx.voice.sample(text),
@@ -585,6 +596,27 @@ export function registerIpc(ctx: AppContext, getWindow: () => BrowserWindow | nu
     'pikzels.setPrices': (overrides: Record<string, number> | null) => ctx.pikzels.setPrices(overrides),
 
     // ---------------------------------------------------------------- youtube (the owner's channel, read-only)
+    'opusclip.state': () => ctx.opusclip.state(),
+    'opusclip.check': () => ctx.opusclip.check(),
+    'opusclip.defaultSource': () => ctx.opusclip.defaultSource(),
+    'opusclip.start': (o: OpusClipOptions) => ctx.opusclip.start(o),
+    'opusclip.refresh': (id: string) => ctx.opusclip.refresh(id),
+    'opusclip.cancel': (id: string) => ctx.opusclip.cancel(id),
+    'opusclip.removeRun': (id: string) => ctx.opusclip.removeRun(id),
+    'opusclip.download': (runId: string, clipId: string) => ctx.opusclip.download(runId, clipId),
+    'opusclip.share': (runId: string, v: 'DEFAULT' | 'PUBLIC') => ctx.opusclip.share(runId, v === 'PUBLIC' ? 'PUBLIC' : 'DEFAULT'),
+    'opusclip.censor': (runId: string, clipId: string, beep: boolean) => ctx.opusclip.censor(runId, clipId, !!beep),
+    'opusclip.brandTemplates': () => ctx.opusclip.brandTemplates(),
+    'opusclip.socialAccounts': () => ctx.opusclip.socialAccounts(),
+    'opusclip.socialCopy': (o: Parameters<AppContext['opusclip']['socialCopy']>[0]) => ctx.opusclip.socialCopy(o),
+    'opusclip.post': (req: OpusPostRequest) => ctx.opusclip.post(req),
+    'opusclip.cancelSchedule': (id: string) => ctx.opusclip.cancelSchedule(id),
+    'opusclip.collections': () => ctx.opusclip.collections(),
+    'opusclip.createCollection': (name: string) => ctx.opusclip.createCollection(name),
+    'opusclip.deleteCollection': (id: string) => ctx.opusclip.deleteCollection(id),
+    'opusclip.addToCollection': (c: string, clip: string) => ctx.opusclip.addToCollection(c, clip),
+    'opusclip.removeFromCollection': (c: string, clip: string) => ctx.opusclip.removeFromCollection(c, clip),
+    'opusclip.exportCollection': (id: string) => ctx.opusclip.exportCollection(id),
     'youtube.status': () => ctx.youtube.status(),
     'youtube.setClient': (clientId: string, clientSecret?: string | null) => ctx.youtube.setClient(String(clientId ?? ''), clientSecret),
     'youtube.connect': () => ctx.youtube.connect(),

@@ -3,6 +3,17 @@
 Each release's section becomes its GitHub release text and the notes shown in the app's update dialog.
 A release is blocked until the section for its version has notes.
 
+## 1.13.0
+
+- **Shorts tab (step 5) with OpusClip.** After the edit is finished, send the video to OpusClip and manage everything its API offers from the editor:
+  - **Clipping options:** ClipAnything or ClipBasic, what to look for, topic keywords, clip length, vertical/square/landscape, language, brand template, genre, only part of the video, remove filler words, upload only, email or webhook when ready.
+  - **Clips:** with preview, score and length; download (into Export\Shorts), bleep or mute swear words.
+  - **Posting:** titles, descriptions and hashtags written by OpusClip for each platform, then post now or schedule to the accounts connected in OpusClip (YouTube visibility included), and cancel a scheduled post.
+  - **Collections** (make, add or remove clips, download all, delete) and sharing the OpusClip project.
+
+  The tab can be opened at any time; making clips needs a finished edit. Videos over OpusClip's 10 GB limit go up as a copy at the same resolution, so the vertical crops stay sharp.
+- **Settings > API keys**: one place for the OpusClip, Pikzels and ElevenLabs keys. A key is encrypted with Windows credential protection, kept in the app's data folder (updates never remove it), and never shown again after you paste it: only "Saved", with Replace and Remove.
+
 ## 1.12.3
 
 - Export file names now say the size, e.g. "Rlaarlo XDX_whole_2160p_2026-10-20_14-05.mp4", and a quick check is named "…_QUICK-CHECK-540p_…" so it is never uploaded by mistake. The finished message in the top bar shows the size too.

@@ -8,7 +8,7 @@ import { chapterLines } from '@shared/captions'
 import type { PublishPart } from '@shared/ipc'
 import type { Project } from '@shared/project'
 import { toast } from '../state/app'
-import { applyOp, editor } from '../state/editor'
+import { applyOp, editor, setWorkspace } from '../state/editor'
 import { createStore, useStore } from '../state/store'
 import { CopyButton, Spinner } from '../components/bits'
 import { Icon } from '../components/Icon'
@@ -95,6 +95,9 @@ export function PublishWorkspace() {
       <FlowFooter hint={pub.titles[0] ? <>Title in use: <b className="pub-using">{pub.titles[0]}</b></> : 'Pick the title you want to use, check the description and tags, then finish.'}>
         <button className="btn primary pub-finish" onClick={finishAndExport} title="Export the video with this title, description and tags">
           <Icon name="export" size={14} /> Finish And Export
+        </button>
+        <button className="btn" onClick={() => setWorkspace('shorts')} title="Make shorts from the finished video with OpusClip">
+          Next: Shorts →
         </button>
       </FlowFooter>
     </div>

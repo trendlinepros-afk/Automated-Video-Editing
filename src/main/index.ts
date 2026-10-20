@@ -30,6 +30,7 @@ import { createFootageIndexService } from './services/footageIndex'
 import { createMusicService } from './services/music'
 import { createPikzelsService } from './services/pikzels'
 import { createVoiceService } from './services/elevenlabs'
+import { createOpusClipService } from './services/opusclip'
 import { createYouTubeAnalyticsService } from './services/youtubeAnalytics'
 import {
   createProfileService,
@@ -136,6 +137,7 @@ function buildContext(log: ActivityLog): AppContext {
   c.footage = createFootageIndexService(c)
   c.pikzels = createPikzelsService(c)
   c.voice = createVoiceService(c)
+  c.opusclip = createOpusClipService(c)
   c.youtube = createYouTubeAnalyticsService(c, { openExternal: (url) => shell.openExternal(url) })
   c.updater = createUpdaterService(c)
   return c

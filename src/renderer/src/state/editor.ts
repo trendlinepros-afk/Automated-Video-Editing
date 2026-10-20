@@ -9,13 +9,14 @@ import { createStore } from './store'
 import { call, toast } from './app'
 
 export type SideTab = 'chat' | 'inspector' | 'transcript' | 'thumbnails' | 'publish' | 'shorts' | 'versions' | 'notes'
-/** The editor's pages, in the order of the flow: instructions, the edit, thumbnails, then title, description and tags. */
-export type Workspace = 'instructions' | 'edit' | 'thumbnails' | 'publish'
+/** The editor's pages, in the order of the flow: instructions, the edit, thumbnails, title/description/tags, then shorts. */
+export type Workspace = 'instructions' | 'edit' | 'thumbnails' | 'publish' | 'shorts'
 export const WORKSPACES: [Workspace, string][] = [
   ['instructions', 'Instructions'],
   ['edit', 'Editing'],
   ['thumbnails', 'Thumbnails'],
-  ['publish', 'Title, desc, tags']
+  ['publish', 'Title, desc, tags'],
+  ['shorts', 'Shorts']
 ]
 
 export interface OutputLine {
